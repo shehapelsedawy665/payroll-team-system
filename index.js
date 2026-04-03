@@ -1,13 +1,15 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(__dirname));
 
-// 🔴 مهم: الاتصال بقاعدة البيانات مرة واحدة
+// ================= DB =================
 let isConnected = false;
 
 async function connectDB() {
@@ -18,6 +20,7 @@ async function connectDB() {
     isConnected = true;
 }
 
+// ================= MODEL =================
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", new mongoose.Schema({
     employee_name: String,
     nationalId: String,
@@ -31,6 +34,11 @@ const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", new mongoos
 }));
 
 const R = (n) => Math.round(n * 100) / 100;
+
+// ================= ROOT =================
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "index.html"));
+});
 
 // ================= HISTORY =================
 app.get("/history/:id", async (req, res) => {
@@ -87,7 +95,6 @@ app.post("/calculate", async (req, res) => {
 
     const taxDueToDate = R(annualTaxTotal / 360 * totalDays);
     let monthlyTax = R(taxDueToDate - d.prevTaxes);
-
     if (monthlyTax < 0) monthlyTax = 0;
 
     const martyrs = R(gross * 0.0005);
@@ -107,5 +114,4 @@ app.post("/calculate", async (req, res) => {
     res.json({ gross, insurance, tax: monthlyTax, martyrs, net });
 });
 
-// 🔴 أهم سطر في Vercel
 module.exports = app;
