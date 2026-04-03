@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payroll System | Payroll Team</title>
+    <style>
+        :root { --primary: #1a73e8; --success: #27ae60; --dark: #2c3e50; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h1 { color: var(--dark); margin: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: #fdfdfd; border: 1px solid #eee; padding: 20px; border-radius: 10px; }
+        .card h3 { color: var(--primary); margin-top: 0; border-right: 4px solid var(--primary); padding-right: 10px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; color: #555; }
+        input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 15px; background: var(--success); color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn:hover { background: #219150; }
+        .results { margin-top: 30px; display: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; background: var(--dark); color: white; padding: 20px; border-radius: 10px; text-align: center; }
+        .res-item span { display: block; font-size: 22px; color: #f1c40f; font-weight: bold; margin-top: 5px; }
+        #status { font-size: 12px; margin-top: -10px; margin-bottom: 10px; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>نظام إدارة الرواتب المتكامل 📊</h1>
+        <p>Managed by Payroll Team</p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>البيانات الأساسية</h3>
+            <label>الرقم القومي (14 رقم)</label>
+            <input type="text" id="nid" placeholder="أدخل الرقم القومي" onblur="checkHistory()">
+            <div id="status"></div>
+            <label>اسم الموظف</label>
+            <input type="text" id="name" placeholder="الاسم يظهر تلقائياً">
+            <label>شهر الراتب</label>
+            <input type="month" id="month">
+        </div>
+
+        <div class="card">
+            <h3>الاستحقاقات (التعاقدية)</h3>
+            <label>الراتب الأساسي (Basic)</label>
+            <input type="number" id="basic" value="10000">
+            <label>بدل انتقال / بدلات أخرى</label>
+            <input type="number" id="trans" value="0">
+            <label>عمولات / متغير</label>
+            <input type="number" id="comm" value="0">
+        </div>
+
+        <div class="card">
+            <h3>أيام العمل والتاريخ</h3>
+            <label>عدد أيام العمل الفعلي</label>
+            <input type="number" id="days" value="30" max="30">
+            <label>أيام سابقة (تراكمي)</label>
+            <input type="number" id="pDays" value="0" readonly style="background: #eee;">
+            <label>وعاء ضريبي سابق</label>
+            <input type="number" id="pTaxable" value="0" readonly style="background: #eee;">
+            <input type="hidden" id="pTaxes" value="0">
+        </div>
+    </div>
+
+    <button class="btn" onclick="processPayroll()">حساب واعتماد الراتب 💾</button>
+
+    <div class="results" id="resBox">
+        <div class="res-item">Gross Salary<span id="outG">0</span></div>
+        <div class="res-item">Insurance<span id="outI">0</span></div>
+        <div class="res-item">Income Tax<span id="outT">0</span></div>
+        <div class="res-item">Martyrs Fund<span id="outM">0</span></div>
+        <div class="res-item">NET SALARY<span id="outN">0</span></div>
+    </div>
+</div>
+
+<script>
+    // حط لينك السيرفر بتاعك هنا بعد ما ترفعه أونلاين
+    const API_BASE = "http://localhost:3000"; 
+
+    async function checkHistory() {
+        const id = document.getElementById('nid').value;
+        if(id.length < 14) return;
+        
+        document.getElementById('status').innerText = "⏳ جاري فحص التاريخ التراكمي...";
+        try {
+            const res = await fetch(`${API_BASE}/history/${id}`);
+            const data = await res.json();
+            if(data.found) {
+                document.getElementById('name').value = data.name;
+                document.getElementById('pDays').value = data.prevDays;
+                document.getElementById('pTaxable').value = data.prevTaxable;
+                document.getElementById('pTaxes').value = data.prevTaxes;
+                document.getElementById('status').innerText = "✅ تم تحميل البيانات التراكمية بنجاح.";
+            } else {
+                document.getElementById('status').innerText = "🆕 موظف جديد (لا يوجد تاريخ سابق).";
+            }
+        } catch(e) {
+            document.getElementById('status').innerText = "❌ فشل الاتصال بالسيرفر.";
+        }
+    }
+
+    async function processPayroll() {
+        const payload = {
+            nationalId: document.getElementById('nid').value,
+            name: document.getElementById('name').value,
+            month: document.getElementById('month').value,
+            basic: Number(document.getElementById('basic').value),
+            transport: Number(document.getElementById('trans').value),
+            special: 0,
+            comm: Number(document.getElementById('comm').value),
+            days: Number(document.getElementById('days').value),
+            prevDays: Number(document.getElementById('pDays').value),
+            prevTaxable: Number(document.getElementById('pTaxable').value),
+            prevTaxes: Number(document.getElementById('pTaxes').value),
+            taxCode: 1
+        };
+
+        try {
+            const res = await fetch(`${API_BASE}/calculate`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const r = await res.json();
+
+            document.getElementById('resBox').style.display = 'grid';
+            document.getElementById('outG').innerText = r.gross.toLocaleString();
+            document.getElementById('outI').innerText = r.insurance.toLocaleString();
+            document.getElementById('outT').innerText = r.tax.toLocaleString();
+            document.getElementById('outM').innerText = r.martyrs.toLocaleString();
+            document.getElementById('outN').innerText = r.net.toLocaleString();
+            
+            alert("تم اعتماد وحفظ الراتب بنجاح!");
+        } catch(e) {
+            alert("خطأ في الحساب، تأكد من تشغيل السيرفر.");
+        }
+    }
+</script>
+
+</body>
+</html>
