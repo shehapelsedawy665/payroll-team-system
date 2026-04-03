@@ -19,7 +19,7 @@
         .btn:hover { background: #219150; }
         .results { margin-top: 30px; display: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; background: var(--dark); color: white; padding: 20px; border-radius: 10px; text-align: center; }
         .res-item span { display: block; font-size: 22px; color: #f1c40f; font-weight: bold; margin-top: 5px; }
-        #status { font-size: 12px; margin-top: -10px; margin-bottom: 10px; color: var(--primary); }
+        #status { font-size: 12px; margin-top: -10px; margin-bottom: 10px; color: var(--primary); height: 15px; }
     </style>
 </head>
 <body>
@@ -76,8 +76,8 @@
 </div>
 
 <script>
-    // حط لينك السيرفر بتاعك هنا بعد ما ترفعه أونلاين
-    const API_BASE = "http://localhost:3000"; 
+    // تم تحديث الرابط للينك الـ Vercel الخاص بك يا شهاب
+    const API_BASE = "https://payroll-team-system.vercel.app"; 
 
     async function checkHistory() {
         const id = document.getElementById('nid').value;
@@ -98,6 +98,7 @@
             }
         } catch(e) {
             document.getElementById('status').innerText = "❌ فشل الاتصال بالسيرفر.";
+            console.error(e);
         }
     }
 
@@ -123,6 +124,9 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
+            
+            if (!res.ok) throw new Error('Server Error');
+            
             const r = await res.json();
 
             document.getElementById('resBox').style.display = 'grid';
@@ -132,9 +136,10 @@
             document.getElementById('outM').innerText = r.martyrs.toLocaleString();
             document.getElementById('outN').innerText = r.net.toLocaleString();
             
-            alert("تم اعتماد وحفظ الراتب بنجاح!");
+            alert("تم اعتماد وحفظ الراتب بنجاح لـ Payroll Team!");
         } catch(e) {
-            alert("خطأ في الحساب، تأكد من تشغيل السيرفر.");
+            alert("خطأ في الاتصال بالسيرفر. تأكد أن Vercel يعمل وأن MongoDB تسمح بالدخول.");
+            console.error(e);
         }
     }
 </script>
