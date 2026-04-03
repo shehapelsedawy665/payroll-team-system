@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>Payroll System | Payroll Team</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; direction: rtl; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; font-size: 18px; }
+        .res { margin-top: 20px; padding: 15px; background: #eee; display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>نظام رواتب Payroll Team</h2>
+    <input type="text" id="nid" placeholder="الرقم القومي" onblur="check()">
+    <input type="text" id="name" placeholder="اسم الموظف">
+    <input type="month" id="month">
+    <input type="number" id="basic" placeholder="الراتب الأساسي">
+    <input type="number" id="trans" placeholder="بدلات">
+    <input type="number" id="comm" placeholder="عمولات">
+    <input type="number" id="days" value="30" placeholder="أيام العمل">
+    
+    <input type="hidden" id="pDays" value="0">
+    <input type="hidden" id="pTaxable" value="0">
+    <input type="hidden" id="pTaxes" value="0">
+
+    <button onclick="calc()">حساب وحفظ</button>
+
+    <div id="resBox" class="res">
+        <p>المرتب الإجمالي: <span id="outG"></span></p>
+        <p>صافي المرتب: <span id="outN"></span></p>
+    </div>
+</div>
+
+<script>
+    const API = ""; // سيبه فاضي طالما الملفات في نفس المشروع
+
+    async function check() {
+        const id = document.getElementById('nid').value;
+        if(id.length < 14) return;
+        const res = await fetch(`/history/${id}`);
+        const data = await res.json();
+        if(data.found) {
+            document.getElementById('name').value = data.name;
+            document.getElementById('pDays').value = data.prevDays;
+            document.getElementById('pTaxable').value = data.prevTaxable;
+            document.getElementById('pTaxes').value = data.prevTaxes;
+        }
+    }
+
+    async function calc() {
+        const data = {
+            nationalId: document.getElementById('nid').value,
+            name: document.getElementById('name').value,
+            month: document.getElementById('month').value,
+            basic: Number(document.getElementById('basic').value),
+            transport: Number(document.getElementById('trans').value),
+            comm: Number(document.getElementById('comm').value),
+            days: Number(document.getElementById('days').value),
+            prevDays: Number(document.getElementById('pDays').value),
+            prevTaxable: Number(document.getElementById('pTaxable').value),
+            prevTaxes: Number(document.getElementById('pTaxes').value)
+        };
+        const res = await fetch(`/calculate`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const r = await res.json();
+        document.getElementById('resBox').style.display = 'block';
+        document.getElementById('outG').innerText = r.gross;
+        document.getElementById('outN').innerText = r.net;
+        alert("تم الحفظ بنجاح!");
+    }
+</script>
+</body>
+</html>
