@@ -9,9 +9,7 @@ app.use(express.json());
 // 1. الربط بقاعدة البيانات
 const mongoURI = "mongodb://Sedawy:Shehapelsedawy%2366@ac-uso95cd-shard-00-00.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-01.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-02.a6bquen.mongodb.net:27017/payrollDB?ssl=true&replicaSet=atlas-129j51-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Egyptian-Payroll";
 
-mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log("✅ MongoDB Connected"))
-    .catch(err => console.error("❌ MongoDB Error:", err));
+mongoose.connect(mongoURI).then(() => console.log("✅ DB Connected"));
 
 const Payroll = mongoose.model("Payroll", new mongoose.Schema({
     employee_name: String, nationalId: String, month: String,
@@ -21,8 +19,8 @@ const Payroll = mongoose.model("Payroll", new mongoose.Schema({
 
 const R = (n) => Math.round(n * 100) / 100;
 
-// 2. الـ API Routes
-app.get("/history/:id", async (req, res) => {
+// 2. الـ API الحسابات
+app.get("/api/history/:id", async (req, res) => {
     try {
         const history = await Payroll.find({ nationalId: req.params.id });
         let prevDays = 0, prevTaxable = 0, prevTaxes = 0;
@@ -32,10 +30,10 @@ app.get("/history/:id", async (req, res) => {
             prevTaxes += (r.monthlyTax || 0); 
         });
         res.json({ found: history.length > 0, prevDays, prevTaxable, prevTaxes, name: history.length > 0 ? history[0].employee_name : "" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { res.status(500).json(err); }
 });
 
-app.post("/calculate", async (req, res) => {
+app.post("/api/calculate", async (req, res) => {
     try {
         const d = req.body;
         const actualBasic = R((d.basic / 30) * d.days);
@@ -59,76 +57,100 @@ app.post("/calculate", async (req, res) => {
         const martyrs = R(gross * 0.0005);
         const net = R(gross - insurance - monthlyTax - martyrs);
 
-        const newEntry = new Payroll({ 
+        await new Payroll({ 
             employee_name: d.name, nationalId: d.nationalId, month: d.month, 
-            gross, taxableIncome: currentTaxable, monthlyTax, days: d.days, 
-            insurance, martyrs, net 
-        });
-        await newEntry.save();
+            gross, taxableIncome: currentTaxable, monthlyTax, days: d.days, insurance, martyrs, net 
+        }).save();
 
         res.json({ gross, insurance, tax: monthlyTax, martyrs, net });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { res.status(500).json(err); }
 });
 
-// 3. الواجهة (HTML)
+// 3. الواجهة الشيك (نفس ستراكشر صورة 51)
 app.get("/", (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Payroll System</title>
+    <title>Payroll System | Payroll Team</title>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; text-align: center; }
-        .box { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-top: 20px; }
-        input { width: 90%; padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 5px; text-align: center; }
-        button { width: 100%; padding: 15px; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; margin-top: 20px; }
-        .res { margin-top: 25px; display: grid; grid-template-columns: repeat(5, 1fr); background: #2c3e50; color: white; padding: 15px; border-radius: 10px; }
-        .res div span { display: block; color: #f1c40f; font-weight: bold; font-size: 20px; }
+        :root { --primary: #1a73e8; --success: #27ae60; --dark: #2c3e50; --warning: #f1c40f; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1050px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: var(--dark); margin-bottom: 30px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 20px; }
+        .card { border: 1px solid #e1e4e8; padding: 20px; border-radius: 12px; background: #fff; }
+        .card h3 { color: var(--primary); margin-top: 0; border-right: 4px solid var(--primary); padding-right: 10px; margin-bottom: 20px; text-align: right; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #555; text-align: right; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; text-align: center; font-size: 16px; }
+        .btn { width: 100%; padding: 18px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn:hover { background: #219150; }
+        .results { margin-top: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background: var(--dark); color: white; padding: 25px; border-radius: 12px; text-align: center; }
+        .res-item span { display: block; font-size: 24px; color: var(--warning); font-weight: bold; margin-top: 8px; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h1>Payroll Team System</h1>
+    <div class="container">
+        <h1>📊 نظام إدارة الرواتب المتكامل</h1>
         <div class="grid">
-            <div><input type="text" id="nid" placeholder="الرقم القومي" onblur="check()"></div>
-            <div><input type="text" id="name" placeholder="الاسم"></div>
-            <div><input type="month" id="month"></div>
-            <div><input type="number" id="basic" value="10000"></div>
-            <div><input type="number" id="trans" value="0" placeholder="بدلات"></div>
-            <div><input type="number" id="comm" value="0" placeholder="عمولات"></div>
-            <div><input type="number" id="days" value="30"></div>
-            <div><input type="number" id="pDays" value="0" readonly></div>
-            <div><input type="number" id="pTaxable" value="0" readonly><input type="hidden" id="pTaxes" value="0"></div>
+            <div class="card">
+                <h3>| البيانات الأساسية</h3>
+                <label>الرقم القومي</label>
+                <input type="text" id="nid" onblur="check()">
+                <label>اسم الموظف</label>
+                <input type="text" id="name">
+                <label>الشهر</label>
+                <input type="month" id="month">
+            </div>
+            <div class="card">
+                <h3>| الماليات</h3>
+                <label>الأساسي</label>
+                <input type="number" id="basic" value="10000">
+                <label>بدلات</label>
+                <input type="number" id="trans" value="0">
+                <label>عمولات</label>
+                <input type="number" id="comm" value="0">
+            </div>
+            <div class="card">
+                <h3>| العمل والتراكمي</h3>
+                <label>أيام العمل</label>
+                <input type="number" id="days" value="30">
+                <label>أيام سابقة</label>
+                <input type="number" id="pDays" value="0" readonly>
+                <label>وعاء ضريبي سابق</label>
+                <input type="number" id="pTaxable" value="0" readonly>
+                <input type="hidden" id="pTaxes" value="0">
+            </div>
         </div>
-        <button onclick="doCalc()">حساب وحفظ</button>
-        <div class="res">
-            <div>Gross<span id="rG">0</span></div>
-            <div>Ins<span id="rI">0</span></div>
-            <div>Tax<span id="rT">0</span></div>
-            <div>Martyr<span id="rM">0</span></div>
-            <div>NET<span id="rN">0</span></div>
+
+        <button class="btn" onclick="calc()">💾 اعتماد وحفظ الراتب</button>
+
+        <div class="results">
+            <div class="res-item">Gross<span id="outG">0</span></div>
+            <div class="res-item">Insurance<span id="outI">0</span></div>
+            <div class="res-item">Tax<span id="outT">0</span></div>
+            <div class="res-item">Martyrs<span id="outM">0</span></div>
+            <div class="res-item">NET SALARY<span id="outN">0</span></div>
         </div>
     </div>
+
     <script>
         async function check() {
             const id = document.getElementById('nid').value;
             if(id.length < 14) return;
-            try {
-                const res = await fetch('/history/' + id);
-                const data = await res.json();
-                if(data.found) {
-                    document.getElementById('name').value = data.name;
-                    document.getElementById('pDays').value = data.prevDays;
-                    document.getElementById('pTaxable').value = data.prevTaxable;
-                    document.getElementById('pTaxes').value = data.prevTaxes;
-                }
-            } catch(e) { console.error("Check Error:", e); }
+            const res = await fetch('/api/history/' + id);
+            const data = await res.json();
+            if(data.found) {
+                document.getElementById('name').value = data.name;
+                document.getElementById('pDays').value = data.prevDays;
+                document.getElementById('pTaxable').value = data.prevTaxable;
+                document.getElementById('pTaxes').value = data.prevTaxes;
+            }
         }
 
-        async function doCalc() {
-            const bodyData = {
+        async function calc() {
+            const data = {
                 nationalId: document.getElementById('nid').value,
                 name: document.getElementById('name').value,
                 month: document.getElementById('month').value,
@@ -142,24 +164,21 @@ app.get("/", (req, res) => {
             };
 
             try {
-                const res = await fetch('/calculate', {
+                const res = await fetch('/api/calculate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(bodyData)
+                    body: JSON.stringify(data)
                 });
-                
-                if(!res.ok) throw new Error("السيرفر رجع خطأ");
-                
                 const r = await res.json();
-                document.getElementById('rG').innerText = r.gross;
-                document.getElementById('rI').innerText = r.insurance;
-                document.getElementById('rT').innerText = r.tax;
-                document.getElementById('rM').innerText = r.martyrs;
-                document.getElementById('rN').innerText = r.net;
-                alert("تم الحساب والحفظ!");
+                
+                document.getElementById('outG').innerText = r.gross.toLocaleString();
+                document.getElementById('outI').innerText = r.insurance.toLocaleString();
+                document.getElementById('outT').innerText = r.tax.toLocaleString();
+                document.getElementById('outM').innerText = r.martyrs.toLocaleString();
+                document.getElementById('outN').innerText = r.net.toLocaleString();
+                alert("✅ تم الحساب والحفظ!");
             } catch(e) {
-                alert("مشكلة في الحساب: " + e.message);
-                console.error(e);
+                alert("❌ حدث خطأ في الحساب");
             }
         }
     </script>
