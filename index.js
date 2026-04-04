@@ -14,7 +14,7 @@ const connectDB = async () => {
     try {
         await mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 10000 });
         isConnected = true;
-    } catch (err) { console.log("DB Connection Success"); }
+    } catch (err) { console.log("DB Connection Error"); }
 };
 
 const Payroll = mongoose.model("Payroll", new mongoose.Schema({
@@ -26,6 +26,7 @@ const Payroll = mongoose.model("Payroll", new mongoose.Schema({
 
 const R = (n) => Math.round(n * 100) / 100;
 
+// دالة حساب الضرائب (G2N) بنفس منطق الإكسيل الدقيق
 function calculateG2N(d) {
     const basicFull = Number(d.basic) || 0;
     const days = Number(d.days) || 30;
@@ -39,25 +40,20 @@ function calculateG2N(d) {
 
     const actualBasic = R((basicFull / 30) * days);
     const actualGross = actualBasic + trans + comm;
-    
-    // 1. حساب التأمينات والشهداء
     const insurance = R(insSalary * 0.11);
     const martyrs = R(actualGross * 0.0005);
     
-    // 2. الوعاء الضريبي للفترة (Gross - Insurance)
     const currentTaxable = actualGross - insurance;
     const totalDays = days + prevDays;
     const totalTaxable = currentTaxable + prevTaxable;
     
-    // 3. تحويل الوعاء لسنوي وتطبيق الـ Floor (معادلة الإكسيل)
+    // معادلة الإكسيل السنوية
     const annualTaxable = Math.floor((totalTaxable / totalDays * 360) / 10) * 10;
     
-    // 4. خصم الإعفاء الشخصي (20,000 ج)
-    let temp = Math.max(0, annualTaxable - 20000);
     let annualTax = 0;
+    let temp = Math.max(0, annualTaxable - 20000); // إعفاء شخصي
 
-    // 5. منطق "تدرج الدخل" (Income Tiers) لعام 2024/2025
-    // الرقم اللي بيحدد "الفئة" هو الوعاء السنوي بعد خصم التأمينات
+    // منطق الشرائح لعام 2024/2025
     if (annualTaxable <= 600000) {
         if (temp > 40000) { let x = Math.min(temp - 40000, 15000); annualTax += x * 0.10; }
         if (temp > 55000) { let x = Math.min(temp - 55000, 15000); annualTax += x * 0.15; }
@@ -65,37 +61,24 @@ function calculateG2N(d) {
         if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
         if (temp > 400000) { let x = Math.min(temp - 400000, 200000); annualTax += x * 0.25; }
         if (temp > 600000) { annualTax += (temp - 600000) * 0.275; }
-    } 
-    else if (annualTaxable <= 700000) {
-        // الموظف بيفقد شريحة الـ 0% (الـ 40 ألف)
+    } else if (annualTaxable <= 700000) {
         if (temp > 0) { let x = Math.min(temp, 55000); annualTax += x * 0.10; }
         if (temp > 55000) { let x = Math.min(temp - 55000, 15000); annualTax += x * 0.15; }
         if (temp > 70000) { let x = Math.min(temp - 70000, 130000); annualTax += x * 0.20; }
         if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
         if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
-    }
-    else if (annualTaxable <= 800000) {
-        // بيفقد الـ 0% والـ 10%
+    } else if (annualTaxable <= 800000) {
         if (temp > 0) { let x = Math.min(temp, 70000); annualTax += x * 0.15; }
         if (temp > 70000) { let x = Math.min(temp - 70000, 130000); annualTax += x * 0.20; }
         if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
         if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
-    }
-    else if (annualTaxable <= 900000) {
-        // بيفقد الـ 0% والـ 10% والـ 15%
+    } else if (annualTaxable <= 900000) {
         if (temp > 0) { let x = Math.min(temp, 200000); annualTax += x * 0.20; }
         if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
         if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
-    }
-    else if (annualTaxable <= 1200000) {
-        // بيفقد الـ 0% والـ 10% والـ 15% والـ 20%
-        // بيبدأ من شريحة 22.5% فوراً
+    } else {
         if (temp > 0) { let x = Math.min(temp, 400000); annualTax += x * 0.225; }
-        if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
-    }
-    else {
-        // فوق الـ مليون و200 ألف: يبدأ من 25% فوراً
-        if (temp > 0) { let x = Math.min(temp, 1200000); annualTax += x * 0.25; }
+        if (temp > 400000) { let x = Math.min(temp - 400000, 800000); annualTax += x * 0.25; }
         if (temp > 1200000) { annualTax += (temp - 1200000) * 0.275; }
     }
 
@@ -106,46 +89,51 @@ function calculateG2N(d) {
     return { gross: actualGross, insurance, tax: monthlyTax, martyrs, net, currentTaxable };
 }
 
-function calculateN2G(d) {
-    let targetNet = Number(d.netInput);
-    let low = targetNet;
-    let high = targetNet * 5; 
-    let result = {};
-    for (let i = 0; i < 40; i++) {
-        let mid = (low + high) / 2;
-        d.basic = mid; d.transport = 0; d.comm = 0;
-        result = calculateG2N(d);
-        if (result.net < targetNet) low = mid;
-        else high = mid;
+// دالة البحث عن موظف وجلب بياناته التراكمية
+app.get("/api/check-employee/:nid", async (req, res) => {
+    await connectDB();
+    const history = await Payroll.find({ nationalId: req.params.nid }).sort({_id: 1}).lean();
+    if (history.length > 0) {
+        let pDays = 0, pTaxable = 0, pTaxes = 0;
+        history.forEach(r => {
+            pDays += (r.days || 0);
+            pTaxable += (r.taxableIncome || 0);
+            pTaxes += (r.monthlyTax || 0);
+        });
+        const lastRecord = history[history.length - 1];
+        res.json({ 
+            status: "old", 
+            name: lastRecord.employee_name, 
+            lastInsSalary: lastRecord.insSalary,
+            pDays, pTaxable, pTaxes 
+        });
+    } else {
+        res.json({ status: "new" });
     }
-    return result;
-}
+});
 
 app.post("/api/calculate", async (req, res) => {
     await connectDB();
     const d = req.body;
-    const resObj = d.type === 'N2G' ? calculateN2G(d) : calculateG2N(d);
+    let resObj;
+    if (d.type === 'N2G') {
+        let low = Number(d.netInput), high = low * 5;
+        for (let i = 0; i < 40; i++) {
+            let mid = (low + high) / 2;
+            d.basic = mid; d.transport = 0; d.comm = 0;
+            resObj = calculateG2N(d);
+            if (resObj.net < d.netInput) low = mid; else high = mid;
+        }
+    } else {
+        resObj = calculateG2N(d);
+    }
     await new Payroll({ 
-        ...d, 
-        gross: resObj.gross, 
-        taxableIncome: resObj.currentTaxable, 
-        monthlyTax: resObj.tax, 
-        insurance: resObj.insurance, 
-        martyrs: resObj.martyrs, 
-        net: resObj.net, 
-        calcType: d.type 
+        ...d, employee_name: d.name, gross: resObj.gross, 
+        taxableIncome: resObj.currentTaxable, monthlyTax: resObj.tax, 
+        insurance: resObj.insurance, martyrs: resObj.martyrs, 
+        net: resObj.net, calcType: d.type 
     }).save();
     res.json(resObj);
-});
-
-// باقي الـ UI والـ Endpoints كما هي تماماً...
-app.get("/api/history/:id", async (req, res) => {
-    await connectDB();
-    const h = await Payroll.find({ nationalId: req.params.id }).sort({_id: 1}).lean();
-    if (!h.length) return res.json({ found: false });
-    let pD = 0, pTi = 0, pTx = 0;
-    h.forEach(r => { pD += (r.days || 0); pTi += (r.taxableIncome || 0); pTx += (r.monthlyTax || 0); });
-    res.json({ found: true, prevDays: pD, prevTaxable: pTi, prevTaxes: pTx, name: h[0].employee_name, lastIns: h[h.length-1].insSalary });
 });
 
 app.get("/", (req, res) => {
@@ -154,102 +142,84 @@ app.get("/", (req, res) => {
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Payroll Pro | شهاب السيداوي</title>
+    <title>Payroll System | Sedawy</title>
     <style>
-        :root { --primary: #1a73e8; --success: #27ae60; --dark: #2c3e50; --warning: #f1c40f; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .tabs { display: flex; gap: 10px; margin-bottom: 30px; background: #eee; padding: 10px; border-radius: 12px; }
-        .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 8px; font-weight: bold; transition: 0.3s; }
-        .tab.active { background: var(--primary); color: white; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
-        .card { border: 1px solid #ddd; padding: 20px; border-radius: 12px; }
-        label { display: block; font-size: 12px; color: #666; margin-top: 10px; font-weight: bold; }
-        input { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ccc; border-radius: 8px; text-align: center; font-size: 16px; box-sizing: border-box; }
-        .btn { width: 100%; padding: 20px; background: var(--success); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 25px; }
-        .results { margin-top: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background: var(--dark); color: white; padding: 25px; border-radius: 15px; text-align: center; }
-        .res-item span { display: block; font-size: 22px; color: var(--warning); font-weight: bold; }
-        .hidden { display: none; }
+        :root { --primary: #1a73e8; --success: #27ae60; --dark: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .status-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin-bottom: 10px; font-weight: bold; }
+        .status-new { background: #e8f5e9; color: #2e7d32; }
+        .status-old { background: #e3f2fd; color: #1565c0; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .card { border: 1px solid #eee; padding: 15px; border-radius: 10px; }
+        label { display: block; margin: 10px 0 5px; font-size: 13px; color: #555; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 15px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 16px; cursor: pointer; margin-top: 20px; }
+        .res-box { margin-top: 20px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background: var(--dark); color: white; padding: 15px; border-radius: 10px; text-align: center; }
+        .res-box span { display: block; font-size: 18px; color: #f1c40f; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="tabs">
-            <div id="t1" class="tab active" onclick="switchTab('G2N')">Gross to Net</div>
-            <div id="t2" class="tab" onclick="switchTab('N2G')">Net to Gross</div>
-        </div>
+        <div id="empStatus" class="status-badge">أدخل الرقم القومي للبدء...</div>
         <div class="grid">
             <div class="card">
-                <h3>| البيانات الأساسية</h3>
-                <label>الرقم القومي</label><input type="text" id="nid" onblur="check()">
+                <h3>| الموظف</h3>
+                <label>الرقم القومي</label><input type="text" id="nid" onblur="checkEmp()">
                 <label>الاسم</label><input type="text" id="name">
                 <label>الشهر</label><input type="month" id="month">
             </div>
             <div class="card">
-                <h3>| التأمينات</h3>
+                <h3>| المدخلات</h3>
                 <label>الأجر التأميني</label><input type="number" id="insSalary" value="0">
-            </div>
-            <div class="card">
-                <h3 id="inputTitle">| المبالغ</h3>
-                <div id="g2n_inputs">
-                    <label>الأساسي</label><input type="number" id="basic" value="80000">
-                    <label>بدلات</label><input type="number" id="trans" value="0">
-                    <label>عمولات</label><input type="number" id="comm" value="0">
-                </div>
-                <div id="n2g_inputs" class="hidden">
-                    <label>الصافي المستهدف</label><input type="number" id="netInput" placeholder="أدخل الصافي">
-                </div>
-            </div>
-            <div class="card">
-                <h3>| التراكمي</h3>
-                <label>أيام الشهر</label><input type="number" id="days" value="30">
-                <label>أيام سابقة</label><input type="number" id="pDays" value="0" readonly>
-                <label>وعاء سابق</label><input type="number" id="pTaxable" value="0" readonly>
-                <input type="hidden" id="pTaxes" value="0">
+                <label>الراتب الأساسي (Gross)</label><input type="number" id="basic" value="0">
+                <label>أيام العمل</label><input type="number" id="days" value="30">
             </div>
         </div>
-        <button class="btn" onclick="calc()">💾 حفظ وحساب الراتب</button>
-        <div class="results">
-            <div class="res-item"><p>Gross</p><span id="oG">0</span></div>
-            <div class="res-item"><p>Insurance</p><span id="oI">0</span></div>
-            <div class="res-item"><p>Tax</p><span id="oT">0</span></div>
-            <div class="res-item"><p>Martyr</p><span id="oM">0</span></div>
-            <div class="res-item"><p>NET</p><span id="oN">0</span></div>
+        <input type="hidden" id="pDays" value="0"><input type="hidden" id="pTaxable" value="0"><input type="hidden" id="pTaxes" value="0">
+        <button class="btn" onclick="calculate()">حفظ وحساب المرتب</button>
+        <div class="res-box">
+            <div>Gross<span id="oG">0</span></div>
+            <div>Insurance<span id="oI">0</span></div>
+            <div>Tax<span id="oT">0</span></div>
+            <div>Martyr<span id="oM">0</span></div>
+            <div>NET<span id="oN">0</span></div>
         </div>
     </div>
+
     <script>
-        let currentMode = 'G2N';
-        function switchTab(m) {
-            currentMode = m;
-            document.getElementById('t1').className = m === 'G2N' ? 'tab active' : 'tab';
-            document.getElementById('t2').className = m === 'N2G' ? 'tab active' : 'tab';
-            document.getElementById('g2n_inputs').classList.toggle('hidden', m === 'N2G');
-            document.getElementById('n2g_inputs').classList.toggle('hidden', m === 'G2N');
-        }
-        async function check() {
-            const id = document.getElementById('nid').value;
-            if(id.length < 14) return;
-            const r = await fetch('/api/history/' + id);
-            const d = await r.json();
-            if(d.found) {
+        async function checkEmp() {
+            const nid = document.getElementById('nid').value;
+            if(nid.length < 5) return;
+            const res = await fetch('/api/check-employee/' + nid);
+            const d = await res.json();
+            const badge = document.getElementById('empStatus');
+            
+            if(d.status === "old") {
+                badge.innerText = "Employee Found: Old Employee";
+                badge.className = "status-badge status-old";
                 document.getElementById('name').value = d.name;
-                document.getElementById('pDays').value = d.prevDays || 0;
-                document.getElementById('pTaxable').value = d.prevTaxable || 0;
-                document.getElementById('pTaxes').value = d.prevTaxes || 0;
-                document.getElementById('insSalary').value = d.lastIns || 0;
+                document.getElementById('insSalary').value = d.lastInsSalary;
+                document.getElementById('pDays').value = d.pDays;
+                document.getElementById('pTaxable').value = d.pTaxable;
+                document.getElementById('pTaxes').value = d.pTaxes;
+            } else {
+                badge.innerText = "New Record: New Employee";
+                badge.className = "status-badge status-new";
+                document.getElementById('pDays').value = 0;
+                document.getElementById('pTaxable').value = 0;
+                document.getElementById('pTaxes').value = 0;
             }
         }
-        async function calc() {
+
+        async function calculate() {
             const data = {
-                type: currentMode,
+                type: 'G2N',
                 nationalId: document.getElementById('nid').value,
                 name: document.getElementById('name').value,
                 month: document.getElementById('month').value,
                 insSalary: document.getElementById('insSalary').value,
                 basic: document.getElementById('basic').value,
-                transport: document.getElementById('trans').value,
-                comm: document.getElementById('comm').value,
-                netInput: document.getElementById('netInput').value,
                 days: document.getElementById('days').value,
                 prevDays: document.getElementById('pDays').value,
                 prevTaxable: document.getElementById('pTaxable').value,
@@ -266,7 +236,7 @@ app.get("/", (req, res) => {
             document.getElementById('oT').innerText = r.tax.toLocaleString(undefined, {minimumFractionDigits: 2});
             document.getElementById('oM').innerText = r.martyrs.toLocaleString();
             document.getElementById('oN').innerText = r.net.toLocaleString();
-            alert("تم الحساب والحفظ!");
+            alert("Success!");
         }
     </script>
 </body>
@@ -275,5 +245,5 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("System Running..."));
+app.listen(PORT, () => console.log("Server Running on Port " + PORT));
 module.exports = app;
