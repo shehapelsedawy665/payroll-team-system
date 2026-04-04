@@ -6,14 +6,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Configuration & Connection ---
+// --- Database Connection Configuration ---
 const mongoURI = "mongodb://Sedawy:Shehapelsedawy%2366@ac-uso95cd-shard-00-00.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-01.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-02.a6bquen.mongodb.net:27017/payrollDB?ssl=true&replicaSet=atlas-129j51-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Egyptian-Payroll";
 
-mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log("✅ Database Engine Connected Successfully"))
-    .catch(err => console.error("❌ Critical DB Error:", err));
+mongoose.connect(mongoURI)
+    .then(() => console.log("🚀 Atlas Engine: Online & Connected"))
+    .catch(err => console.error("❌ Database Connection Failed:", err));
 
-// --- Schemas & Models ---
+// --- Database Schemas ---
 const EmployeeSchema = new mongoose.Schema({
     name: { type: String, required: true },
     nationalId: { type: String, required: true },
@@ -39,15 +39,15 @@ const PayrollSchema = new mongoose.Schema({
 const Employee = mongoose.models.Employee || mongoose.model("Employee", EmployeeSchema);
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", PayrollSchema);
 
-// --- Calculation Engine (The Heart) ---
+// --- Advanced Calculation Logic ---
 const R = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
 function calculateEgyptianTax(annualTaxable) {
     let tax = 0;
-    let remainder = annualTaxable; // Already adjusted for exemption in the caller
+    let remainder = annualTaxable; 
 
     const brackets = [
-        { limit: 10000, rate: 0.00 }, 
+        { limit: 30000, rate: 0.00 }, 
         { limit: 15000, rate: 0.10 }, 
         { limit: 15000, rate: 0.15 }, 
         { limit: 140000, rate: 0.20 },
@@ -65,10 +65,10 @@ function calculateEgyptianTax(annualTaxable) {
     return tax;
 }
 
-function processMonthlyPayroll(data, prev, emp) {
+function processPayroll(data, prev, emp) {
     const { basicFull, days, month } = data;
     
-    // 1. Insurance Calculation
+    // 1. Insurance (Fixed to always check max/min based on Law)
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     let effectiveBase = Math.max(minIns, Math.min(maxIns, emp.insSalary));
@@ -78,15 +78,15 @@ function processMonthlyPayroll(data, prev, emp) {
     const actualGross = R((basicFull / 30) * days);
     const martyrs = R(actualGross * 0.0005);
 
-    // 3. Taxable Pool Logic (Exemption prorated by days)
+    // 3. Taxable Pool Logic (Prorated Personal Exemption 20k)
     const personalExemption = R((20000 / 360) * days);
     const currentTaxablePool = Math.max(0, (actualGross - insAmt) - personalExemption);
 
-    // 4. Cumulative Logic (YTD)
+    // 4. Cumulative YTD Calculation
     const totalDays = days + (prev.pDays || 0);
     const totalTaxablePool = currentTaxablePool + (prev.pTaxable || 0);
     
-    // Project to Annual
+    // Projecting to 360 days for Tax Brackets
     const annualTaxableProjected = Math.floor(((totalTaxablePool / totalDays) * 360) / 10) * 10;
     
     const annualTax = calculateEgyptianTax(annualTaxableProjected);
@@ -103,7 +103,7 @@ function processMonthlyPayroll(data, prev, emp) {
     };
 }
 
-// --- API Implementation ---
+// --- API Endpoints ---
 app.get("/api/employees", async (req, res) => {
     try {
         const emps = await Employee.find().sort({ hiringDate: -1 });
@@ -137,9 +137,7 @@ app.post("/api/payroll/calculate", async (req, res) => {
     try {
         const { empId, month, days, basicGross, prevData } = req.body;
         const emp = await Employee.findById(empId);
-        if (!emp) return res.status(404).send("Employee not found");
-
-        const result = processMonthlyPayroll({ basicFull: basicGross, days, month }, prevData, emp);
+        const result = processPayroll({ basicFull: basicGross, days, month }, prevData, emp);
         const record = new Payroll({ employeeId: empId, month, days, ...result });
         await record.save();
         res.json(record);
@@ -152,64 +150,56 @@ app.delete("/api/employees/:id", async (req, res) => {
     res.json({ success: true });
 });
 
-app.post("/api/employees/:id/resign", async (req, res) => {
-    await Employee.findByIdAndUpdate(req.params.id, { resignationDate: req.body.date });
-    res.json({ success: true });
-});
-
-// --- User Interface (Frontend) ---
+// --- Frontend UI (HTML/JS) ---
 app.get("/", (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise Payroll System v7.5</title>
+    <title>Enterprise Payroll Management v8.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
-        body { font-family: 'Cairo', sans-serif; background-color: #f1f5f9; }
-        .custom-shadow { box-shadow: 0 10px 40px -10px rgba(0,0,0,0.05); }
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
     </style>
 </head>
 <body class="flex min-h-screen">
-    <aside class="w-72 bg-slate-900 text-white flex flex-col h-screen sticky top-0 shadow-2xl">
-        <div class="p-10 text-3xl font-black border-b border-slate-800 text-center tracking-tighter">
-            <i class="fas fa-file-invoice-dollar text-indigo-500 mb-2 block"></i>
-            ERP <span class="text-indigo-400">PAYROLL</span>
+    <aside class="w-80 bg-slate-900 text-white flex flex-col h-screen sticky top-0 shadow-2xl">
+        <div class="p-12 text-3xl font-black border-b border-slate-800 text-center tracking-tighter">
+            <span class="text-indigo-500">ODOO</span> CORE
         </div>
-        <nav class="p-6 space-y-4">
-            <div onclick="location.reload()" class="flex items-center p-4 rounded-2xl bg-indigo-600 text-white font-bold cursor-pointer shadow-lg shadow-indigo-600/20">
-                <i class="fas fa-users-cog ml-4 text-xl"></i> قائمة الموظفين
+        <nav class="p-8 space-y-6">
+            <div onclick="location.reload()" class="flex items-center p-5 rounded-[2rem] bg-indigo-600 text-white font-bold cursor-pointer shadow-xl shadow-indigo-500/20">
+                <i class="fas fa-users-gear ml-4 text-2xl"></i> قائمة الموظفين
             </div>
         </nav>
-        <div class="mt-auto p-6 text-[10px] text-center text-slate-500 uppercase font-bold tracking-widest border-t border-slate-800">
-            Internal Production System v7.5
+        <div class="mt-auto p-8 text-[10px] text-center text-slate-600 uppercase tracking-[0.2em] border-t border-slate-800 font-black">
+            System Logic Verified v8.5
         </div>
     </aside>
 
-    <main class="flex-1 p-12 overflow-y-auto">
+    <main class="flex-1 p-16 overflow-y-auto">
         <div id="view-list">
-            <div class="flex justify-between items-end mb-12">
+            <div class="flex justify-between items-center mb-16">
                 <div>
-                    <h1 class="text-4xl font-black text-slate-800 mb-2">إدارة الموارد البشرية</h1>
-                    <p class="text-slate-500">متابعة رواتب الموظفين والضرائب والتأمينات</p>
+                    <h1 class="text-5xl font-black text-slate-800 mb-3 tracking-tight">إدارة الرواتب</h1>
+                    <p class="text-slate-500 text-lg">النظام الموحد لحساب الضرائب والتأمينات الاجتماعية</p>
                 </div>
-                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-indigo-200 transition-all active:scale-95">
-                    <i class="fas fa-plus ml-2"></i> إضافة موظف
+                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-[2rem] font-black shadow-2xl shadow-indigo-200 transition-all active:scale-95">
+                    + إضافة موظف جديد
                 </button>
             </div>
 
-            <div class="bg-white rounded-[2.5rem] overflow-hidden custom-shadow border border-slate-100">
-                <table class="w-full text-right border-collapse">
+            <div class="bg-white rounded-[3rem] overflow-hidden shadow-sm border border-slate-100">
+                <table class="w-full text-right">
                     <thead>
-                        <tr class="bg-slate-50/50 text-slate-400 text-sm uppercase">
-                            <th class="p-8 font-bold">اسم الموظف</th>
-                            <th class="p-8 text-center font-bold">تاريخ التعيين</th>
-                            <th class="p-8 text-center font-bold">الحالة</th>
-                            <th class="p-8 text-center font-bold">الإجراءات</th>
+                        <tr class="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-widest">
+                            <th class="p-10">الموظف</th>
+                            <th class="p-10 text-center">تاريخ التعيين</th>
+                            <th class="p-10 text-center">الحالة</th>
+                            <th class="p-10 text-center">إدارة</th>
                         </tr>
                     </thead>
                     <tbody id="empTable" class="divide-y divide-slate-50"></tbody>
@@ -217,64 +207,57 @@ app.get("/", (req, res) => {
             </div>
         </div>
 
-        <div id="view-profile" class="hidden animate-in fade-in duration-500">
-            <button onclick="location.reload()" class="mb-10 text-indigo-600 font-black flex items-center hover:-translate-x-2 transition-transform">
-                <i class="fas fa-arrow-right ml-3"></i> العودة للقائمة الرئيسية
+        <div id="view-profile" class="hidden">
+            <button onclick="location.reload()" class="mb-12 text-indigo-600 font-black flex items-center hover:-translate-x-3 transition-transform text-lg">
+                <i class="fas fa-chevron-right ml-4"></i> العودة للقائمة
             </button>
 
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-10">
-                <div class="space-y-6">
-                    <div class="bg-white p-10 rounded-[2.5rem] custom-shadow text-center border-t-8 border-indigo-500">
-                        <div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl text-indigo-500">
-                            <i class="fas fa-user"></i>
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-12">
+                <div class="space-y-8">
+                    <div class="bg-white p-12 rounded-[3rem] shadow-sm text-center border-b-[12px] border-indigo-500">
+                        <div class="w-28 h-28 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl text-indigo-500">
+                            <i class="fas fa-id-badge"></i>
                         </div>
-                        <h3 id="p-name" class="text-2xl font-black text-slate-800">--</h3>
-                        <p id="p-nid" class="text-slate-400 text-sm mt-2 font-mono">--</p>
-                        <div class="mt-8 pt-8 border-t border-slate-50 flex flex-col gap-3">
-                            <button onclick="resign()" class="w-full py-4 bg-orange-50 text-orange-600 rounded-2xl font-bold hover:bg-orange-100 transition">إنهاء الخدمة</button>
-                            <button onclick="del()" class="w-full py-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition">حذف السجل</button>
+                        <h3 id="p-name" class="text-3xl font-black text-slate-800 mb-2">--</h3>
+                        <p id="p-nid" class="text-slate-400 font-mono text-sm tracking-widest">--</p>
+                        <div class="mt-10 pt-10 border-t border-slate-50">
+                            <button onclick="del()" class="w-full py-5 bg-red-50 text-red-600 rounded-2xl font-black hover:bg-red-100 transition">حذف السجل</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="lg:col-span-3 space-y-10">
-                    <div id="calc-container" class="bg-slate-900 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-10 opacity-10 text-9xl"><i class="fas fa-calculator"></i></div>
-                        <h4 class="text-2xl font-black mb-10 flex items-center">
-                            <span class="w-3 h-10 bg-indigo-500 rounded-full ml-4"></span>
-                            معالجة الراتب الشهري
+                <div class="lg:col-span-3 space-y-12">
+                    <div id="calc-container" class="bg-slate-900 p-16 rounded-[4rem] text-white shadow-2xl relative">
+                        <h4 class="text-2xl font-black mb-12 flex items-center">
+                            <i class="fas fa-coins ml-4 text-indigo-400"></i> معالجة الراتب الشهري
                         </h4>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div class="space-y-2">
-                                <label class="text-[11px] text-slate-500 font-bold uppercase tracking-widest">فترة الاستحقاق</label>
-                                <input type="month" id="c-month" class="w-full bg-slate-800/50 border-2 border-slate-700 p-5 rounded-2xl text-white outline-none font-bold" readonly>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                            <div class="space-y-3">
+                                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">الشهر</label>
+                                <input type="month" id="c-month" class="w-full bg-slate-800 border-none p-6 rounded-[1.5rem] text-white font-bold" readonly>
                             </div>
-                            <div class="space-y-2">
-                                <label class="text-[11px] text-slate-500 font-bold uppercase tracking-widest">إجمالي الراتب (Gross)</label>
-                                <input type="number" id="c-gross" placeholder="0.00" class="w-full bg-slate-800 border-2 border-slate-700 p-5 rounded-2xl text-white outline-none focus:border-indigo-500 transition font-bold">
+                            <div class="space-y-3">
+                                <label class="text-xs font-black text-slate-500 uppercase tracking-widest">إجمالي الراتب (Gross)</label>
+                                <input type="number" id="c-gross" placeholder="0.00" class="w-full bg-slate-800 border-none p-6 rounded-[1.5rem] text-white focus:ring-4 ring-indigo-500/20 transition outline-none font-black text-xl">
                             </div>
                             <div class="flex items-end">
-                                <button onclick="runCalc()" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-lg hover:bg-indigo-500 transition-all active:scale-95">
-                                    حساب واعتماد الشهر
+                                <button onclick="runCalc()" class="w-full bg-indigo-600 text-white py-6 rounded-[1.5rem] font-black shadow-xl hover:bg-indigo-500 transition-all">
+                                    تأكيد الحساب
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-[2.5rem] overflow-hidden custom-shadow border border-slate-100">
-                        <div class="p-8 border-b bg-slate-50/50 flex justify-between items-center">
-                            <h5 class="font-black text-slate-800 text-lg">سجل المدفوعات التاريخي</h5>
-                            <span class="text-xs text-slate-400">جميع المبالغ بالجنيه المصري</span>
-                        </div>
-                        <table class="w-full text-center text-xs">
-                            <thead class="bg-slate-50 text-slate-400">
+                    <div class="bg-white rounded-[3rem] overflow-hidden shadow-sm border">
+                        <table class="w-full text-center text-sm">
+                            <thead class="bg-slate-50 text-slate-400 font-black">
                                 <tr>
-                                    <th class="p-6">الشهر</th>
-                                    <th class="p-6">Gross</th>
-                                    <th class="p-6">تأمين (11%)</th>
-                                    <th class="p-6">شهداء</th>
-                                    <th class="p-6 text-red-500">الضريبة</th>
-                                    <th class="p-6 bg-emerald-50 text-emerald-700 font-black">الصافي (Net)</th>
+                                    <th class="p-8">الشهر</th>
+                                    <th class="p-8">Gross</th>
+                                    <th class="p-8">تأمين</th>
+                                    <th class="p-8">شهداء</th>
+                                    <th class="p-8 text-red-500">الضريبة</th>
+                                    <th class="p-8 bg-emerald-50 text-emerald-700 font-black text-lg">الصافي (Net)</th>
                                 </tr>
                             </thead>
                             <tbody id="histBody" class="divide-y divide-slate-100"></tbody>
@@ -285,37 +268,32 @@ app.get("/", (req, res) => {
         </div>
     </main>
 
-    <div id="modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 z-[100]">
-        <div class="bg-white rounded-[3rem] p-12 w-full max-w-xl shadow-2xl animate-in zoom-in duration-300">
-            <h3 class="text-3xl font-black mb-8 text-slate-800">تسجيل موظف جديد</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div id="modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-8 z-[100]">
+        <div class="bg-white rounded-[4rem] p-16 w-full max-w-2xl shadow-2xl">
+            <h3 class="text-4xl font-black mb-12 text-slate-800">بيانات الموظف الجديد</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div class="md:col-span-2">
-                    <label class="text-xs font-bold text-slate-400 mb-2 block uppercase">الاسم الكامل</label>
-                    <input type="text" id="n-name" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none">
+                    <input type="text" id="n-name" placeholder="اسم الموظف بالكامل" class="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-indigo-500 outline-none font-bold">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-400 mb-2 block uppercase">الرقم القومي</label>
-                    <input type="text" id="n-nid" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none">
+                    <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-indigo-500 outline-none font-bold">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-400 mb-2 block uppercase">تاريخ التعيين</label>
-                    <input type="date" id="n-hdate" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none">
+                    <input type="date" id="n-hdate" class="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-indigo-500 outline-none font-bold text-slate-400">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-400 mb-2 block uppercase">الراتب التأميني</label>
-                    <input type="number" id="n-ins" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none">
+                    <input type="number" id="n-ins" placeholder="الراتب التأميني" class="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-indigo-500 outline-none font-bold">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-400 mb-2 block uppercase">نوع العقد</label>
-                    <select id="n-type" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none font-bold text-indigo-600">
+                    <select id="n-type" class="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] focus:border-indigo-500 outline-none font-black text-indigo-600">
                         <option>Full Time</option>
                         <option>Part Time</option>
                     </select>
                 </div>
             </div>
-            <div class="flex gap-4 mt-12">
-                <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition">إتمام التسجيل</button>
-                <button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-500 py-5 rounded-2xl font-bold hover:bg-slate-200 transition">إلغاء</button>
+            <div class="flex gap-6 mt-16">
+                <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-6 rounded-[2rem] font-black shadow-2xl hover:bg-indigo-700">حفظ البيانات</button>
+                <button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-500 py-6 rounded-[2rem] font-black">إلغاء</button>
             </div>
         </div>
     </div>
@@ -324,31 +302,22 @@ app.get("/", (req, res) => {
 
     <script>
         async function load() {
-            try {
-                const res = await fetch('/api/employees');
-                const data = await res.json();
-                document.getElementById('empTable').innerHTML = data.map(e => \`
-                    <tr class="hover:bg-slate-50/80 transition cursor-pointer group" onclick="openProfile('\${e._id}')">
-                        <td class="p-8 font-black text-slate-700">
-                            <div class="flex items-center">
-                                <div class="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center ml-4 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition">
-                                    <i class="fas fa-user-check"></i>
-                                </div>
-                                \${e.name}
-                            </div>
-                        </td>
-                        <td class="p-8 text-center text-slate-500 font-bold">\${new Date(e.hiringDate).toLocaleDateString('en-GB')}</td>
-                        <td class="p-8 text-center">
-                            <span class="px-4 py-2 \${e.resignationDate ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'} rounded-xl text-[10px] font-black uppercase tracking-wider">
-                                \${e.resignationDate ? 'مستقيل' : 'نشط'}
-                            </span>
-                        </td>
-                        <td class="p-8 text-center">
-                            <button class="text-indigo-600 font-black hover:underline underline-offset-8">إدارة الراتب <i class="fas fa-chevron-left mr-2 text-[10px]"></i></button>
-                        </td>
-                    </tr>
-                \`).join('');
-            } catch(e) { console.error(e); }
+            const res = await fetch('/api/employees');
+            const data = await res.json();
+            document.getElementById('empTable').innerHTML = data.map(e => \`
+                <tr class="hover:bg-slate-50 transition cursor-pointer group" onclick="openProfile('\${e._id}')">
+                    <td class="p-10 font-black text-slate-700 text-xl">\${e.name}</td>
+                    <td class="p-10 text-center text-slate-400 font-bold">\${new Date(e.hiringDate).toLocaleDateString('en-GB')}</td>
+                    <td class="p-10 text-center">
+                        <span class="px-6 py-3 \${e.resignationDate ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'} rounded-2xl text-xs font-black">
+                            \${e.resignationDate ? 'مستقيل' : 'نشط'}
+                        </span>
+                    </td>
+                    <td class="p-10 text-center">
+                        <i class="fas fa-chevron-left text-indigo-500 group-hover:-translate-x-2 transition-transform"></i>
+                    </td>
+                </tr>
+            \`).join('');
         }
 
         async function openProfile(id) {
@@ -370,22 +339,18 @@ app.get("/", (req, res) => {
             }
             document.getElementById('c-month').value = lastMonth;
 
-            if (data.emp.resignationDate && lastMonth > data.emp.resignationDate.substring(0, 7)) {
-                document.getElementById('calc-container').classList.add('hidden');
-            }
-
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
 
             document.getElementById('histBody').innerHTML = data.history.map(r => \`
-                <tr class="hover:bg-slate-50 transition border-b border-slate-50">
-                    <td class="p-6 font-black text-slate-600">\${r.month}</td>
-                    <td class="p-6 font-bold">\${r.gross.toLocaleString()}</td>
-                    <td class="p-6">\${r.insurance.toLocaleString()}</td>
-                    <td class="p-6 text-orange-500 font-bold">\${r.martyrs.toLocaleString()}</td>
-                    <td class="p-6 text-red-500 font-black">\${r.monthlyTax.toLocaleString()}</td>
-                    <td class="p-6 font-black text-emerald-700 bg-emerald-50/30 shadow-inner">\${r.net.toLocaleString()}</td>
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-8 font-black text-slate-600 text-lg">\${r.month}</td>
+                    <td class="p-8 font-bold">\${r.gross.toLocaleString()}</td>
+                    <td class="p-8">\${r.insurance.toLocaleString()}</td>
+                    <td class="p-8 text-orange-500 font-bold">\${r.martyrs.toLocaleString()}</td>
+                    <td class="p-8 text-red-500 font-black">\${r.monthlyTax.toLocaleString()}</td>
+                    <td class="p-8 font-black text-emerald-700 bg-emerald-50/40 shadow-inner text-xl">\${r.net.toLocaleString()}</td>
                 </tr>
             \`).join('');
         }
@@ -398,7 +363,6 @@ app.get("/", (req, res) => {
                 insSalary: Number(document.getElementById('n-ins').value),
                 jobType: document.getElementById('n-type').value
             };
-            if(!body.name || !body.nationalId) return alert("برجاء ملء البيانات");
             await fetch('/api/employees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
             location.reload();
         }
@@ -415,7 +379,6 @@ app.get("/", (req, res) => {
                     pTaxes: Number(document.getElementById('pTx').value)
                 }
             };
-            if(!body.basicGross) return alert("أدخل الراتب المستحق أولاً");
             const res = await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
             if (res.ok) {
                 openProfile(body.empId);
@@ -424,7 +387,6 @@ app.get("/", (req, res) => {
         }
 
         async function del() { if(confirm("حذف ملف الموظف نهائياً؟")) { await fetch(\`/api/employees/\${document.getElementById('currId').value}\`, {method:'DELETE'}); location.reload(); } }
-        async function resign() { const d = prompt("تاريخ الاستقالة (YYYY-MM-DD):"); if(d) { await fetch(\`/api/employees/\${document.getElementById('currId').value}/resign\`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({date:d})}); openProfile(document.getElementById('currId').value); } }
 
         window.onload = load;
     </script>
@@ -434,4 +396,4 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(\`✅ System Operational on Port \${PORT}\`));
+app.listen(PORT, () => console.log(\`✅ Enterprise Core Operational: Port \${PORT}\`));
