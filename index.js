@@ -14,7 +14,7 @@ const connectDB = async () => {
     try {
         await mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 10000 });
         isConnected = true;
-    } catch (err) { console.log("DB Linked"); }
+    } catch (err) { console.log("DB Connected"); }
 };
 
 const Payroll = mongoose.model("Payroll", new mongoose.Schema({
@@ -35,7 +35,6 @@ function calculateG2N(d) {
     const rDate = d.resignationDate ? new Date(d.resignationDate) : null;
     const currentMonthDate = new Date(d.month + "-01");
 
-    // التأمينات: لو تعيين بعد يوم 1 ومافيش استقالة في نفس الشهر = 0
     let insurance = 0;
     const isHiredAfterFirst = hDate && hDate.getDate() > 1 && hDate.getMonth() === currentMonthDate.getMonth();
     const isResignedSameMonth = rDate && rDate.getMonth() === currentMonthDate.getMonth();
@@ -51,7 +50,6 @@ function calculateG2N(d) {
     const totalDays = days + (Number(d.prevDays) || 0);
     const totalTaxable = currentTaxable + (Number(d.prevTaxable) || 0);
     
-    // الوعاء السنوي (Floor 10)
     const annualTaxable = Math.floor(((totalTaxable / totalDays) * 360) / 10) * 10;
     
     let annualTax = 0;
@@ -111,55 +109,48 @@ app.get("/", (req, res) => {
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Payroll Pro Max | Sedawy</title>
+    <title>Payroll Precision v5</title>
     <style>
-        :root { --primary: #1a73e8; --success: #27ae60; --error: #d32f2f; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; }
+        :root { --primary: #1a73e8; --success: #27ae60; --error: #d32f2f; --dark: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
-        .card { border: 1px solid #eee; padding: 15px; border-radius: 8px; position: relative; }
+        .card { border: 1px solid #eee; padding: 15px; border-radius: 8px; }
         label { display: block; margin-top: 10px; font-size: 12px; font-weight: bold; color: #555; }
         input, select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
         .btn { width: 100%; padding: 15px; background: var(--success); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        .res-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 25px; background: #2c3e50; color: white; padding: 20px; border-radius: 10px; text-align: center; }
+        .res-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 25px; background: var(--dark); color: white; padding: 20px; border-radius: 10px; text-align: center; }
         .res-grid span { display: block; font-size: 18px; color: #f1c40f; font-weight: bold; }
         .error-msg { color: var(--error); font-size: 11px; font-weight: bold; display: none; margin-top: 4px; }
+        option:disabled { color: #ccc; background: #f9f9f9; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 style="text-align:center; color: var(--primary);">Payroll Management System</h2>
+        <h2 style="text-align:center; color: var(--primary);">Sequential Payroll System</h2>
         <div class="grid">
             <div class="card">
                 <h3>| الموظف</h3>
                 <label>الرقم القومي</label><input type="text" id="nid" onblur="checkEmp()">
                 <label>الاسم</label><input type="text" id="name">
                 <label>نوع العمل</label>
-                <select id="empType" onchange="validateIns()">
-                    <option value="Full Time">Full Time</option>
-                    <option value="Part Time">Part Time</option>
-                </select>
+                <select id="empType" onchange="validateIns()"><option value="Full Time">Full Time</option><option value="Part Time">Part Time</option></select>
             </div>
             <div class="card">
-                <h3>| التواريخ والأيام</h3>
+                <h3>| التواريخ</h3>
                 <label>تاريخ التعيين</label><input type="date" id="hiringDate" onchange="suggestDays()">
                 <label>تاريخ الاستقالة</label><input type="date" id="resignationDate" onchange="suggestDays()">
-                <label>الشهر</label><select id="monthSelect" onchange="suggestDays()"></select>
+                <label>شهر الاحتساب (Sequential)</label><select id="monthSelect" onchange="suggestDays()"></select>
                 <label>أيام العمل</label><input type="number" id="days" value="30">
             </div>
             <div class="card">
                 <h3>| المبالغ</h3>
-                <label>الأجر التأميني</label>
-                <input type="number" id="insSalary" oninput="validateIns()">
-                <div id="insErr" class="error-msg"></div>
+                <label>الأجر التأميني</label><input type="number" id="insSalary" oninput="validateIns()"><div id="insErr" class="error-msg"></div>
                 <label>Gross Salary</label><input type="number" id="basic">
             </div>
         </div>
-
         <input type="hidden" id="pDays" value="0"><input type="hidden" id="pTaxable" value="0"><input type="hidden" id="pTaxes" value="0">
-
         <button class="btn" id="saveBtn" onclick="saveRecord()">💾 حفظ وحساب الراتب</button>
-
         <div class="res-grid">
             <div>Gross <span id="oG">0</span></div>
             <div>Insurance <span id="oI">0</span></div>
@@ -171,26 +162,6 @@ app.get("/", (req, res) => {
 
     <script>
         let globalStatus = "new";
-
-        function validateIns() {
-            const type = document.getElementById('empType').value;
-            const val = Number(document.getElementById('insSalary').value);
-            const err = document.getElementById('insErr');
-            const saveBtn = document.getElementById('saveBtn');
-            const max = 16700;
-            const min = type === "Full Time" ? 5384.62 : 2720; // 7000/1.3 = 5384.62
-
-            if(val > max || val < min) {
-                err.style.display = "block";
-                err.innerText = "خطأ: الحد الأدنى " + min + " والحد الأقصى " + max;
-                saveBtn.disabled = true;
-                saveBtn.style.opacity = "0.5";
-            } else {
-                err.style.display = "none";
-                saveBtn.disabled = false;
-                saveBtn.style.opacity = "1";
-            }
-        }
 
         function suggestDays() {
             const hStr = document.getElementById('hiringDate').value;
@@ -204,23 +175,18 @@ app.get("/", (req, res) => {
             
             let days = 30;
 
-            // لو التعيين والاستقالة في نفس الشهر
-            if(hDate && rDate && hDate.getMonth() === rDate.getMonth()) {
+            if(hDate && rDate && hDate.getMonth() === currentMonth.getMonth() && rDate.getMonth() === currentMonth.getMonth()) {
                 days = rDate.getDate() - hDate.getDate() + 1;
             }
-            // لو تعيين بس في شهر الاحتساب
             else if(hDate && hDate.getMonth() === currentMonth.getMonth() && hDate.getFullYear() === currentMonth.getFullYear()) {
                 days = 30 - hDate.getDate() + 1;
             }
-            // لو استقالة بس في شهر الاحتساب
             else if(rDate && rDate.getMonth() === currentMonth.getMonth() && rDate.getFullYear() === currentMonth.getFullYear()) {
                 days = Math.min(rDate.getDate(), 30);
             }
-            // موظف قديم ومستمر
-            else if(globalStatus === "old" && !rDate) {
+            else if(globalStatus === "old") {
                 days = 30;
             }
-
             document.getElementById('days').value = Math.max(1, days);
         }
 
@@ -237,22 +203,58 @@ app.get("/", (req, res) => {
                 opt.value = m;
                 opt.innerText = m;
                 
+                // 1. لو الشهر محفوظ فعلاً -> Disable
                 if(saved.includes(m)) {
                     opt.disabled = true;
-                } else if (lastSavedIndex !== -1 && index !== lastSavedIndex + 1) {
+                } 
+                // 2. لو مش محفوظ، بنطبق قاعدة "الشهر التالي فقط"
+                else {
+                    // لو فيه تاريخ استقالة قديم، بنسمح بفتح الشهور اللي *بعد* شهر الاستقالة فقط
                     if(resDateStr) {
                         let rDate = new Date(resDateStr);
                         let rMonthStr = rDate.getFullYear() + "-" + String(rDate.getMonth()+1).padStart(2,'0');
-                        if(m <= rMonthStr) opt.disabled = true;
-                    } else {
+                        
+                        // لو الشهر الحالي (m) أصغر من أو يساوي شهر الاستقالة -> Disable
+                        if(m <= rMonthStr) {
+                            opt.disabled = true;
+                        } 
+                        // لو الشهر هو أول شهر متاح بعد الاستقالة، نسيبه مفتوح
+                        // أو لو هو الشهر اللي عليه الدور بعد آخر حفظ (في حالة رجع اشتغل وحفظنا شهور جديدة)
+                        else if (lastSavedIndex !== -1 && index !== lastSavedIndex + 1) {
+                            opt.disabled = true;
+                        }
+                    } 
+                    // لو مفيش استقالة، لازم يلتزم بالترتيب (Next Month Only)
+                    else if (lastSavedIndex !== -1 && index !== lastSavedIndex + 1) {
                         opt.disabled = true;
                     }
                 }
                 select.appendChild(opt);
             });
 
+            // اختيار أول شهر متاح (مش disabled)
             for(let i=0; i<select.options.length; i++) {
                 if(!select.options[i].disabled) { select.selectedIndex = i; break; }
+            }
+        }
+
+        function validateIns() {
+            const type = document.getElementById('empType').value;
+            const val = Number(document.getElementById('insSalary').value);
+            const err = document.getElementById('insErr');
+            const saveBtn = document.getElementById('saveBtn');
+            const max = 16700;
+            const min = type === "Full Time" ? 5384.62 : 2720;
+
+            if(val > max || (val < min && val > 0)) {
+                err.style.display = "block";
+                err.innerText = "خطأ: الحد الأدنى " + min + " والحد الأقصى " + max;
+                saveBtn.disabled = true;
+                saveBtn.style.opacity = "0.5";
+            } else {
+                err.style.display = "none";
+                saveBtn.disabled = false;
+                saveBtn.style.opacity = "1";
             }
         }
 
@@ -305,7 +307,7 @@ app.get("/", (req, res) => {
             document.getElementById('oT').innerText = r.tax.toLocaleString(undefined, {minimumFractionDigits: 2});
             document.getElementById('oM').innerText = r.martyrs.toLocaleString();
             document.getElementById('oN').innerText = r.net.toLocaleString();
-            alert("تم الحساب والحفظ بنجاح!");
+            alert("تم الحفظ بنجاح لشهر " + data.month);
             checkEmp(); 
         }
     </script>
@@ -315,5 +317,5 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("System Running..."));
+app.listen(PORT, () => console.log("Final Precision System Running..."));
 module.exports = app;
