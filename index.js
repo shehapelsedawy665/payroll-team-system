@@ -6,43 +6,63 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// الاتصال بـ MongoDB Atlas
+// الاتصال بقاعدة البيانات
 const mongoURI = process.env.MONGO_URI || "mongodb://Sedawy:Shehapelsedawy%2366@ac-uso95cd-shard-00-00.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-01.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-02.a6bquen.mongodb.net:27017/payrollDB?ssl=true&replicaSet=atlas-129j51-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Egyptian-Payroll";
 
-mongoose.connect(mongoURI)
-    .then(() => console.log("ERP Database Connected Successfully"))
-    .catch(err => console.error("Database Connection Error:", err));
+mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 10000 })
+    .then(() => console.log("ERP DB Connected"))
+    .catch(err => console.log("DB Error:", err));
 
-// --- Database Models ---
+// --- Schemas ---
 const Employee = mongoose.model("Employee", new mongoose.Schema({
     name: String,
     nationalId: { type: String, unique: true },
-    insSalary: Number,
-    hiringDate: { type: Date, default: Date.now },
-    status: { type: String, default: 'active' }
+    employmentType: { type: String, default: "Full Time" },
+    hiringDate: Date,
+    resignationDate: Date,
+    insSalary: Number
 }));
 
-const PayrollRecord = mongoose.model("PayrollRecord", new mongoose.Schema({
+const Payroll = mongoose.model("Payroll", new mongoose.Schema({
     employeeId: mongoose.Schema.Types.ObjectId,
-    employeeName: String,
     month: String,
     days: Number,
     gross: Number,
+    taxableIncome: Number,
+    monthlyTax: Number,
     insurance: Number,
-    tax: Number,
     martyrs: Number,
-    net: Number,
-    createdAt: { type: Date, default: Date.now }
+    net: Number
 }));
 
-// --- Payroll Calculation Logic ---
+// --- Payroll Engine (Sequential Logic) ---
 const R = (n) => Math.round(n * 100) / 100;
 
-function calculateTax(taxableIncome, days) {
-    // تحويل لسنوي (360 يوم) وتقريب لأقرب 10 جنيه أقل حسب القانون
-    const annualTaxable = Math.floor(((taxableIncome / days) * 360) / 10) * 10;
+function calculateSequential(data, prevData) {
+    const { basicFull, days, insSalary, hDateStr, rDateStr, monthStr } = data;
+    const { prevDays, prevTaxable, prevTaxes } = prevData;
+
+    const currentMonthDate = new Date(monthStr + "-01");
+    const hDate = hDateStr ? new Date(hDateStr) : null;
+    const rDate = rDateStr ? new Date(rDateStr) : null;
+
+    // التأمينات: مبلغ كامل وليس Prorated بناءً على طلبك
+    let insurance = insSalary * 0.11;
+    
+    // لو فيه لوجيك مخصص لعدم حساب التأمين في شهور معينة، بيتحط هنا
+    // مثال: لو تعين بعد يوم 1 في الشهر وما استقالش نفس الشهر.. إلخ
+
+    const actualBasic = (basicFull / 30) * days;
+    const martyrs = actualBasic * 0.0005;
+    const currentTaxable = actualBasic - insurance;
+
+    const totalDays = days + prevDays;
+    const totalTaxable = currentTaxable + prevTaxable;
+    
+    const annualTaxable = Math.floor(((totalTaxable / totalDays) * 360) / 10) * 10;
+    
     let annualTax = 0;
-    let temp = Math.max(0, annualTaxable - 20000); // إعفاء شخصي 20,000
+    let temp = Math.max(0, annualTaxable - 20000); // إعفاء 20 ألف
 
     if (annualTaxable <= 600000) {
         if (temp > 40000) { let x = Math.min(temp - 40000, 15000); annualTax += x * 0.10; }
@@ -56,130 +76,220 @@ function calculateTax(taxableIncome, days) {
         if (temp > 400000) { let x = Math.min(temp - 400000, 800000); annualTax += x * 0.25; }
         if (temp > 1200000) { annualTax += (temp - 1200000) * 0.275; }
     }
-    return (annualTax / 360) * days;
+
+    const totalTaxDueUntilNow = (annualTax / 360) * totalDays;
+    const monthlyTax = Math.max(0, totalTaxDueUntilNow - prevTaxes);
+
+    return {
+        gross: R(actualBasic),
+        insurance: R(insurance),
+        tax: R(monthlyTax),
+        martyrs: R(martyrs),
+        net: R(actualBasic - insurance - monthlyTax - martyrs),
+        currentTaxable: R(currentTaxable)
+    };
 }
 
-// --- API Routes ---
-
-// 1. جلب الموظفين
+// --- APIs ---
 app.get("/api/employees", async (req, res) => {
-    const data = await Employee.find().sort({ name: 1 });
-    res.json(data);
+    res.json(await Employee.find().sort({ name: 1 }).lean());
 });
 
-// 2. إضافة موظف جديد
 app.post("/api/employees", async (req, res) => {
     try {
         const emp = new Employee(req.body);
         await emp.save();
-        res.json({ success: true });
-    } catch (err) { res.status(400).json({ error: "الرقم القومي مسجل مسبقاً" }); }
+        res.json({ success: true, emp });
+    } catch(e) { res.status(400).json({ error: "خطأ في الحفظ" }); }
 });
 
-// 3. حساب وحفظ الراتب
-app.post("/api/payroll/run", async (req, res) => {
-    const { empId, month, days, basicGross, bonus, deductions } = req.body;
-    const emp = await Employee.findById(empId);
-
-    const actualGross = (basicGross / 30) * days;
-    const insurance = emp.insSalary * 0.11; 
-    const martyrs = (actualGross + bonus) * 0.0005;
-    const taxableIncome = (actualGross + bonus) - insurance - deductions;
+// جلب تفاصيل الموظف وسجل رواتبه
+app.get("/api/employees/:id/payroll-details", async (req, res) => {
+    const emp = await Employee.findById(req.params.id).lean();
+    const history = await Payroll.find({ employeeId: emp._id }).sort({ month: 1 }).lean();
     
-    const monthlyTax = calculateTax(taxableIncome, days);
-    const net = (actualGross + bonus) - insurance - monthlyTax - martyrs - deductions;
-
-    const record = new PayrollRecord({
-        employeeId: emp._id,
-        employeeName: emp.name,
-        month, days,
-        gross: R(actualGross + bonus),
-        insurance: R(insurance),
-        tax: R(monthlyTax),
-        martyrs: R(martyrs),
-        net: R(net)
+    let pDays = 0, pTaxable = 0, pTaxes = 0;
+    history.forEach(r => { 
+        pDays += r.days; 
+        pTaxable += r.taxableIncome; 
+        pTaxes += r.monthlyTax; 
     });
 
+    res.json({ emp, history, prevData: { pDays, pTaxable, pTaxes } });
+});
+
+app.post("/api/payroll/calculate", async (req, res) => {
+    const { empId, month, days, basicGross, prevData } = req.body;
+    const emp = await Employee.findById(empId);
+
+    const result = calculateSequential({
+        basicFull: basicGross,
+        days: days,
+        insSalary: emp.insSalary,
+        hDateStr: emp.hiringDate,
+        rDateStr: emp.resignationDate,
+        monthStr: month
+    }, prevData);
+
+    const record = new Payroll({
+        employeeId: emp._id,
+        month, days,
+        gross: result.gross,
+        taxableIncome: result.currentTaxable,
+        monthlyTax: result.tax,
+        insurance: result.insurance,
+        martyrs: result.martyrs,
+        net: result.net
+    });
     await record.save();
     res.json(record);
 });
 
-// 4. صفحة الـ UI الرئيسية (Dashboard)
+// --- UI (Dashboard + Employee Profile) ---
 app.get("/", (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Enterprise Payroll System v1</title>
+    <title>Professional ERP Payroll</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style> .modal-open { overflow: hidden; } </style>
 </head>
-<body class="bg-slate-50 flex min-h-screen">
-    <div class="w-72 bg-indigo-900 text-white fixed h-full p-6 shadow-2xl">
-        <h1 class="text-2xl font-black mb-10 text-indigo-300 tracking-tighter"><i class="fas fa-layer-group ml-2"></i> ERP PAYROLL</h1>
-        <nav class="space-y-2">
-            <button class="w-full text-right p-4 rounded-xl bg-indigo-800 font-bold"><i class="fas fa-users ml-3"></i> إدارة الموظفين</button>
-            <button class="w-full text-right p-4 rounded-xl hover:bg-indigo-800 transition"><i class="fas fa-coins ml-3"></i> سجل الرواتب</button>
+<body class="bg-slate-50 flex min-h-screen text-slate-800">
+    
+    <div class="w-64 bg-indigo-900 text-white fixed h-full p-6 shadow-xl z-10">
+        <h1 class="text-2xl font-black mb-8 text-indigo-300 border-b border-indigo-700 pb-4">ERP SYSTEM</h1>
+        <nav class="space-y-3">
+            <button onclick="showSection('employees')" class="w-full text-right p-3 rounded-lg bg-indigo-800 font-bold"><i class="fas fa-users ml-3"></i> إدارة الموظفين</button>
         </nav>
     </div>
 
-    <div class="mr-72 w-full p-10">
-        <div class="flex justify-between items-center mb-12">
-            <div>
-                <h2 class="text-3xl font-extrabold text-slate-800">شؤون العاملين</h2>
-                <p class="text-slate-500 mt-1">إدارة بيانات الموظفين واحتساب الرواتب الشهرية</p>
+    <div class="mr-64 w-full p-8">
+        <div id="sec-employees">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-extrabold text-slate-800">سجل الموظفين</h2>
+                <button onclick="openEmpModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-md transition">+ موظف جديد</button>
             </div>
-            <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95">+ إضافة موظف جديد</button>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-right">
+                    <thead class="bg-slate-100 border-b border-slate-200">
+                        <tr>
+                            <th class="p-4 font-bold">الاسم</th>
+                            <th class="p-4 font-bold">الرقم القومي</th>
+                            <th class="p-4 font-bold">التعيين</th>
+                            <th class="p-4 font-bold">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="empTable" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <table class="w-full text-right">
-                <thead class="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                        <th class="p-6 text-slate-600 font-bold">اسم الموظف</th>
-                        <th class="p-6 text-slate-600 font-bold">الرقم القومي</th>
-                        <th class="p-6 text-slate-600 font-bold">الأجر التأميني</th>
-                        <th class="p-6 text-slate-600 font-bold">الإجراءات</th>
-                    </tr>
-                </thead>
-                <tbody id="empTable" class="divide-y divide-slate-50">
-                    </tbody>
-            </table>
+        <div id="sec-profile" class="hidden">
+            <button onclick="showSection('employees')" class="mb-6 text-indigo-600 font-bold hover:underline"><i class="fas fa-arrow-right ml-2"></i> عودة للقائمة</button>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-xl font-bold mb-4 border-b pb-2 text-indigo-800" id="p-name">--</h3>
+                    <div class="space-y-2 text-sm">
+                        <p><span class="font-bold text-slate-500">الرقم القومي:</span> <span id="p-nid">--</span></p>
+                        <p><span class="font-bold text-slate-500">نوع العمل:</span> <span id="p-type">--</span></p>
+                        <p><span class="font-bold text-slate-500">تاريخ التعيين:</span> <span id="p-hdate">--</span></p>
+                        <p><span class="font-bold text-slate-500">تاريخ الاستقالة:</span> <span id="p-rdate">--</span></p>
+                        <p><span class="font-bold text-slate-500">الأجر التأميني:</span> <span id="p-ins" class="font-bold text-green-600">--</span></p>
+                    </div>
+                </div>
+
+                <div class="col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-indigo-200 border-t-4 border-t-indigo-500">
+                    <h3 class="text-xl font-bold mb-4">احتساب راتب جديد (Sequential)</h3>
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">شهر الاحتساب</label>
+                            <input type="month" id="c-month" class="w-full p-2 border rounded-lg bg-slate-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">أيام العمل</label>
+                            <input type="number" id="c-days" value="30" class="w-full p-2 border rounded-lg bg-slate-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Gross Salary</label>
+                            <input type="number" id="c-gross" class="w-full p-2 border rounded-lg bg-slate-50">
+                        </div>
+                    </div>
+                    <button onclick="runPayroll()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition shadow-md">
+                        <i class="fas fa-calculator ml-2"></i> احسب واحفظ الراتب
+                    </button>
+                    <input type="hidden" id="prevDays"><input type="hidden" id="prevTaxable"><input type="hidden" id="prevTaxes"><input type="hidden" id="currentEmpId">
+                </div>
+            </div>
+
+            <h3 class="text-xl font-bold mb-4">سجل الرواتب المحفوظة</h3>
+            <div class="bg-slate-800 text-white rounded-2xl overflow-hidden shadow-lg">
+                <table class="w-full text-center">
+                    <thead class="bg-slate-900 text-slate-400 text-sm">
+                        <tr>
+                            <th class="p-4">الشهر</th>
+                            <th class="p-4">الأيام</th>
+                            <th class="p-4">Gross</th>
+                            <th class="p-4">Insurance</th>
+                            <th class="p-4">Tax</th>
+                            <th class="p-4">Martyr</th>
+                            <th class="p-4 font-bold text-emerald-400">NET</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable" class="divide-y divide-slate-700"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
-            <h3 class="text-2xl font-bold mb-6 text-slate-800">بيانات الموظف</h3>
-            <div class="space-y-4">
-                <input type="text" id="name" placeholder="اسم الموظف" class="w-full p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 ring-indigo-500 outline-none">
-                <input type="text" id="nid" placeholder="الرقم القومي" class="w-full p-4 bg-slate-50 border-none rounded-2xl">
-                <input type="number" id="insSal" placeholder="الأجر التأميني" class="w-full p-4 bg-slate-50 border-none rounded-2xl">
-                <div class="flex gap-3 mt-8">
-                    <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">حفظ البيانات</button>
-                    <button onclick="closeModal()" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">إلغاء</button>
+    <div id="addEmpModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-[600px] p-8 shadow-2xl">
+            <h3 class="text-2xl font-bold mb-6 border-b pb-4">إضافة موظف جديد</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2"><label class="text-xs font-bold text-slate-500">الاسم</label><input type="text" id="n-name" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
+                <div><label class="text-xs font-bold text-slate-500">الرقم القومي</label><input type="text" id="n-nid" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500">نوع العمل</label>
+                    <select id="n-type" class="w-full p-3 bg-slate-50 border rounded-xl">
+                        <option>Full Time</option><option>Part Time</option>
+                    </select>
                 </div>
+                <div><label class="text-xs font-bold text-slate-500">تاريخ التعيين</label><input type="date" id="n-hdate" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
+                <div><label class="text-xs font-bold text-slate-500">تاريخ الاستقالة (اختياري)</label><input type="date" id="n-rdate" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
+                <div class="col-span-2"><label class="text-xs font-bold text-slate-500">الأجر التأميني</label><input type="number" id="n-ins" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
+            </div>
+            <div class="flex gap-4 mt-8">
+                <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold">حفظ</button>
+                <button onclick="closeEmpModal()" class="flex-1 bg-slate-200 text-slate-600 py-3 rounded-xl font-bold">إلغاء</button>
             </div>
         </div>
     </div>
 
     <script>
-        const openModal = () => document.getElementById('modal').classList.remove('hidden');
-        const closeModal = () => document.getElementById('modal').classList.add('hidden');
+        function showSection(id) {
+            document.getElementById('sec-employees').classList.add('hidden');
+            document.getElementById('sec-profile').classList.add('hidden');
+            document.getElementById('sec-' + id).classList.remove('hidden');
+            if(id === 'employees') loadEmps();
+        }
 
-        async function loadEmployees() {
+        const openEmpModal = () => document.getElementById('addEmpModal').classList.remove('hidden');
+        const closeEmpModal = () => document.getElementById('addEmpModal').classList.add('hidden');
+
+        async function loadEmps() {
             const res = await fetch('/api/employees');
             const data = await res.json();
-            const table = document.getElementById('empTable');
-            table.innerHTML = data.map(e => \`
+            document.getElementById('empTable').innerHTML = data.map(e => \`
                 <tr class="hover:bg-slate-50 transition">
-                    <td class="p-6 font-bold text-slate-800">\${e.name}</td>
-                    <td class="p-6 text-slate-500 font-mono">\${e.nationalId}</td>
-                    <td class="p-6 font-bold text-indigo-600">\${e.insSalary.toLocaleString()} ج.م</td>
-                    <td class="p-6">
-                        <button onclick="runPayroll('\${e._id}')" class="bg-emerald-50 text-emerald-700 px-5 py-2 rounded-xl font-bold hover:bg-emerald-100 transition">
-                            <i class="fas fa-bolt ml-2"></i> صرف الراتب
+                    <td class="p-4 font-bold text-indigo-900">\${e.name}</td>
+                    <td class="p-4 text-slate-500">\${e.nationalId}</td>
+                    <td class="p-4">\${e.hiringDate ? e.hiringDate.split('T')[0] : '---'}</td>
+                    <td class="p-4">
+                        <button onclick="openProfile('\${e._id}')" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-bold hover:bg-indigo-200 transition">
+                            <i class="fas fa-folder-open ml-1"></i> فتح الملف
                         </button>
                     </td>
                 </tr>
@@ -187,40 +297,85 @@ app.get("/", (req, res) => {
         }
 
         async function saveEmp() {
-            const payload = {
-                name: document.getElementById('name').value,
-                nationalId: document.getElementById('nid').value,
-                insSalary: document.getElementById('insSal').value
-            };
-            const res = await fetch('/api/employees', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            if(res.ok) { closeModal(); loadEmployees(); }
-            else alert("خطأ في الحفظ!");
-        }
-
-        async function runPayroll(id) {
-            const gross = prompt("أدخل الراتب الإجمالي المستحق (Gross):", "10000");
-            if(!gross) return;
-            const res = await fetch('/api/payroll/run', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+            await fetch('/api/employees', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    empId: id,
-                    month: "2026-04",
-                    days: 30,
-                    basicGross: Number(gross),
-                    bonus: 0,
-                    deductions: 0
+                    name: document.getElementById('n-name').value,
+                    nationalId: document.getElementById('n-nid').value,
+                    employmentType: document.getElementById('n-type').value,
+                    hiringDate: document.getElementById('n-hdate').value || null,
+                    resignationDate: document.getElementById('n-rdate').value || null,
+                    insSalary: document.getElementById('n-ins').value
                 })
             });
-            const data = await res.json();
-            alert(\`تم الحساب بنجاح!\\nالصافي: \${data.net} ج.م\\nالضريبة: \${data.tax} ج.م\`);
+            closeEmpModal(); loadEmps();
         }
 
-        window.onload = loadEmployees;
+        async function openProfile(id) {
+            document.getElementById('currentEmpId').value = id;
+            showSection('profile');
+            
+            const res = await fetch(\`/api/employees/\${id}/payroll-details\`);
+            const data = await res.json();
+            
+            // Fill Info
+            document.getElementById('p-name').innerText = data.emp.name;
+            document.getElementById('p-nid').innerText = data.emp.nationalId;
+            document.getElementById('p-type').innerText = data.emp.employmentType;
+            document.getElementById('p-hdate').innerText = data.emp.hiringDate ? data.emp.hiringDate.split('T')[0] : '---';
+            document.getElementById('p-rdate').innerText = data.emp.resignationDate ? data.emp.resignationDate.split('T')[0] : '---';
+            document.getElementById('p-ins').innerText = data.emp.insSalary.toLocaleString();
+
+            // Fill Prev Data
+            document.getElementById('prevDays').value = data.prevData.pDays;
+            document.getElementById('prevTaxable').value = data.prevData.pTaxable;
+            document.getElementById('prevTaxes').value = data.prevData.pTaxes;
+
+            // Render History Table
+            const tbody = document.getElementById('historyTable');
+            if(data.history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-slate-500">لا توجد رواتب مسجلة لهذا الموظف</td></tr>';
+            } else {
+                tbody.innerHTML = data.history.map(r => \`
+                    <tr class="hover:bg-slate-700 transition">
+                        <td class="p-4 font-bold text-indigo-300">\${r.month}</td>
+                        <td class="p-4">\${r.days}</td>
+                        <td class="p-4">\${r.gross.toLocaleString()}</td>
+                        <td class="p-4">\${r.insurance.toLocaleString()}</td>
+                        <td class="p-4">\${r.monthlyTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td class="p-4">\${r.martyrs.toLocaleString()}</td>
+                        <td class="p-4 font-bold text-emerald-400">\${r.net.toLocaleString()}</td>
+                    </tr>
+                \`).join('');
+            }
+        }
+
+        async function runPayroll() {
+            const id = document.getElementById('currentEmpId').value;
+            const month = document.getElementById('c-month').value;
+            const days = document.getElementById('c-days').value;
+            const gross = document.getElementById('c-gross').value;
+
+            if(!month || !gross) return alert("يرجى إدخال الشهر والراتب");
+
+            await fetch('/api/payroll/calculate', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    empId: id, month, days: Number(days), basicGross: Number(gross),
+                    prevData: {
+                        prevDays: Number(document.getElementById('prevDays').value),
+                        prevTaxable: Number(document.getElementById('prevTaxable').value),
+                        prevTaxes: Number(document.getElementById('prevTaxes').value)
+                    }
+                })
+            });
+            
+            document.getElementById('c-month').value = "";
+            document.getElementById('c-gross').value = "";
+            openProfile(id); // Refresh profile to show new saved month
+        }
+
+        window.onload = () => showSection('employees');
     </script>
 </body>
 </html>
@@ -228,5 +383,4 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("ERP Online on port " + PORT));
-                                             
+app.listen(PORT, () => console.log("Final Sequential ERP Running..."));
