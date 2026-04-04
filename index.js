@@ -14,7 +14,7 @@ const connectDB = async () => {
     try {
         await mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 10000 });
         isConnected = true;
-    } catch (err) { console.log("DB Connection Error"); }
+    } catch (err) { console.log("DB Error"); }
 };
 
 const Payroll = mongoose.model("Payroll", new mongoose.Schema({
@@ -25,8 +25,7 @@ const Payroll = mongoose.model("Payroll", new mongoose.Schema({
     hiringDate: Date, resignationDate: Date
 }));
 
-const R = (n) => Math.round(n * 100) / 100;
-
+// دالة الحسابات الدقيقة
 function calculateG2N(d) {
     const basicFull = Number(d.basic) || 0;
     const days = Number(d.days) || 30;
@@ -35,29 +34,30 @@ function calculateG2N(d) {
     const rDate = d.resignationDate ? new Date(d.resignationDate) : null;
     const currentMonthDate = new Date(d.month + "-01");
 
-    // منطق التأمينات (بند رقم 6)
+    // 1. حساب التأمينات (Logic 1st day check)
     let insurance = 0;
-    const isHiredAfterFirst = hDate && hDate.getDate() > 1 && hDate.getMonth() === currentMonthDate.getMonth() && hDate.getFullYear() === currentMonthDate.getFullYear();
-    const isResignedSameMonth = rDate && rDate.getMonth() === currentMonthDate.getMonth() && rDate.getFullYear() === currentMonthDate.getFullYear();
-
+    const isHiredAfterFirst = hDate && hDate.getDate() > 1 && hDate.getMonth() === currentMonthDate.getMonth();
+    const isResignedSameMonth = rDate && rDate.getMonth() === currentMonthDate.getMonth();
+    
     if (!(isHiredAfterFirst && !isResignedSameMonth)) {
-        insurance = R(insSalary * 0.11);
+        insurance = insSalary * 0.11; 
     }
 
-    const actualBasic = R((basicFull / 30) * days);
-    const actualGross = actualBasic; // إضافة البدلات هنا لو لزم الأمر
-    const martyrs = R(actualGross * 0.0005);
+    const actualBasic = (basicFull / 30) * days;
+    const actualGross = actualBasic;
+    const martyrs = actualGross * 0.0005;
     
     const currentTaxable = actualGross - insurance;
     const totalDays = days + (Number(d.prevDays) || 0);
     const totalTaxable = currentTaxable + (Number(d.prevTaxable) || 0);
     
-    const annualTaxable = Math.floor((totalTaxable / totalDays * 360) / 10) * 10;
+    // 2. الوعاء السنوي (Floor 10) - أهم خطوة للضرائب
+    const annualTaxable = Math.floor(((totalTaxable / totalDays) * 360) / 10) * 10;
     
     let annualTax = 0;
-    let temp = Math.max(0, annualTaxable - 20000);
+    let temp = Math.max(0, annualTaxable - 20000); // إعفاء شخصي
 
-    // منطق الشرائح (نفس المعادلة الدقيقة السابقة)
+    // 3. الشرائح (بدون تقريب وسيط)
     if (annualTaxable <= 600000) {
         if (temp > 40000) { let x = Math.min(temp - 40000, 15000); annualTax += x * 0.10; }
         if (temp > 55000) { let x = Math.min(temp - 55000, 15000); annualTax += x * 0.15; }
@@ -76,10 +76,17 @@ function calculateG2N(d) {
     }
 
     const totalTaxDueUntilNow = (annualTax / 360) * totalDays;
-    const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - (Number(d.prevTaxes) || 0)));
-    const net = R(actualGross - insurance - monthlyTax - martyrs);
+    const monthlyTax = Math.max(0, totalTaxDueUntilNow - (Number(d.prevTaxes) || 0));
     
-    return { gross: actualGross, insurance, tax: monthlyTax, martyrs, net, currentTaxable };
+    // التقريب النهائي فقط
+    return { 
+        gross: Math.round(actualGross * 100) / 100, 
+        insurance: Math.round(insurance * 100) / 100, 
+        tax: Math.round(monthlyTax * 100) / 100, 
+        martyrs: Math.round(martyrs * 100) / 100, 
+        net: Math.round((actualGross - insurance - monthlyTax - martyrs) * 100) / 100,
+        currentTaxable
+    };
 }
 
 app.get("/api/check-employee/:nid", async (req, res) => {
@@ -88,15 +95,9 @@ app.get("/api/check-employee/:nid", async (req, res) => {
     if (history.length > 0) {
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         let savedMonths = history.map(h => h.month);
-        history.forEach(r => {
-            pDays += r.days; pTaxable += r.taxableIncome; pTaxes += r.monthlyTax;
-        });
+        history.forEach(r => { pDays += r.days; pTaxable += r.taxableIncome; pTaxes += r.monthlyTax; });
         const last = history[history.length - 1];
-        res.json({ 
-            status: "old", name: last.employee_name, empType: last.employmentType,
-            hDate: last.hiringDate, rDate: last.resignationDate,
-            lastIns: last.insSalary, pDays, pTaxable, pTaxes, savedMonths 
-        });
+        res.json({ status: "old", name: last.employee_name, empType: last.employmentType, hDate: last.hiringDate, rDate: last.resignationDate, lastIns: last.insSalary, pDays, pTaxable, pTaxes, savedMonths });
     } else { res.json({ status: "new" }); }
 });
 
@@ -114,27 +115,28 @@ app.get("/", (req, res) => {
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Payroll System Pro</title>
+    <title>Payroll Pro | Sedawy</title>
     <style>
-        :root { --primary: #1a73e8; --success: #27ae60; --error: #d32f2f; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f8f9fa; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .card { border: 1px solid #eee; padding: 15 min; border-radius: 10px; background: #fff; }
-        label { display: block; margin-top: 10px; font-size: 12px; font-weight: bold; color: #444; }
-        input, select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .btn { width: 100%; padding: 15px; background: var(--success); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        .res-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 20px; background: #2c3e50; color: white; padding: 20px; border-radius: 10px; text-align: center; }
-        .res-grid span { display: block; font-size: 20px; color: #f1c40f; margin-top: 5px; }
-        .error-text { color: var(--error); font-size: 11px; display: none; }
+        :root { --primary: #1a73e8; --success: #27ae60; --dark: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; margin:0; }
+        .container { max-width: 1000px; margin: 20px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .card { border: 1px solid #eee; padding: 20px; border-radius: 10px; }
+        label { display: block; margin-top: 10px; font-size: 12px; font-weight: bold; color: #666; }
+        input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 15px; }
+        .btn { width: 100%; padding: 18px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 25px; transition: 0.3s; }
+        .btn:hover { background: #219150; }
+        .res-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 30px; background: var(--dark); color: white; padding: 25px; border-radius: 12px; text-align: center; }
+        .res-grid span { display: block; font-size: 22px; color: #f1c40f; margin-top: 5px; font-weight: bold; }
+        .error { color: #d32f2f; font-size: 11px; margin-top: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 style="text-align:center; color: var(--primary);">Payroll Management System</h2>
+        <h2 style="text-align:center; color: var(--primary);">Payroll Precision System</h2>
         <div class="grid">
             <div class="card">
-                <h3>بيانات الموظف</h3>
+                <h3>| الموظف</h3>
                 <label>الرقم القومي</label><input type="text" id="nid" onblur="checkEmp()">
                 <label>الاسم</label><input type="text" id="name">
                 <label>نوع العمل</label>
@@ -144,27 +146,23 @@ app.get("/", (req, res) => {
                 </select>
             </div>
             <div class="card">
-                <h3>التواريخ</h3>
-                <label>تاريخ التعيين</label><input type="date" id="hiringDate">
-                <label>تاريخ الاستقالة</label><input type="date" id="resignationDate">
-                <label>شهر الاحتساب</label>
-                <select id="monthSelect"></select>
+                <h3>| التواريخ والأيام</h3>
+                <label>تاريخ التعيين</label><input type="date" id="hiringDate" onchange="suggestDays()">
+                <label>تاريخ الاستقالة</label><input type="date" id="resignationDate" onchange="suggestDays()">
+                <label>أيام العمل (Editable)</label><input type="number" id="days" value="30">
+                <label>شهر الاحتساب</label><select id="monthSelect"></select>
             </div>
             <div class="card">
-                <h3>الماليات</h3>
-                <label>الأجر التأميني (Min/Max Alert)</label>
-                <input type="number" id="insSalary" oninput="validateIns()">
-                <div id="insError" class="error-text">خارج الحدود المسموحة!</div>
+                <h3>| المبالغ</h3>
+                <label>الأجر التأميني</label><input type="number" id="insSalary" oninput="validateIns()">
+                <div id="insErr" class="error" style="display:none;"></div>
                 <label>Gross Salary</label><input type="number" id="basic">
-                <label>أيام العمل</label><input type="number" id="days" value="30">
             </div>
         </div>
 
-        <input type="hidden" id="pDays" value="0">
-        <input type="hidden" id="pTaxable" value="0">
-        <input type="hidden" id="pTaxes" value="0">
+        <input type="hidden" id="pDays" value="0"><input type="hidden" id="pTaxable" value="0"><input type="hidden" id="pTaxes" value="0">
 
-        <button class="btn" onclick="saveAndCalc()">💾 حفظ واحسب الشهر الحالي</button>
+        <button class="btn" onclick="saveRecord()">🚀 حفظ ومعالجة الراتب</button>
 
         <div class="res-grid">
             <div>Gross <span id="oG">0</span></div>
@@ -176,36 +174,66 @@ app.get("/", (req, res) => {
     </div>
 
     <script>
-        let savedMonths = [];
+        // دالة تحديد الأيام أوتوماتيك (بحد أقصى 30 وأدنى 1)
+        function suggestDays() {
+            const h = document.getElementById('hiringDate').value;
+            const r = document.getElementById('resignationDate').value;
+            const m = document.getElementById('monthSelect').value;
+            if(!m) return;
 
-        function fillMonths(alreadySaved = []) {
+            let start = new Date(m + "-01");
+            let end = new Date(new Date(m + "-01").setMonth(start.getMonth() + 1, 0)); // آخر يوم في الشهر
+            
+            if(h && new Date(h) > start) start = new Date(h);
+            if(r && new Date(r) < end) end = new Date(r);
+            
+            let diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            document.getElementById('days').value = Math.max(1, Math.min(30, diff));
+        }
+
+        function fillMonths(saved = [], resignationDate = null) {
             const select = document.getElementById('monthSelect');
             select.innerHTML = "";
             const months = ["01","02","03","04","05","06","07","08","09","10","11","12"];
+            
+            // تحديد أول شهر متاح
+            let lastSaved = saved.length > 0 ? saved[saved.length - 1] : null;
+            let resDate = resignationDate ? new Date(resignationDate) : null;
+
             months.forEach(m => {
                 const val = "2026-" + m;
                 const opt = document.createElement('option');
                 opt.value = val;
                 opt.innerText = val;
-                if(alreadySaved.includes(val)) opt.disabled = true;
+
+                // المنطق: لو الشهر محفوظ قبل كدة يبقى Disabled
+                if(saved.includes(val)) {
+                    opt.disabled = true;
+                } 
+                // لو مش محفوظ، بس هو مش "الشهر اللي عليه الدور"، يبقى Disabled
+                // إلا لو فيه استقالة في شهر سابق، بنفتح الشهور اللي بعدها
+                else if (lastSaved && val < lastSaved) {
+                    opt.disabled = true;
+                }
+                
                 select.appendChild(opt);
             });
+            // اختيار أول شهر مش Disabled
+            for(let i=0; i<select.options.length; i++){
+                if(!select.options[i].disabled) { select.selectedIndex = i; break; }
+            }
         }
-        fillMonths();
+        fillMonths([]);
 
         function validateIns() {
             const type = document.getElementById('empType').value;
             const val = Number(document.getElementById('insSalary').value);
-            const err = document.getElementById('insError');
-            const max = 16700;
-            const min = type === "Full Time" ? Math.round(7000/1.3 * 100)/100 : 2720;
-            
-            if(val > max || val < min) {
+            const err = document.getElementById('insErr');
+            const min = type === "Full Time" ? 5384.62 : 2720;
+            if(val > 16700 || val < min) {
                 err.style.display = "block";
-                err.innerText = "تنبيه: الحد الأدنى " + min + " والحد الأقصى " + max;
-            } else {
-                err.style.display = "none";
-            }
+                err.innerText = "Alert: Min " + min + " | Max 16700";
+            } else { err.style.display = "none"; }
         }
 
         async function checkEmp() {
@@ -222,15 +250,14 @@ app.get("/", (req, res) => {
                 document.getElementById('pDays').value = d.pDays;
                 document.getElementById('pTaxable').value = d.pTaxable;
                 document.getElementById('pTaxes').value = d.pTaxes;
-                fillMonths(d.savedMonths);
-                alert("Old Employee Data Loaded");
+                fillMonths(d.savedMonths, d.rDate);
+                suggestDays();
             } else {
                 fillMonths([]);
-                alert("New Employee");
             }
         }
 
-        async function saveAndCalc() {
+        async function saveRecord() {
             const data = {
                 nationalId: document.getElementById('nid').value,
                 name: document.getElementById('name').value,
@@ -253,23 +280,23 @@ app.get("/", (req, res) => {
             });
             const r = await res.json();
             
-            // Update UI
             document.getElementById('oG').innerText = r.gross.toLocaleString();
             document.getElementById('oI').innerText = r.insurance.toLocaleString();
             document.getElementById('oT').innerText = r.tax.toLocaleString(undefined, {minimumFractionDigits: 2});
             document.getElementById('oM').innerText = r.martyrs.toLocaleString();
             document.getElementById('oN').innerText = r.net.toLocaleString();
 
-            // 🔥 Point 2: Update previouses instantly without refresh
+            // تحديث التراكمي فوراً
             document.getElementById('pDays').value = Number(data.prevDays) + Number(data.days);
             document.getElementById('pTaxable').value = Number(data.prevTaxable) + r.currentTaxable;
             document.getElementById('pTaxes').value = Number(data.prevTaxes) + r.tax;
             
-            // Disable the month we just calculated
-            const currentOpt = document.querySelector("#monthSelect option[value='"+data.month+"']");
-            if(currentOpt) currentOpt.disabled = true;
+            // تحديث قائمة الشهور لتعطيل الشهر الحالي واختيار القادم
+            let currentOption = document.querySelector("#monthSelect option[value='"+data.month+"']");
+            if(currentOption) currentOption.disabled = true;
+            document.getElementById('monthSelect').selectedIndex += 1;
 
-            alert("Month Recorded Successfully!");
+            alert("Month Saved Successfully!");
         }
     </script>
 </body>
@@ -278,5 +305,5 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("System Running on " + PORT));
+app.listen(PORT, () => console.log("Precision System Running..."));
 module.exports = app;
