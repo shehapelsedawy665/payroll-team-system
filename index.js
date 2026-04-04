@@ -6,9 +6,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 1. إعدادات قاعدة البيانات
 const mongoURI = "mongodb://Sedawy:Shehapelsedawy%2366@ac-uso95cd-shard-00-00.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-01.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-02.a6bquen.mongodb.net:27017/payrollDB?ssl=true&replicaSet=atlas-129j51-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Egyptian-Payroll";
 
-// إدارة الاتصال بقاعدة البيانات لمنع الـ Timeout
 let isConnected = false;
 const connectDB = async () => {
     if (isConnected) return;
@@ -18,9 +18,8 @@ const connectDB = async () => {
             socketTimeoutMS: 45000,
         });
         isConnected = true;
-        console.log("✅ Database Connected");
     } catch (err) {
-        console.log("❌ Database Connection Error:", err);
+        console.log("DB Connection Error:", err);
     }
 };
 
@@ -32,7 +31,7 @@ const Payroll = mongoose.model("Payroll", new mongoose.Schema({
 
 const R = (n) => Math.round(n * 100) / 100;
 
-// API لخدمة البيانات التاريخية
+// 2. الـ APIs
 app.get("/api/history/:id", async (req, res) => {
     await connectDB();
     try {
@@ -48,20 +47,24 @@ app.get("/api/history/:id", async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// API الحساب والاعتماد
 app.post("/api/calculate", async (req, res) => {
     await connectDB();
     try {
         const d = req.body;
-        const basic = Number(d.basic) || 0;
+        const basicFull = Number(d.basic) || 0;
         const days = Number(d.days) || 0;
         const trans = Number(d.transport) || 0;
         const comm = Number(d.comm) || 0;
         
-        const actualBasic = R((basic / 30) * days);
-        const gross = actualBasic + trans + comm;
-        const insurance = R(Math.min(gross, 16700) * 0.11);
-        const currentTaxable = R(gross - insurance - (20000 / 360 * days));
+        // الحساب الفعلي للأجر بناءً على الأيام
+        const actualBasic = R((basicFull / 30) * days);
+        const actualGross = actualBasic + trans + comm;
+
+        // التأمينات على المبلغ الكامل (Full Amount) حسب طلبك
+        const insurance = R(Math.min((basicFull + trans + comm), 16700) * 0.11);
+        
+        const martyrs = R(actualGross * 0.0005);
+        const currentTaxable = R(actualGross - insurance - (20000 / 360 * days));
         
         const totalDays = days + (Number(d.prevDays) || 0);
         const totalTaxable = currentTaxable + (Number(d.prevTaxable) || 0);
@@ -77,74 +80,99 @@ app.post("/api/calculate", async (req, res) => {
         }
         
         const monthlyTax = R((annualTax / 360 * totalDays) - (Number(d.prevTaxes) || 0));
-        const martyrs = R(gross * 0.0005);
-        const net = R(gross - insurance - monthlyTax - martyrs);
+        const net = R(actualGross - insurance - monthlyTax - martyrs);
 
-        const newRecord = new Payroll({ 
+        await new Payroll({ 
             employee_name: d.name, nationalId: d.nationalId, month: d.month, 
-            gross, taxableIncome: currentTaxable, monthlyTax, days, insurance, martyrs, net 
-        });
-        await newRecord.save();
+            gross: actualGross, taxableIncome: currentTaxable, monthlyTax, days, insurance, martyrs, net 
+        }).save();
 
-        res.json({ gross, insurance, tax: monthlyTax, martyrs, net });
+        res.json({ gross: actualGross, insurance, tax: monthlyTax, martyrs, net });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// واجهة المستخدم (HTML)
+// 3. واجهة الـ HTML الكاملة
 app.get("/", (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Payroll System | Payroll Team</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الرواتب المتكامل</title>
     <style>
-        :root { --primary: #1a73e8; --success: #27ae60; --dark: #2c3e50; --warning: #f1c40f; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
-        .container { max-width: 1050px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: var(--dark); margin-bottom: 30px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 20px; }
-        .card { border: 1px solid #e1e4e8; padding: 20px; border-radius: 12px; }
-        .card h3 { color: var(--primary); margin-top: 0; border-right: 4px solid var(--primary); padding-right: 10px; text-align: right; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; text-align: center; font-size: 16px; }
-        .btn { width: 100%; padding: 18px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        .results { margin-top: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background: var(--dark); color: white; padding: 25px; border-radius: 12px; text-align: center; }
-        .res-item span { display: block; font-size: 24px; color: var(--warning); font-weight: bold; margin-top: 8px; }
+        :root { --primary: #1a73e8; --success: #27ae60; --dark: #2c3e50; --warning: #f1c40f; --light: #f8f9fa; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f7; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: var(--dark); font-size: 2.2em; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+        h1 span { font-size: 0.8em; vertical-align: middle; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; }
+        .card { background: #fff; border: 1px solid #e1e4e8; padding: 25px; border-radius: 15px; transition: 0.3s; }
+        .card:hover { box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .card h3 { color: var(--primary); margin-top: 0; border-right: 5px solid var(--primary); padding-right: 15px; margin-bottom: 25px; font-size: 1.3em; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #666; }
+        input { width: 100%; padding: 14px; margin-bottom: 20px; border: 1px solid #ced4da; border-radius: 10px; box-sizing: border-box; text-align: center; font-size: 16px; background: var(--light); transition: 0.2s; }
+        input:focus { border-color: var(--primary); outline: none; background: #fff; box-shadow: 0 0 0 3px rgba(26,115,232,0.1); }
+        input[readonly] { background: #f1f3f4; cursor: not-allowed; color: #777; }
+        .btn { width: 100%; padding: 20px; background: var(--success); color: white; border: none; border-radius: 12px; font-size: 20px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 20px; box-shadow: 0 4px 15px rgba(39,174,96,0.3); }
+        .btn:hover { background: #219150; transform: translateY(-2px); }
+        .btn:active { transform: translateY(0); }
+        .results { margin-top: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; background: var(--dark); color: white; padding: 30px; border-radius: 15px; }
+        .res-item { text-align: center; border-left: 1px solid #444; }
+        .res-item:last-child { border-left: none; }
+        .res-item p { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #bbb; }
+        .res-item span { display: block; font-size: 26px; color: var(--warning); font-weight: bold; margin-top: 10px; }
+        @media (max-width: 768px) { .results { grid-template-columns: 1fr 1fr; } .res-item { border: none; padding: 10px; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 نظام إدارة الرواتب المتكامل</h1>
+        <h1>📊 نظام إدارة الرواتب المتكامل <span>(Payroll Team)</span></h1>
+        
         <div class="grid">
             <div class="card">
                 <h3>| البيانات الأساسية</h3>
-                <input type="text" id="nid" placeholder="الرقم القومي" onblur="check()">
-                <input type="text" id="name" placeholder="اسم الموظف">
+                <label>الرقم القومي</label>
+                <input type="text" id="nid" placeholder="أدخل 14 رقم" maxlength="14" onblur="check()">
+                <label>اسم الموظف</label>
+                <input type="text" id="name" placeholder="يظهر تلقائياً للمسجلين">
+                <label>الشهر الضريبي</label>
                 <input type="month" id="month">
             </div>
+
             <div class="card">
-                <h3>| الماليات</h3>
-                <input type="number" id="basic" value="10000" placeholder="الأساسي">
-                <input type="number" id="trans" value="0" placeholder="بدلات">
-                <input type="number" id="comm" value="0" placeholder="عمولات">
+                <h3>| الماليات (الشهرية)</h3>
+                <label>الراتب الأساسي</label>
+                <input type="number" id="basic" value="10000">
+                <label>بدل انتقال / سكن</label>
+                <input type="number" id="trans" value="0">
+                <label>عمولات / إضافي</label>
+                <input type="number" id="comm" value="0">
             </div>
+
             <div class="card">
-                <h3>| التراكمي</h3>
-                <input type="number" id="days" value="30" placeholder="أيام العمل">
+                <h3>| أيام العمل والتراكمي</h3>
+                <label>أيام العمل الفعلية</label>
+                <input type="number" id="days" value="30" max="30">
+                <label>إجمالي أيام العمل السابقة</label>
                 <input type="number" id="pDays" value="0" readonly>
+                <label>وعاء ضريبي سابق</label>
                 <input type="number" id="pTaxable" value="0" readonly>
                 <input type="hidden" id="pTaxes" value="0">
             </div>
         </div>
-        <button class="btn" onclick="calc()">💾 اعتماد وحفظ الراتب</button>
+
+        <button class="btn" onclick="calc()">💾 اعتماد وحفظ الراتب في القاعدة</button>
+
         <div class="results">
-            <div class="res-item">Gross<span id="oG">0</span></div>
-            <div class="res-item">Ins<span id="oI">0</span></div>
-            <div class="res-item">Tax<span id="oT">0</span></div>
-            <div class="res-item">Martyr<span id="oM">0</span></div>
-            <div class="res-item">NET<span id="oN">0</span></div>
+            <div class="res-item"><p>Gross Salary</p><span id="oG">0</span></div>
+            <div class="res-item"><p>Insurance</p><span id="oI">0</span></div>
+            <div class="res-item"><p>Income Tax</p><span id="oT">0</span></div>
+            <div class="res-item"><p>Martyrs Tax</p><span id="oM">0</span></div>
+            <div class="res-item"><p>Net Salary</p><span id="oN">0</span></div>
         </div>
     </div>
+
     <script>
         async function check() {
             const id = document.getElementById('nid').value;
@@ -157,10 +185,20 @@ app.get("/", (req, res) => {
                     document.getElementById('pDays').value = d.prevDays;
                     document.getElementById('pTaxable').value = d.prevTaxable;
                     document.getElementById('pTaxes').value = d.prevTaxes;
+                } else {
+                    document.getElementById('pDays').value = 0;
+                    document.getElementById('pTaxable').value = 0;
+                    document.getElementById('pTaxes').value = 0;
                 }
-            } catch(e) { console.log("History check failed"); }
+            } catch(e) { console.error("Error fetching history"); }
         }
+
         async function calc() {
+            const btn = document.querySelector('.btn');
+            const originalText = btn.innerText;
+            btn.innerText = "جاري الحساب والحفظ...";
+            btn.disabled = true;
+
             const data = {
                 nationalId: document.getElementById('nid').value,
                 name: document.getElementById('name').value,
@@ -173,6 +211,7 @@ app.get("/", (req, res) => {
                 prevTaxable: document.getElementById('pTaxable').value,
                 prevTaxes: document.getElementById('pTaxes').value
             };
+
             try {
                 const res = await fetch('/api/calculate', {
                     method: 'POST',
@@ -181,13 +220,21 @@ app.get("/", (req, res) => {
                 });
                 const r = await res.json();
                 if(r.error) throw new Error(r.error);
+
                 document.getElementById('oG').innerText = r.gross.toLocaleString();
                 document.getElementById('oI').innerText = r.insurance.toLocaleString();
                 document.getElementById('oT').innerText = r.tax.toLocaleString();
                 document.getElementById('oM').innerText = r.martyrs.toLocaleString();
                 document.getElementById('oN').innerText = r.net.toLocaleString();
-                alert("✅ تم الحساب والحفظ بنجاح!");
-            } catch(e) { alert("❌ خطأ: " + e.message); }
+                
+                alert("✅ تم بنجاح! تم حفظ الراتب وتحديث سجل الموظف.");
+                await check(); // لتحديث البيانات التراكمية فوراً
+            } catch(e) {
+                alert("❌ خطأ في النظام: " + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
@@ -196,6 +243,5 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("🚀 Server up on port " + PORT));
-
+app.listen(PORT, () => console.log("Server Running on port " + PORT));
 module.exports = app;
