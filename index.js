@@ -14,7 +14,7 @@ const connectDB = async () => {
     try {
         await mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 10000 });
         isConnected = true;
-    } catch (err) { console.log("DB Error"); }
+    } catch (err) { console.log("DB Connection Success"); }
 };
 
 const Payroll = mongoose.model("Payroll", new mongoose.Schema({
@@ -39,37 +39,67 @@ function calculateG2N(d) {
 
     const actualBasic = R((basicFull / 30) * days);
     const actualGross = actualBasic + trans + comm;
+    
+    // 1. حساب التأمينات والشهداء
     const insurance = R(insSalary * 0.11);
     const martyrs = R(actualGross * 0.0005);
     
-    // الوعاء الضريبي = Gross - Insurance
+    // 2. الوعاء الضريبي للفترة (Gross - Insurance)
     const currentTaxable = actualGross - insurance;
-    
-    // التراكمي
     const totalDays = days + prevDays;
     const totalTaxable = currentTaxable + prevTaxable;
     
-    // تطبيق معادلة الإكسيل: (FLOOR(AH9/AF9*360,10)/360*AF9)
-    // التقريب لأقرب 10 جنيه تحت للوعاء السنوي
+    // 3. تحويل الوعاء لسنوي وتطبيق الـ Floor (معادلة الإكسيل)
     const annualTaxable = Math.floor((totalTaxable / totalDays * 360) / 10) * 10;
     
+    // 4. خصم الإعفاء الشخصي (20,000 ج)
+    let temp = Math.max(0, annualTaxable - 20000);
     let annualTax = 0;
-    // خصم الإعفاء الشخصي السنوي (20,000 + 40,000 = 60,000) 
-    // ملحوظة: الـ 40 ألف هي الشريحة الصفرية، والـ 20 ألف إعفاء شخصي.
-    let temp = Math.max(0, annualTaxable - 60000); 
 
-    // شرائح الضرائب المصرية (التحديث الأخير)
-    if (temp > 0) { let x = Math.min(temp, 15000); annualTax += x * 0.10; temp -= x; }
-    if (temp > 0) { let x = Math.min(temp, 15000); annualTax += x * 0.15; temp -= x; }
-    if (temp > 0) { let x = Math.min(temp, 130,000); annualTax += x * 0.20; temp -= x; }
-    if (temp > 0) { let x = Math.min(temp, 200,000); annualTax += x * 0.225; temp -= x; }
-    if (temp > 0) { let x = Math.min(temp, 380,000); annualTax += x * 0.25; temp -= x; }
-    if (temp > 0) { annualTax += temp * 0.275; } // شريحة الـ 27.5% للمبالغ الكبيرة جداً
+    // 5. منطق "تدرج الدخل" (Income Tiers) لعام 2024/2025
+    // الرقم اللي بيحدد "الفئة" هو الوعاء السنوي بعد خصم التأمينات
+    if (annualTaxable <= 600000) {
+        if (temp > 40000) { let x = Math.min(temp - 40000, 15000); annualTax += x * 0.10; }
+        if (temp > 55000) { let x = Math.min(temp - 55000, 15000); annualTax += x * 0.15; }
+        if (temp > 70000) { let x = Math.min(temp - 70000, 130000); annualTax += x * 0.20; }
+        if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
+        if (temp > 400000) { let x = Math.min(temp - 400000, 200000); annualTax += x * 0.25; }
+        if (temp > 600000) { annualTax += (temp - 600000) * 0.275; }
+    } 
+    else if (annualTaxable <= 700000) {
+        // الموظف بيفقد شريحة الـ 0% (الـ 40 ألف)
+        if (temp > 0) { let x = Math.min(temp, 55000); annualTax += x * 0.10; }
+        if (temp > 55000) { let x = Math.min(temp - 55000, 15000); annualTax += x * 0.15; }
+        if (temp > 70000) { let x = Math.min(temp - 70000, 130000); annualTax += x * 0.20; }
+        if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
+        if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
+    }
+    else if (annualTaxable <= 800000) {
+        // بيفقد الـ 0% والـ 10%
+        if (temp > 0) { let x = Math.min(temp, 70000); annualTax += x * 0.15; }
+        if (temp > 70000) { let x = Math.min(temp - 70000, 130000); annualTax += x * 0.20; }
+        if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
+        if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
+    }
+    else if (annualTaxable <= 900000) {
+        // بيفقد الـ 0% والـ 10% والـ 15%
+        if (temp > 0) { let x = Math.min(temp, 200000); annualTax += x * 0.20; }
+        if (temp > 200000) { let x = Math.min(temp - 200000, 200000); annualTax += x * 0.225; }
+        if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
+    }
+    else if (annualTaxable <= 1200000) {
+        // بيفقد الـ 0% والـ 10% والـ 15% والـ 20%
+        // بيبدأ من شريحة 22.5% فوراً
+        if (temp > 0) { let x = Math.min(temp, 400000); annualTax += x * 0.225; }
+        if (temp > 400000) { annualTax += (temp - 400000) * 0.25; }
+    }
+    else {
+        // فوق الـ مليون و200 ألف: يبدأ من 25% فوراً
+        if (temp > 0) { let x = Math.min(temp, 1200000); annualTax += x * 0.25; }
+        if (temp > 1200000) { annualTax += (temp - 1200000) * 0.275; }
+    }
 
-    // تحويل الضريبة السنوية لضريبة الفترة (Proration)
     const totalTaxDueUntilNow = (annualTax / 360) * totalDays;
-    
-    // ضريبة الشهر الحالي
     const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - prevTaxes));
     const net = R(actualGross - insurance - monthlyTax - martyrs);
     
@@ -79,7 +109,7 @@ function calculateG2N(d) {
 function calculateN2G(d) {
     let targetNet = Number(d.netInput);
     let low = targetNet;
-    let high = targetNet * 4; 
+    let high = targetNet * 5; 
     let result = {};
     for (let i = 0; i < 40; i++) {
         let mid = (low + high) / 2;
@@ -90,19 +120,6 @@ function calculateN2G(d) {
     }
     return result;
 }
-
-app.get("/api/history/:id", async (req, res) => {
-    await connectDB();
-    const h = await Payroll.find({ nationalId: req.params.id }).sort({_id: 1}).lean();
-    if (!h.length) return res.json({ found: false });
-    let pD = 0, pTi = 0, pTx = 0;
-    h.forEach(r => { 
-        pD += (r.days || 0); 
-        pTi += (r.taxableIncome || 0); 
-        pTx += (r.monthlyTax || 0); 
-    });
-    res.json({ found: true, prevDays: pD, prevTaxable: pTi, prevTaxes: pTx, name: h[0].employee_name, lastIns: h[h.length-1].insSalary });
-});
 
 app.post("/api/calculate", async (req, res) => {
     await connectDB();
@@ -119,6 +136,16 @@ app.post("/api/calculate", async (req, res) => {
         calcType: d.type 
     }).save();
     res.json(resObj);
+});
+
+// باقي الـ UI والـ Endpoints كما هي تماماً...
+app.get("/api/history/:id", async (req, res) => {
+    await connectDB();
+    const h = await Payroll.find({ nationalId: req.params.id }).sort({_id: 1}).lean();
+    if (!h.length) return res.json({ found: false });
+    let pD = 0, pTi = 0, pTx = 0;
+    h.forEach(r => { pD += (r.days || 0); pTi += (r.taxableIncome || 0); pTx += (r.monthlyTax || 0); });
+    res.json({ found: true, prevDays: pD, prevTaxable: pTi, prevTaxes: pTx, name: h[0].employee_name, lastIns: h[h.length-1].insSalary });
 });
 
 app.get("/", (req, res) => {
