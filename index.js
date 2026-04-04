@@ -35,23 +35,14 @@ const Payroll = mongoose.model("Payroll", new mongoose.Schema({
     net: Number
 }));
 
-// --- Payroll Engine (Sequential Logic) ---
+// --- Payroll Engine ---
 const R = (n) => Math.round(n * 100) / 100;
 
 function calculateSequential(data, prevData) {
-    const { basicFull, days, insSalary, hDateStr, rDateStr, monthStr } = data;
+    const { basicFull, days, insSalary } = data;
     const { prevDays, prevTaxable, prevTaxes } = prevData;
 
-    const currentMonthDate = new Date(monthStr + "-01");
-    const hDate = hDateStr ? new Date(hDateStr) : null;
-    const rDate = rDateStr ? new Date(rDateStr) : null;
-
-    // التأمينات: مبلغ كامل وليس Prorated بناءً على طلبك
     let insurance = insSalary * 0.11;
-    
-    // لو فيه لوجيك مخصص لعدم حساب التأمين في شهور معينة، بيتحط هنا
-    // مثال: لو تعين بعد يوم 1 في الشهر وما استقالش نفس الشهر.. إلخ
-
     const actualBasic = (basicFull / 30) * days;
     const martyrs = actualBasic * 0.0005;
     const currentTaxable = actualBasic - insurance;
@@ -62,7 +53,7 @@ function calculateSequential(data, prevData) {
     const annualTaxable = Math.floor(((totalTaxable / totalDays) * 360) / 10) * 10;
     
     let annualTax = 0;
-    let temp = Math.max(0, annualTaxable - 20000); // إعفاء 20 ألف
+    let temp = Math.max(0, annualTaxable - 20000); 
 
     if (annualTaxable <= 600000) {
         if (temp > 40000) { let x = Math.min(temp - 40000, 15000); annualTax += x * 0.10; }
@@ -103,7 +94,20 @@ app.post("/api/employees", async (req, res) => {
     } catch(e) { res.status(400).json({ error: "خطأ في الحفظ" }); }
 });
 
-// جلب تفاصيل الموظف وسجل رواتبه
+// مسح الموظف نهائياً من MongoDB
+app.delete("/api/employees/:id", async (req, res) => {
+    await Employee.findByIdAndDelete(req.params.id);
+    await Payroll.deleteMany({ employeeId: req.params.id });
+    res.json({ success: true });
+});
+
+// إنهاء خدمة (استقالة)
+app.post("/api/employees/:id/resign", async (req, res) => {
+    const { date } = req.body;
+    await Employee.findByIdAndUpdate(req.params.id, { resignationDate: date });
+    res.json({ success: true });
+});
+
 app.get("/api/employees/:id/payroll-details", async (req, res) => {
     const emp = await Employee.findById(req.params.id).lean();
     const history = await Payroll.find({ employeeId: emp._id }).sort({ month: 1 }).lean();
@@ -122,30 +126,19 @@ app.post("/api/payroll/calculate", async (req, res) => {
     const { empId, month, days, basicGross, prevData } = req.body;
     const emp = await Employee.findById(empId);
 
-    const result = calculateSequential({
-        basicFull: basicGross,
-        days: days,
-        insSalary: emp.insSalary,
-        hDateStr: emp.hiringDate,
-        rDateStr: emp.resignationDate,
-        monthStr: month
-    }, prevData);
+    const result = calculateSequential({ basicFull: basicGross, days, insSalary: emp.insSalary }, prevData);
 
     const record = new Payroll({
-        employeeId: emp._id,
-        month, days,
-        gross: result.gross,
-        taxableIncome: result.currentTaxable,
-        monthlyTax: result.tax,
-        insurance: result.insurance,
-        martyrs: result.martyrs,
-        net: result.net
+        employeeId: emp._id, month, days,
+        gross: result.gross, taxableIncome: result.currentTaxable,
+        monthlyTax: result.tax, insurance: result.insurance,
+        martyrs: result.martyrs, net: result.net
     });
     await record.save();
     res.json(record);
 });
 
-// --- UI (Dashboard + Employee Profile) ---
+// --- UI Dashboard ---
 app.get("/", (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -155,7 +148,6 @@ app.get("/", (req, res) => {
     <title>Professional ERP Payroll</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style> .modal-open { overflow: hidden; } </style>
 </head>
 <body class="bg-slate-50 flex min-h-screen text-slate-800">
     
@@ -170,7 +162,7 @@ app.get("/", (req, res) => {
         <div id="sec-employees">
             <div class="flex justify-between items-center mb-8">
                 <h2 class="text-3xl font-extrabold text-slate-800">سجل الموظفين</h2>
-                <button onclick="openEmpModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-md transition">+ موظف جديد</button>
+                <button onclick="openEmpModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-md">+ موظف جديد</button>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <table class="w-full text-right">
@@ -178,7 +170,7 @@ app.get("/", (req, res) => {
                         <tr>
                             <th class="p-4 font-bold">الاسم</th>
                             <th class="p-4 font-bold">الرقم القومي</th>
-                            <th class="p-4 font-bold">التعيين</th>
+                            <th class="p-4 font-bold">حالة الموظف</th>
                             <th class="p-4 font-bold">الإجراءات</th>
                         </tr>
                     </thead>
@@ -188,7 +180,13 @@ app.get("/", (req, res) => {
         </div>
 
         <div id="sec-profile" class="hidden">
-            <button onclick="showSection('employees')" class="mb-6 text-indigo-600 font-bold hover:underline"><i class="fas fa-arrow-right ml-2"></i> عودة للقائمة</button>
+            <div class="flex justify-between mb-6">
+                <button onclick="showSection('employees')" class="text-indigo-600 font-bold hover:underline"><i class="fas fa-arrow-right ml-2"></i> عودة للقائمة</button>
+                <div>
+                    <button onclick="resignEmployee()" class="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold hover:bg-orange-200 ml-2"><i class="fas fa-user-slash ml-1"></i> إنهاء خدمة</button>
+                    <button onclick="deleteEmployee()" class="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-bold hover:bg-red-200"><i class="fas fa-trash ml-1"></i> حذف نهائي</button>
+                </div>
+            </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div class="col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -196,18 +194,18 @@ app.get("/", (req, res) => {
                     <div class="space-y-2 text-sm">
                         <p><span class="font-bold text-slate-500">الرقم القومي:</span> <span id="p-nid">--</span></p>
                         <p><span class="font-bold text-slate-500">نوع العمل:</span> <span id="p-type">--</span></p>
-                        <p><span class="font-bold text-slate-500">تاريخ التعيين:</span> <span id="p-hdate">--</span></p>
-                        <p><span class="font-bold text-slate-500">تاريخ الاستقالة:</span> <span id="p-rdate">--</span></p>
+                        <p><span class="font-bold text-slate-500">تاريخ التعيين:</span> <span id="p-hdate" class="text-blue-600 font-bold">--</span></p>
+                        <p><span class="font-bold text-slate-500">تاريخ الاستقالة:</span> <span id="p-rdate" class="text-red-600 font-bold">--</span></p>
                         <p><span class="font-bold text-slate-500">الأجر التأميني:</span> <span id="p-ins" class="font-bold text-green-600">--</span></p>
                     </div>
                 </div>
 
                 <div class="col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-indigo-200 border-t-4 border-t-indigo-500">
-                    <h3 class="text-xl font-bold mb-4">احتساب راتب جديد (Sequential)</h3>
+                    <h3 class="text-xl font-bold mb-4">احتساب راتب (Sequential Logic)</h3>
                     <div class="grid grid-cols-3 gap-4 mb-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1">شهر الاحتساب</label>
-                            <input type="month" id="c-month" class="w-full p-2 border rounded-lg bg-slate-50">
+                            <select id="c-month" class="w-full p-2 border rounded-lg bg-slate-50 outline-none"></select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1">أيام العمل</label>
@@ -218,9 +216,7 @@ app.get("/", (req, res) => {
                             <input type="number" id="c-gross" class="w-full p-2 border rounded-lg bg-slate-50">
                         </div>
                     </div>
-                    <button onclick="runPayroll()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition shadow-md">
-                        <i class="fas fa-calculator ml-2"></i> احسب واحفظ الراتب
-                    </button>
+                    <button id="calcBtn" onclick="runPayroll()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition shadow-md"><i class="fas fa-calculator ml-2"></i> احسب واحفظ الراتب</button>
                     <input type="hidden" id="prevDays"><input type="hidden" id="prevTaxable"><input type="hidden" id="prevTaxes"><input type="hidden" id="currentEmpId">
                 </div>
             </div>
@@ -247,19 +243,13 @@ app.get("/", (req, res) => {
 
     <div id="addEmpModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
         <div class="bg-white rounded-2xl w-[600px] p-8 shadow-2xl">
-            <h3 class="text-2xl font-bold mb-6 border-b pb-4">إضافة موظف جديد</h3>
+            <h3 class="text-2xl font-bold mb-6 border-b pb-4">إضافة موظف</h3>
             <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2"><label class="text-xs font-bold text-slate-500">الاسم</label><input type="text" id="n-name" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
                 <div><label class="text-xs font-bold text-slate-500">الرقم القومي</label><input type="text" id="n-nid" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
-                <div>
-                    <label class="text-xs font-bold text-slate-500">نوع العمل</label>
-                    <select id="n-type" class="w-full p-3 bg-slate-50 border rounded-xl">
-                        <option>Full Time</option><option>Part Time</option>
-                    </select>
-                </div>
+                <div><label class="text-xs font-bold text-slate-500">نوع العمل</label><select id="n-type" class="w-full p-3 bg-slate-50 border rounded-xl"><option>Full Time</option><option>Part Time</option></select></div>
                 <div><label class="text-xs font-bold text-slate-500">تاريخ التعيين</label><input type="date" id="n-hdate" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
-                <div><label class="text-xs font-bold text-slate-500">تاريخ الاستقالة (اختياري)</label><input type="date" id="n-rdate" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
-                <div class="col-span-2"><label class="text-xs font-bold text-slate-500">الأجر التأميني</label><input type="number" id="n-ins" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
+                <div><label class="text-xs font-bold text-slate-500">الأجر التأميني</label><input type="number" id="n-ins" class="w-full p-3 bg-slate-50 border rounded-xl"></div>
             </div>
             <div class="flex gap-4 mt-8">
                 <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold">حفظ</button>
@@ -286,11 +276,9 @@ app.get("/", (req, res) => {
                 <tr class="hover:bg-slate-50 transition">
                     <td class="p-4 font-bold text-indigo-900">\${e.name}</td>
                     <td class="p-4 text-slate-500">\${e.nationalId}</td>
-                    <td class="p-4">\${e.hiringDate ? e.hiringDate.split('T')[0] : '---'}</td>
+                    <td class="p-4 font-bold \${e.resignationDate ? 'text-red-500' : 'text-green-500'}">\${e.resignationDate ? 'مستقيل' : 'على قوة العمل'}</td>
                     <td class="p-4">
-                        <button onclick="openProfile('\${e._id}')" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-bold hover:bg-indigo-200 transition">
-                            <i class="fas fa-folder-open ml-1"></i> فتح الملف
-                        </button>
+                        <button onclick="openProfile('\${e._id}')" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-bold hover:bg-indigo-200"><i class="fas fa-folder-open ml-1"></i> فتح الملف</button>
                     </td>
                 </tr>
             \`).join('');
@@ -300,25 +288,35 @@ app.get("/", (req, res) => {
             await fetch('/api/employees', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    name: document.getElementById('n-name').value,
-                    nationalId: document.getElementById('n-nid').value,
-                    employmentType: document.getElementById('n-type').value,
-                    hiringDate: document.getElementById('n-hdate').value || null,
-                    resignationDate: document.getElementById('n-rdate').value || null,
+                    name: document.getElementById('n-name').value, nationalId: document.getElementById('n-nid').value,
+                    employmentType: document.getElementById('n-type').value, hiringDate: document.getElementById('n-hdate').value,
                     insSalary: document.getElementById('n-ins').value
                 })
             });
             closeEmpModal(); loadEmps();
         }
 
+        async function deleteEmployee() {
+            if(!confirm("هل أنت متأكد من الحذف النهائي؟ سيتم مسح الموظف وكل سجلات رواتبه ولا يمكن التراجع.")) return;
+            const id = document.getElementById('currentEmpId').value;
+            await fetch(\`/api/employees/\${id}\`, { method: 'DELETE' });
+            showSection('employees');
+        }
+
+        async function resignEmployee() {
+            const date = prompt("أدخل تاريخ الاستقالة (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+            if(!date) return;
+            const id = document.getElementById('currentEmpId').value;
+            await fetch(\`/api/employees/\${id}/resign\`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({date}) });
+            openProfile(id);
+        }
+
         async function openProfile(id) {
             document.getElementById('currentEmpId').value = id;
             showSection('profile');
-            
             const res = await fetch(\`/api/employees/\${id}/payroll-details\`);
             const data = await res.json();
             
-            // Fill Info
             document.getElementById('p-name').innerText = data.emp.name;
             document.getElementById('p-nid').innerText = data.emp.nationalId;
             document.getElementById('p-type').innerText = data.emp.employmentType;
@@ -326,61 +324,61 @@ app.get("/", (req, res) => {
             document.getElementById('p-rdate').innerText = data.emp.resignationDate ? data.emp.resignationDate.split('T')[0] : '---';
             document.getElementById('p-ins').innerText = data.emp.insSalary.toLocaleString();
 
-            // Fill Prev Data
             document.getElementById('prevDays').value = data.prevData.pDays;
             document.getElementById('prevTaxable').value = data.prevData.pTaxable;
             document.getElementById('prevTaxes').value = data.prevData.pTaxes;
 
-            // Render History Table
-            const tbody = document.getElementById('historyTable');
-            if(data.history.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-slate-500">لا توجد رواتب مسجلة لهذا الموظف</td></tr>';
+            // --- Month Lock Logic ---
+            const select = document.getElementById('c-month');
+            select.innerHTML = "";
+            const hDate = new Date(data.emp.hiringDate || new Date());
+            const rDate = data.emp.resignationDate ? new Date(data.emp.resignationDate) : null;
+            const calculated = data.history.map(r => r.month);
+
+            let nextMonth = "";
+            if (calculated.length > 0) {
+                let lastStr = calculated[calculated.length - 1];
+                let d = new Date(lastStr + "-01");
+                d.setMonth(d.getMonth() + 1);
+                nextMonth = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
             } else {
-                tbody.innerHTML = data.history.map(r => \`
-                    <tr class="hover:bg-slate-700 transition">
-                        <td class="p-4 font-bold text-indigo-300">\${r.month}</td>
-                        <td class="p-4">\${r.days}</td>
-                        <td class="p-4">\${r.gross.toLocaleString()}</td>
-                        <td class="p-4">\${r.insurance.toLocaleString()}</td>
-                        <td class="p-4">\${r.monthlyTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td class="p-4">\${r.martyrs.toLocaleString()}</td>
-                        <td class="p-4 font-bold text-emerald-400">\${r.net.toLocaleString()}</td>
-                    </tr>
-                \`).join('');
+                nextMonth = hDate.getFullYear() + "-" + String(hDate.getMonth() + 1).padStart(2, '0');
             }
-        }
 
-        async function runPayroll() {
-            const id = document.getElementById('currentEmpId').value;
-            const month = document.getElementById('c-month').value;
-            const days = document.getElementById('c-days').value;
-            const gross = document.getElementById('c-gross').value;
+            let startYear = hDate.getFullYear();
+            let allDisabled = true;
 
-            if(!month || !gross) return alert("يرجى إدخال الشهر والراتب");
+            for (let y = startYear; y <= startYear + 1; y++) {
+                for (let m = 1; m <= 12; m++) {
+                    let mStr = String(m).padStart(2, '0');
+                    let val = \`\${y}-\${mStr}\`;
+                    let option = document.createElement('option');
+                    option.value = val; option.text = val;
 
-            await fetch('/api/payroll/calculate', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    empId: id, month, days: Number(days), basicGross: Number(gross),
-                    prevData: {
-                        prevDays: Number(document.getElementById('prevDays').value),
-                        prevTaxable: Number(document.getElementById('prevTaxable').value),
-                        prevTaxes: Number(document.getElementById('prevTaxes').value)
+                    let optDate = new Date(y, m - 1, 1);
+                    let hLimit = new Date(hDate.getFullYear(), hDate.getMonth(), 1);
+                    let isDisabled = false;
+
+                    if (optDate < hLimit) isDisabled = true;
+                    if (rDate) { let rLimit = new Date(rDate.getFullYear(), rDate.getMonth(), 1); if (optDate > rLimit) isDisabled = true; }
+                    if (calculated.includes(val)) isDisabled = true;
+                    if (val !== nextMonth && !calculated.includes(val)) isDisabled = true; // Strict Sequential
+
+                    option.disabled = isDisabled;
+                    if (val === nextMonth && !isDisabled) { option.selected = true; allDisabled = false; }
+                    
+                    if(isDisabled) {
+                        if(calculated.includes(val)) option.text += " (محسوب)";
+                        else option.text += " (مغلق)";
                     }
-                })
-            });
+                    select.appendChild(option);
+                }
+            }
             
-            document.getElementById('c-month').value = "";
-            document.getElementById('c-gross').value = "";
-            openProfile(id); // Refresh profile to show new saved month
-        }
+            document.getElementById('calcBtn').disabled = allDisabled;
+            if(allDisabled) document.getElementById('calcBtn').classList.add('opacity-50', 'cursor-not-allowed');
+            else document.getElementById('calcBtn').classList.remove('opacity-50', 'cursor-not-allowed');
 
-        window.onload = () => showSection('employees');
-    </script>
-</body>
-</html>
-    `);
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Final Sequential ERP Running..."));
+            const tbody = document.getElementById('historyTable');
+            if(data.history.length === 0) tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-slate-500">لا توجد رواتب مسجلة</td></tr>';
+            else tbody.innerHTML = data.history.map(r => \`<tr class="hover:bg-slate-700"><td class="p-4 font-bold text-indigo
