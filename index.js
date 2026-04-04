@@ -42,31 +42,35 @@ function calculateG2N(d) {
     const insurance = R(insSalary * 0.11);
     const martyrs = R(actualGross * 0.0005);
     
-    // الوعاء الضريبي للشهر الحالي
-    const currentTaxable = R(actualGross - insurance - (20000 / 360 * days));
+    // الوعاء الضريبي = Gross - Insurance
+    const currentTaxable = actualGross - insurance;
     
-    // الحسبة التراكمية
+    // التراكمي
     const totalDays = days + prevDays;
     const totalTaxable = currentTaxable + prevTaxable;
     
-    // تحويل الوعاء السنوي (تقريب لأقرب 10 جنيه أقل)
-    const annualTaxable = Math.floor(((totalTaxable / totalDays) * 360) / 10) * 10;
+    // تطبيق معادلة الإكسيل: (FLOOR(AH9/AF9*360,10)/360*AF9)
+    // التقريب لأقرب 10 جنيه تحت للوعاء السنوي
+    const annualTaxable = Math.floor((totalTaxable / totalDays * 360) / 10) * 10;
     
     let annualTax = 0;
-    let temp = annualTaxable;
+    // خصم الإعفاء الشخصي السنوي (20,000 + 40,000 = 60,000) 
+    // ملحوظة: الـ 40 ألف هي الشريحة الصفرية، والـ 20 ألف إعفاء شخصي.
+    let temp = Math.max(0, annualTaxable - 60000); 
 
-    // قانون الضرائب المصري (شامل المبالغ الكبيرة)
-    temp = Math.max(0, temp - 40000); // الإعفاء الشخصي
+    // شرائح الضرائب المصرية (التحديث الأخير)
     if (temp > 0) { let x = Math.min(temp, 15000); annualTax += x * 0.10; temp -= x; }
     if (temp > 0) { let x = Math.min(temp, 15000); annualTax += x * 0.15; temp -= x; }
-    if (temp > 0) { let x = Math.min(temp, 130000); annualTax += x * 0.20; temp -= x; }
-    if (temp > 0) { let x = Math.min(temp, 200000); annualTax += x * 0.225; temp -= x; }
-    if (temp > 0) { annualTax += temp * 0.25; } // ما زاد عن ذلك
+    if (temp > 0) { let x = Math.min(temp, 130,000); annualTax += x * 0.20; temp -= x; }
+    if (temp > 0) { let x = Math.min(temp, 200,000); annualTax += x * 0.225; temp -= x; }
+    if (temp > 0) { let x = Math.min(temp, 380,000); annualTax += x * 0.25; temp -= x; }
+    if (temp > 0) { annualTax += temp * 0.275; } // شريحة الـ 27.5% للمبالغ الكبيرة جداً
 
-    // الضريبة المستحقة حتى تاريخه ناقص اللي اتدفع قبل كدة
+    // تحويل الضريبة السنوية لضريبة الفترة (Proration)
     const totalTaxDueUntilNow = (annualTax / 360) * totalDays;
-    const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - prevTaxes));
     
+    // ضريبة الشهر الحالي
+    const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - prevTaxes));
     const net = R(actualGross - insurance - monthlyTax - martyrs);
     
     return { gross: actualGross, insurance, tax: monthlyTax, martyrs, net, currentTaxable };
@@ -75,9 +79,9 @@ function calculateG2N(d) {
 function calculateN2G(d) {
     let targetNet = Number(d.netInput);
     let low = targetNet;
-    let high = targetNet * 3; 
+    let high = targetNet * 4; 
     let result = {};
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
         let mid = (low + high) / 2;
         d.basic = mid; d.transport = 0; d.comm = 0;
         result = calculateG2N(d);
@@ -133,7 +137,6 @@ app.get("/", (req, res) => {
         .tab.active { background: var(--primary); color: white; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
         .card { border: 1px solid #ddd; padding: 20px; border-radius: 12px; }
-        .card h3 { color: var(--primary); margin-top: 0; font-size: 1.1em; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
         label { display: block; font-size: 12px; color: #666; margin-top: 10px; font-weight: bold; }
         input { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ccc; border-radius: 8px; text-align: center; font-size: 16px; box-sizing: border-box; }
         .btn { width: 100%; padding: 20px; background: var(--success); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 25px; }
@@ -162,7 +165,7 @@ app.get("/", (req, res) => {
             <div class="card">
                 <h3 id="inputTitle">| المبالغ</h3>
                 <div id="g2n_inputs">
-                    <label>الأساسي</label><input type="number" id="basic" value="10000">
+                    <label>الأساسي</label><input type="number" id="basic" value="80000">
                     <label>بدلات</label><input type="number" id="trans" value="0">
                     <label>عمولات</label><input type="number" id="comm" value="0">
                 </div>
@@ -233,7 +236,7 @@ app.get("/", (req, res) => {
             const r = await res.json();
             document.getElementById('oG').innerText = r.gross.toLocaleString();
             document.getElementById('oI').innerText = r.insurance.toLocaleString();
-            document.getElementById('oT').innerText = r.tax.toLocaleString();
+            document.getElementById('oT').innerText = r.tax.toLocaleString(undefined, {minimumFractionDigits: 2});
             document.getElementById('oM').innerText = r.martyrs.toLocaleString();
             document.getElementById('oN').innerText = r.net.toLocaleString();
             alert("تم الحساب والحفظ!");
@@ -245,5 +248,5 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Running..."));
+app.listen(PORT, () => console.log("System Running..."));
 module.exports = app;
