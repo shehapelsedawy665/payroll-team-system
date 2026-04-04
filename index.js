@@ -8,7 +8,6 @@ app.use(express.json());
 
 const mongoURI = "mongodb://Sedawy:Shehapelsedawy%2366@ac-uso95cd-shard-00-00.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-01.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-02.a6bquen.mongodb.net:27017/payrollDB?ssl=true&replicaSet=atlas-129j51-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Egyptian-Payroll";
 
-// --- Database Logic ---
 let isConnected = false;
 async function connectDB() {
     if (isConnected) return;
@@ -18,7 +17,6 @@ async function connectDB() {
     } catch (e) { console.error("DB Error", e); }
 }
 
-// --- Models ---
 const Employee = mongoose.models.Employee || mongoose.model("Employee", new mongoose.Schema({
     name: String, nationalId: { type: String, unique: true },
     hiringDate: Date, resignationDate: Date,
@@ -31,17 +29,14 @@ const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", new mongoos
     monthlyTax: Number, insurance: Number, martyrs: Number, net: Number
 }));
 
-// --- Pure Calculation Engine ---
 const R = (n) => Math.round(n * 100) / 100;
 
 function runCoreEngine(data, prev, emp) {
     const { basicFull, days, month } = data;
-    // 1. Insurance Logic (الحد الأقصى والأدنى)
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     let effectiveInsBase = Math.max(minIns, Math.min(maxIns, emp.insSalary));
 
-    // 2. Insurance Eligibility Rules (قواعد الاستحقاق)
     let insAmt = 0;
     const hDate = new Date(emp.hiringDate);
     const rDate = emp.resignationDate ? new Date(emp.resignationDate) : null;
@@ -53,12 +48,10 @@ function runCoreEngine(data, prev, emp) {
     else if (isHiringMonth && hDate.getDate() > 1) insAmt = 0;
     else insAmt = effectiveInsBase * 0.11;
 
-    // 3. Financials
     const actualGross = (basicFull / 30) * days;
     const martyrs = R(actualGross * 0.0005);
     const currentTaxable = actualGross - insAmt;
 
-    // 4. Sequential Tax Engine (نظام الشرائح)
     const totalDays = days + prev.pDays;
     const totalTaxable = currentTaxable + prev.pTaxable;
     const annualTaxable = Math.floor(((totalTaxable / totalDays) * 360) / 10) * 10;
@@ -87,7 +80,6 @@ function runCoreEngine(data, prev, emp) {
     };
 }
 
-// --- API Routes ---
 app.use(async (req, res, next) => { await connectDB(); next(); });
 
 app.get("/api/employees", async (req, res) => res.json(await Employee.find().sort({ name: 1 })));
@@ -106,87 +98,78 @@ app.get("/api/employees/:id/details", async (req, res) => {
 app.post("/api/payroll/calculate", async (req, res) => {
     const { empId, month, days, basicGross, prevData } = req.body;
     const emp = await Employee.findById(empId);
+    
+    // Check if month already exists to prevent duplicates
+    const existing = await Payroll.findOne({ employeeId: empId, month });
+    if (existing) return res.status(400).json({ error: "Month already calculated" });
+
     const result = runCoreEngine({ basicFull: basicGross, days, month }, prevData, emp);
     const record = await new Payroll({ employeeId: empId, month, days, ...result }).save();
     res.json(record);
 });
 
-// --- Unified HTML UI ---
 app.get("/", (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Enterprise Payroll</title>
+    <title>Enterprise Payroll v6.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; }
-        .odoo-sidebar { background: #1a1c2e; transition: all 0.3s; }
-        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid #e2e8f0; }
-        .btn-primary { background: #6366f1; box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3); }
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+        body { font-family: 'Cairo', sans-serif; background: #f8fafc; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border: 1px solid #e2e8f0; }
     </style>
 </head>
 <body class="flex min-h-screen">
-    <aside class="w-64 odoo-sidebar text-slate-400 flex flex-col sticky top-0 h-screen">
-        <div class="p-8 text-white font-black text-2xl border-b border-slate-800">CORE ERP</div>
-        <nav class="p-4 space-y-2 flex-1">
-            <div onclick="location.reload()" class="flex items-center p-3 rounded-xl bg-slate-800 text-indigo-400 font-bold cursor-pointer">
-                <i class="fas fa-users-cog ml-3"></i> الموظفين
-            </div>
-        </nav>
-        <div class="p-4 text-[10px] border-t border-slate-800 text-center">Version 5.0 - Final Enterprise</div>
+    <aside class="w-64 bg-slate-900 text-white flex flex-col sticky top-0 h-screen">
+        <div class="p-8 text-2xl font-black border-b border-slate-800">ODOO <span class="text-indigo-400">CORE</span></div>
+        <nav class="p-4 flex-1"><div onclick="location.reload()" class="p-4 rounded-xl bg-slate-800 text-indigo-400 font-bold cursor-pointer"><i class="fas fa-users ml-3"></i> الموظفين</div></nav>
     </aside>
 
-    <main class="flex-1 p-10 overflow-y-auto">
+    <main class="flex-1 p-10">
         <div id="view-list">
-            <div class="flex justify-between items-center mb-10">
-                <h2 class="text-3xl font-black text-slate-800 tracking-tight">إدارة الكادر البشري</h2>
-                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="btn-primary text-white px-8 py-3 rounded-2xl font-bold transition-transform hover:scale-105">
-                    + إضافة موظف
-                </button>
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black">شؤون الموظفين</h2>
+                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200">+ إضافة موظف</button>
             </div>
             <div class="glass rounded-[2rem] overflow-hidden shadow-sm">
                 <table class="w-full text-right text-sm">
-                    <thead class="bg-slate-50 border-b">
-                        <tr><th class="p-5 text-slate-500">الاسم</th><th class="p-5 text-center">النوع</th><th class="p-5 text-center">الحالة</th><th class="p-5 text-center">إجراء</th></tr>
-                    </thead>
+                    <thead class="bg-slate-50 border-b"><tr><th class="p-6">الاسم</th><th class="p-6 text-center">النوع</th><th class="p-6 text-center">الحالة</th><th class="p-6 text-center">إجراء</th></tr></thead>
                     <tbody id="empTable" class="divide-y divide-slate-100"></tbody>
                 </table>
             </div>
         </div>
 
-        <div id="view-profile" class="hidden animate-in fade-in duration-500">
-            <button onclick="location.reload()" class="mb-6 text-indigo-600 font-bold"><i class="fas fa-arrow-right ml-2"></i> العودة للقائمة</button>
+        <div id="view-profile" class="hidden">
+            <button onclick="location.reload()" class="mb-6 text-indigo-600 font-bold flex items-center"><i class="fas fa-arrow-right ml-2"></i> عودة</button>
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                <div class="glass p-8 rounded-[2rem] shadow-sm space-y-6 h-fit">
-                    <h3 id="p-name" class="text-2xl font-black text-slate-800">--</h3>
-                    <div class="space-y-3 text-sm text-slate-500">
-                        <p class="flex justify-between"><span>النوع:</span><span id="p-type" class="text-indigo-600 font-bold">--</span></p>
-                        <p class="flex justify-between"><span>الرقم القومي:</span><span id="p-nid" class="text-slate-800">--</span></p>
-                        <p class="flex justify-between"><span>تأمين:</span><span id="p-ins" class="text-slate-800 font-bold">--</span></p>
+                <div class="glass p-8 rounded-[2rem] space-y-6">
+                    <h3 id="p-name" class="text-2xl font-black">--</h3>
+                    <div class="text-sm space-y-2 border-t pt-4">
+                        <p>التعيين: <span id="p-hdate" class="font-bold">--</span></p>
+                        <p id="p-resign-info" class="text-red-500 hidden font-bold">الاستقالة: <span id="p-rdate">--</span></p>
                     </div>
-                    <div class="pt-6 border-t space-y-2">
-                        <button onclick="resign()" class="w-full py-3 bg-amber-50 text-amber-600 rounded-xl font-bold text-xs hover:bg-amber-100">تسجيل استقالة</button>
+                    <div class="pt-4 space-y-2">
+                        <button onclick="resign()" class="w-full py-3 bg-orange-50 text-orange-600 rounded-xl font-bold text-xs hover:bg-orange-100">تسجيل استقالة</button>
                         <button onclick="del()" class="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold text-xs hover:bg-red-100">حذف نهائي</button>
                     </div>
                 </div>
                 <div class="lg:col-span-3 space-y-8">
-                    <div class="bg-indigo-900 p-10 rounded-[2.5rem] shadow-2xl text-white">
-                        <h4 class="text-xl font-bold mb-8">معالجة المرتب الشهري</h4>
+                    <div id="calc-container" class="bg-indigo-900 p-10 rounded-[3rem] shadow-2xl text-white">
+                        <h4 class="text-xl font-bold mb-8">معالجة المسير الشهري (Sequential)</h4>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div><label class="text-[10px] text-indigo-300 block mb-2 font-bold">الشهر</label><input type="month" id="c-month" class="w-full bg-indigo-800 border-none p-4 rounded-2xl text-white"></div>
-                            <div><label class="text-[10px] text-indigo-300 block mb-2 font-bold">إجمالي الراتب Gross</label><input type="number" id="c-gross" class="w-full bg-indigo-800 border-none p-4 rounded-2xl text-white"></div>
-                            <div class="flex items-end"><button onclick="runCalc()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-emerald-400">اعتماد الحساب <i class="fas fa-check-circle mr-2"></i></button></div>
+                            <div><label class="text-[10px] text-indigo-300 block mb-2 font-bold">شهر الاستحقاق</label><input type="month" id="c-month" class="w-full bg-indigo-800 border-none p-4 rounded-2xl text-white outline-none"></div>
+                            <div><label class="text-[10px] text-indigo-300 block mb-2 font-bold">Gross Salary</label><input type="number" id="c-gross" class="w-full bg-indigo-800 border-none p-4 rounded-2xl text-white outline-none"></div>
+                            <div class="flex items-end"><button onclick="runCalc()" id="btn-calc" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black">اعتماد الحساب</button></div>
                         </div>
                     </div>
-                    <div class="glass rounded-[2rem] overflow-hidden shadow-sm">
+                    <div class="glass rounded-[2rem] overflow-hidden">
                         <table class="w-full text-center text-xs">
-                            <thead class="bg-slate-50 border-b">
-                                <tr><th class="p-4">الشهر</th><th class="p-4">Gross</th><th class="p-4">تأمين</th><th class="p-4">شهداء</th><th class="p-4">ضريبة</th><th class="p-4 text-emerald-600 font-bold">الصافي</th></tr>
-                            </thead>
-                            <tbody id="histBody" class="divide-y divide-slate-50"></tbody>
+                            <thead class="bg-slate-50 border-b"><tr><th class="p-4">الشهر</th><th class="p-4">Gross</th><th class="p-4">تأمين</th><th class="p-4">شهداء</th><th class="p-4">ضريبة</th><th class="p-4 font-black bg-emerald-50">الصافي</th></tr></thead>
+                            <tbody id="histBody" class="divide-y"></tbody>
                         </table>
                     </div>
                 </div>
@@ -194,22 +177,16 @@ app.get("/", (req, res) => {
         </div>
     </main>
 
-    <div id="modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-[2.5rem] p-10 w-full max-w-lg shadow-2xl">
-            <h3 class="text-3xl font-black mb-8">إضافة موظف</h3>
-            <div class="grid grid-cols-1 gap-5">
-                <input type="text" id="n-name" placeholder="الاسم الكامل" class="w-full p-4 bg-slate-50 border rounded-2xl">
+            <h3 class="text-2xl font-black mb-6">إضافة موظف</h3>
+            <div class="space-y-4">
+                <input type="text" id="n-name" placeholder="الاسم" class="w-full p-4 bg-slate-50 border rounded-2xl">
                 <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-4 bg-slate-50 border rounded-2xl">
-                <div class="grid grid-cols-2 gap-4">
-                    <input type="date" id="n-hdate" class="p-4 bg-slate-50 border rounded-2xl">
-                    <input type="number" id="n-ins" placeholder="الأجر التأميني" class="p-4 bg-slate-50 border rounded-2xl">
-                </div>
+                <div class="grid grid-cols-2 gap-4"><input type="date" id="n-hdate" class="p-4 bg-slate-50 border rounded-2xl"><input type="number" id="n-ins" placeholder="التأميني" class="p-4 bg-slate-50 border rounded-2xl"></div>
                 <select id="n-type" class="w-full p-4 bg-slate-50 border rounded-2xl font-bold"><option>Full Time</option><option>Part Time</option></select>
             </div>
-            <div class="flex gap-4 mt-10">
-                <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black">حفظ الموظف</button>
-                <button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 py-4 rounded-2xl font-bold">إلغاء</button>
-            </div>
+            <div class="flex gap-4 mt-8"><button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black">حفظ</button><button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 py-4 rounded-2xl font-bold">إلغاء</button></div>
         </div>
     </div>
 
@@ -221,10 +198,10 @@ app.get("/", (req, res) => {
             const data = await res.json();
             document.getElementById('empTable').innerHTML = data.map(e => \`
                 <tr class="hover:bg-slate-50 transition cursor-pointer" onclick="openProfile('\${e._id}')">
-                    <td class="p-5 font-bold text-slate-700">\${e.name}</td>
-                    <td class="p-5 text-center"><span class="px-3 py-1 bg-slate-100 rounded-lg text-[10px] text-slate-500 font-bold">\${e.jobType}</span></td>
-                    <td class="p-5 text-center"><span class="px-3 py-1 \${e.resignationDate ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'} rounded-lg text-[10px] font-black">\${e.resignationDate ? 'مستقيل' : 'نشط'}</span></td>
-                    <td class="p-5 text-center text-indigo-400 font-bold text-xs underline">إدارة</td>
+                    <td class="p-6 font-bold">\${e.name}</td>
+                    <td class="p-6 text-center text-xs text-slate-400">\${e.jobType}</td>
+                    <td class="p-6 text-center"><span class="px-3 py-1 \${e.resignationDate ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'} rounded-lg text-[10px] font-black">\${e.resignationDate ? 'مستقيل' : 'نشط'}</span></td>
+                    <td class="p-6 text-center text-indigo-400">إدارة</td>
                 </tr>
             \`).join('');
         }
@@ -237,23 +214,42 @@ app.get("/", (req, res) => {
             const data = await res.json();
             
             document.getElementById('p-name').innerText = data.emp.name;
-            document.getElementById('p-type').innerText = data.emp.jobType;
-            document.getElementById('p-ins').innerText = data.emp.insSalary.toLocaleString();
-            document.getElementById('p-nid').innerText = data.emp.nationalId;
+            document.getElementById('p-hdate').innerText = data.emp.hiringDate.split('T')[0];
             
+            // Logic: Calculate next available month
+            let lastMonth = data.history.length > 0 ? data.history[data.history.length - 1].month : data.emp.hiringDate.substring(0, 7);
+            if (data.history.length > 0) {
+                let [y, m] = lastMonth.split('-').map(Number);
+                m++; if(m > 12) { m = 1; y++; }
+                lastMonth = \`\${y}-\${m.toString().padStart(2, '0')}\`;
+            }
+
+            // Constraints for Month Input
+            const monthInput = document.getElementById('c-month');
+            monthInput.value = lastMonth;
+            monthInput.min = data.emp.hiringDate.substring(0, 7);
+            
+            // Logic: Hide calculation if employee resigned
+            if (data.emp.resignationDate) {
+                const rDateStr = data.emp.resignationDate.substring(0, 7);
+                document.getElementById('p-resign-info').classList.remove('hidden');
+                document.getElementById('p-rdate').innerText = data.emp.resignationDate.split('T')[0];
+                if (lastMonth > rDateStr) {
+                    document.getElementById('calc-container').classList.add('hidden');
+                } else {
+                    document.getElementById('calc-container').classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('p-resign-info').classList.add('hidden');
+                document.getElementById('calc-container').classList.remove('hidden');
+            }
+
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
 
             document.getElementById('histBody').innerHTML = data.history.map(r => \`
-                <tr class="hover:bg-slate-50/50">
-                    <td class="p-4 text-slate-600 font-bold">\${r.month}</td>
-                    <td class="p-4">\${r.gross.toLocaleString()}</td>
-                    <td class="p-4">\${r.insurance.toLocaleString()}</td>
-                    <td class="p-4 text-orange-400">\${r.martyrs.toLocaleString()}</td>
-                    <td class="p-4 text-red-400">\${r.monthlyTax.toLocaleString()}</td>
-                    <td class="p-4 font-black text-emerald-600">\${r.net.toLocaleString()}</td>
-                </tr>
+                <tr class="hover:bg-slate-50"><td class="p-4 font-bold text-slate-600">\${r.month}</td><td class="p-4">\${r.gross.toLocaleString()}</td><td class="p-4">\${r.insurance.toLocaleString()}</td><td class="p-4 text-orange-400">\${r.martyrs.toLocaleString()}</td><td class="p-4 text-red-400">\${r.monthlyTax.toLocaleString()}</td><td class="p-4 font-black text-emerald-600">\${r.net.toLocaleString()}</td></tr>
             \`).join('');
         }
 
@@ -269,9 +265,8 @@ app.get("/", (req, res) => {
                 days: 30, basicGross: Number(document.getElementById('c-gross').value),
                 prevData: { pDays: Number(document.getElementById('pD').value), pTaxable: Number(document.getElementById('pTxbl').value), pTaxes: Number(document.getElementById('pTx').value) }
             };
-            if(!body.month || !body.basicGross) return alert("ادخل البيانات كاملة");
-            await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-            openProfile(body.empId);
+            const res = await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+            if(res.ok) openProfile(body.empId); else alert("خطأ: هذا الشهر مسجل بالفعل أو خارج النطاق");
         }
 
         async function del() { if(confirm("حذف الموظف نهائياً؟")) { await fetch(\`/api/employees/\${document.getElementById('currId').value}\`, {method:'DELETE'}); location.reload(); } }
@@ -284,8 +279,4 @@ app.get("/", (req, res) => {
     `);
 });
 
-// --- Final Export ---
 module.exports = app;
-if (process.env.NODE_ENV !== 'production') {
-    app.listen(3000, () => console.log("Smarter Engine: http://localhost:3000"));
-}
