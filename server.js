@@ -9,10 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// الاتصال بالقاعدة
+// 1. الاتصال بالقاعدة
 connectDB();
 
-// تعريف الـ Schemas
+// 2. تعريف الـ Schemas
 const employeeSchema = new mongoose.Schema({
     name: String, 
     nationalId: String, 
@@ -47,7 +47,7 @@ app.post("/api/employees", async (req, res) => {
     res.json(await newEmp.save());
 });
 
-// جلب تفاصيل الموظف وسجلاته المالية
+// جلب تفاصيل الموظف وسجلاته المالية (YTD)
 app.get("/api/employees/:id/details", async (req, res) => {
     try {
         const emp = await Employee.findById(req.params.id);
@@ -100,17 +100,22 @@ app.post("/api/payroll/calculate", async (req, res) => {
     }
 });
 
-// Net to Gross API (Iterative)
+/**
+ * [T3DEEL] Net to Gross API (Iterative + Full Breakdown)
+ * الحسبة هنا بتعتمد على 30 يوم عمل افتراضي وبترجع كل تفاصيل الخصومات
+ */
 app.post("/api/payroll/net-to-gross", async (req, res) => {
     try {
-        const { targetNet, insSalary, days } = req.body;
+        const { targetNet, insSalary } = req.body;
         let estimateGross = Number(targetNet);
-        let currentNet = 0;
+        let finalResult = {};
+        
+        // المحرك التكراري (Iterative Engine) للوصول للـ Gross بدقة
         for (let i = 0; i < 100; i++) {
-            const tempResult = runPayrollLogic({
+            finalResult = runPayrollLogic({
                 fullBasic: estimateGross,
                 fullTrans: 0,
-                days: days || 30,
+                days: 30, // ثابتة للحسابات التقديرية
                 additions: [],
                 deductions: [],
                 month: new Date().toISOString().substring(0, 7),
@@ -118,14 +123,20 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
                 resignationDate: null
             }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: insSalary || 0 });
 
-            currentNet = tempResult.net;
-            let diff = Number(targetNet) - currentNet;
+            let diff = Number(targetNet) - finalResult.net;
             if (Math.abs(diff) < 0.01) break;
             estimateGross += diff; 
         }
-        res.json({ gross: Math.round(estimateGross) });
+
+        res.json({
+            gross: Math.round(estimateGross),
+            insSalary: insSalary || 0,
+            insEmployee: finalResult.insuranceEmployee,
+            taxes: finalResult.monthlyTax,
+            net: finalResult.net
+        });
     } catch (err) {
-        res.status(500).json({ error: "فشل الحساب" });
+        res.status(500).json({ error: "فشل حساب الـ Net to Gross" });
     }
 });
 
@@ -136,21 +147,20 @@ app.delete("/api/employees/:id", async (req, res) => {
     res.json({ success: true });
 });
 
-// تصفية السجل
+// تصفية السجل (Resign)
 app.post("/api/employees/:id/resign", async (req, res) => {
     await Payroll.deleteMany({ employeeId: req.params.id });
     res.json({ success: true });
 });
 
-// --- [هنا الحل لمشكلة الـ Cannot GET] ---
-// تعريف مسار الفولدر الاستاتيكي بشكل مطلق
+// --- [Static Files Logic] ---
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 
-// أي طلب مش API يروح لملف index.html
+// التعامل مع أي مسارات غير معروفة وتوجيهها لـ index.html (لحماية الـ Routing)
 app.get("*", (req, res) => {
     res.sendFile(path.join(publicPath, "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`Payroll Server is LIVE on port ${PORT} 🚀`));
