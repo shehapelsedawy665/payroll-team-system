@@ -3,74 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Payroll Pro - Company View</title>
+    <title>Seday ERP - Payroll Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
         body { font-family: Cairo, sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
         
-        /* Sidebar Styling */
+        /* Sidebar Styling for Desktop */
         #sidebar { width: 60px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; white-space: nowrap; }
         @media (min-width: 1024px) { 
             #sidebar:hover { width: 240px; } 
             #sidebar:hover .nav-text { opacity: 1; display: inline; } 
         }
         
-        /* Mobile Navigation Fix */
+        /* Universal Responsive Fix (Mobile, Foldable, Tablets) */
         @media (max-width: 1023px) {
-            #sidebar { width: 100% !important; height: 65px !important; flex-direction: row !important; bottom: 0 !important; top: auto !important; right: 0 !important; left: 0 !important; justify-content: space-around; padding: 0 5px; border-top: 1px solid #1e293b; }
-            #sidebar .nav-text, #sidebar .border-b, #sidebar .border-t, .logo-area { display: none !important; }
+            #sidebar { width: 100% !important; height: 70px !important; flex-direction: row !important; bottom: 0 !important; top: auto !important; right: 0 !important; left: 0 !important; justify-content: space-around; padding: 0 10px; border-top: 2px solid #1e293b; background: #0f172a; }
+            #sidebar .nav-text, .logo-area { display: none !important; }
             #sidebar nav { flex-direction: row !important; display: flex; width: 100%; justify-content: space-around; align-items: center; }
-            main { margin-right: 0 !important; padding-bottom: 90px !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+            main { margin-right: 0 !important; padding-bottom: 100px !important; padding-left: 1rem !important; padding-right: 1rem !important; width: 100vw; }
+            .grid { gap: 1rem !important; }
+            .card-padding { padding: 1.5rem !important; }
         }
 
+        /* Prevent Text Clipping */
+        .truncate-custom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .nav-text { opacity: 0; transition: opacity 0.3s; display: none; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        
+        /* Smooth Transitions */
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Table Responsiveness */
-        .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 1rem; position: relative; }
-        table { width: 100%; min-width: 700px; } /* Ensures table content doesn't squash */
+        /* Responsive Tables */
+        .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 1.5rem; }
+        table { width: 100%; min-width: 800px; } 
 
-        /* Custom Scrollbar for better UX */
-        .table-container::-webkit-scrollbar { height: 4px; }
-        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        /* Custom Scrollbar */
+        .table-container::-webkit-scrollbar { height: 6px; }
+        .table-container::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-slate-100 flex min-h-screen">
+<body class="bg-slate-50 flex min-h-screen">
 
     <div id="login-view" class="fixed inset-0 bg-slate-900 z-[300] flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-fade-in text-center">
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-fade-in text-center border-t-8 border-indigo-600">
             <div class="w-20 h-20 bg-indigo-600 text-white rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6 shadow-lg rotate-3"><i class="fas fa-bolt"></i></div>
-            <h2 class="text-3xl font-black text-slate-800 mb-2">تسجيل الدخول</h2>
-            <p class="text-slate-400 text-sm mb-8">أهلاً بك في نظام SEDAY المطور 2026</p>
+            <h2 class="text-3xl font-black text-slate-800 mb-2">SEDAY ERP</h2>
+            <p class="text-slate-400 text-sm mb-8 font-bold">Egyptian Payroll Engine 2026</p>
             <div class="space-y-4">
-                <input type="email" id="auth-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
-                <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
+                <input type="email" id="auth-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
+                <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
                 <button onclick="handleLogin()" id="login-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition mb-2">دخول آمن 🔒</button>
-                <button onclick="handleRegister()" id="reg-btn" class="w-full bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold text-sm border-2 border-dashed border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 transition">إنشاء حساب شركة جديد 🏢</button>
+                <button onclick="handleRegister()" id="reg-btn" class="w-full bg-slate-50 text-slate-500 py-3 rounded-2xl font-bold text-xs border-2 border-dashed border-slate-200 hover:bg-indigo-50 transition">إنشاء حساب شركة جديد 🏢</button>
             </div>
-            <p class="mt-6 text-[10px] text-slate-300 uppercase tracking-widest italic">Egyptian Payroll Engine v3.0</p>
         </div>
     </div>
 
     <aside id="sidebar" class="bg-slate-900 text-white fixed h-full right-0 top-0 z-[100] flex flex-col shadow-2xl hidden">
-        <div class="logo-area p-4 mb-10 text-indigo-500 font-black text-2xl border-b border-slate-800 hidden lg:block text-center">
-            <i class="fas fa-bolt"></i> <span class="nav-text italic uppercase mr-2">SEDAY ERP</span>
+        <div class="logo-area p-6 mb-10 text-indigo-400 font-black text-2xl border-b border-slate-800 hidden lg:block text-center">
+            <i class="fas fa-bolt"></i> <span class="nav-text italic uppercase mr-2">SEDAY</span>
         </div>
         <nav class="flex-1">
-            <div onclick="showDash()" class="p-4 hover:bg-indigo-600 flex items-center justify-center lg:justify-start cursor-pointer transition rounded-xl lg:rounded-none">
+            <div onclick="showDash()" class="p-5 hover:bg-indigo-600 flex items-center justify-center lg:justify-start cursor-pointer transition">
                 <i class="fas fa-home lg:ml-4 text-xl"></i> <span class="nav-text">الرئيسية</span>
             </div>
-            <div onclick="showHR()" class="p-4 hover:bg-indigo-600 flex items-center justify-center lg:justify-start cursor-pointer transition rounded-xl lg:rounded-none">
-                <i class="fas fa-users lg:ml-4 text-xl"></i> <span class="nav-text">إدارة الموظفين</span>
+            <div onclick="showHR()" class="p-5 hover:bg-indigo-600 flex items-center justify-center lg:justify-start cursor-pointer transition">
+                <i class="fas fa-users lg:ml-4 text-xl"></i> <span class="nav-text">الموظفين</span>
             </div>
-            <div onclick="showCalc()" class="p-4 hover:bg-indigo-600 flex items-center justify-center lg:justify-start cursor-pointer transition text-emerald-400 rounded-xl lg:rounded-none">
-                <i class="fas fa-calculator lg:ml-4 text-xl"></i> <span class="nav-text">Net to Gross</span>
+            <div onclick="showCalc()" class="p-5 hover:bg-emerald-600 flex items-center justify-center lg:justify-start cursor-pointer transition text-emerald-400 hover:text-white">
+                <i class="fas fa-magic lg:ml-4 text-xl"></i> <span class="nav-text">Net to Gross</span>
             </div>
-            <div onclick="handleLogout()" class="p-4 hover:bg-rose-600 flex items-center justify-center lg:justify-start cursor-pointer transition text-rose-400 lg:mt-auto rounded-xl lg:rounded-none">
-                <i class="fas fa-sign-out-alt lg:ml-4 text-xl"></i> <span class="nav-text">خروج</span>
+            <div onclick="handleLogout()" class="p-5 hover:bg-rose-600 flex items-center justify-center lg:justify-start cursor-pointer transition text-rose-400 lg:mt-auto">
+                <i class="fas fa-power-off lg:ml-4 text-xl"></i> <span class="nav-text">خروج</span>
             </div>
         </nav>
     </aside>
@@ -78,56 +83,80 @@
     <main id="main-content" class="flex-1 lg:mr-[60px] p-4 md:p-8 transition-all hidden">
         
         <div id="dashboard-view" class="animate-fade-in">
-            <h1 class="text-2xl md:text-4xl font-black text-slate-800 mb-6 md:mb-10 italic text-center lg:text-right">لوحة <span class="text-indigo-600">التحكم</span></h1>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-                <div onclick="showHR()" class="bg-white p-6 md:p-8 rounded-[2rem] shadow-lg border-4 border-transparent hover:border-indigo-500 cursor-pointer transition group">
-                    <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-xl mb-4"><i class="fas fa-users-cog"></i></div>
-                    <h3 class="text-lg font-black mb-1 text-slate-800">إدارة الموظفين</h3>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase">عرض البيانات وحساب الرواتب.</p>
+            <header class="mb-10 text-center lg:text-right">
+                <h1 class="text-3xl md:text-5xl font-black text-slate-800 italic">أهلاً <span class="text-indigo-600">يا بطل!</span></h1>
+                <p class="text-slate-400 font-bold mt-2 uppercase tracking-tighter text-xs">نظام إدارة المرتبات الذكي</p>
+            </header>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div onclick="showHR()" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-b-4 border-indigo-500 hover:shadow-xl cursor-pointer transition-all active:scale-95 group">
+                    <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i class="fas fa-user-tie"></i></div>
+                    <h3 class="text-xl font-black text-slate-800">إدارة الموظفين</h3>
+                    <p class="text-slate-400 text-xs mt-2 leading-relaxed">إضافة وتعديل بيانات الموظفين وحساب الرواتب الشهرية.</p>
                 </div>
-                <div onclick="showCalc()" class="bg-white p-6 md:p-8 rounded-[2rem] shadow-lg border-4 border-transparent hover:border-emerald-500 cursor-pointer transition group">
-                    <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-xl mb-4"><i class="fas fa-calculator"></i></div>
-                    <h3 class="text-lg font-black mb-1 text-slate-800">Net to Gross</h3>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase">حساب الشامل من الصافي.</p>
+                
+                <div onclick="showCalc()" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-b-4 border-emerald-500 hover:shadow-xl cursor-pointer transition-all active:scale-95 group">
+                    <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fas fa-coins"></i></div>
+                    <h3 class="text-xl font-black text-slate-800">Net to Gross</h3>
+                    <p class="text-slate-400 text-xs mt-2 leading-relaxed">المعادلة العكسية: احسب الراتب الشامل بناءً على الصافي المطلوب.</p>
                 </div>
             </div>
         </div>
 
         <div id="list-view" class="hidden animate-fade-in">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <button onclick="showDash()" class="text-indigo-600 font-bold mb-1 block text-xs">← العودة للرئيسية</button>
-                    <h1 class="text-2xl font-black text-slate-800">قائمة الموظفين</h1>
+                    <h1 class="text-2xl font-black text-slate-800">قائمة الكوادر البشرية</h1>
+                    <p class="text-slate-400 text-[10px] font-bold">إجمالي الموظفين المسجلين في الشركة</p>
                 </div>
-                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="w-full md:w-auto bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl hover:bg-indigo-700 transition">+ إضافة موظف</button>
+                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="w-full md:w-auto bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-lg hover:bg-indigo-700 transition active:scale-95">+ إضافة موظف</button>
             </div>
-            <div class="table-container bg-white border border-slate-200 shadow-xl">
+            
+            <div class="table-container bg-white border border-slate-200 shadow-sm">
                 <table class="text-right">
                     <thead class="bg-slate-50 border-b">
                         <tr>
-                            <th class="p-4 text-xs font-black text-slate-500">اسم الموظف</th>
-                            <th class="p-4 text-center text-xs font-black text-slate-500">الرقم القومي</th>
-                            <th class="p-4 text-center text-xs font-black text-slate-500">حالة الموظف</th>
-                            <th class="p-4 text-center text-xs font-black text-slate-500">الإجراء</th>
+                            <th class="p-5 text-xs font-black text-slate-500 uppercase">الاسم الكامل</th>
+                            <th class="p-5 text-center text-xs font-black text-slate-500 uppercase">الرقم القومي</th>
+                            <th class="p-5 text-center text-xs font-black text-slate-500 uppercase">الحالة</th>
+                            <th class="p-5 text-center text-xs font-black text-slate-500 uppercase">الإجراء</th>
                         </tr>
                     </thead>
-                    <tbody id="empTable" class="divide-y divide-slate-50"></tbody>
+                    <tbody id="empTable" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
                 </table>
             </div>
         </div>
 
         <div id="net-gross-view" class="hidden animate-fade-in">
-            <button onclick="showDash()" class="text-emerald-600 font-bold mb-6 block text-sm">← العودة</button>
-            <div class="max-w-2xl mx-auto bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-2xl text-center border-t-4 border-emerald-500">
-                <h2 class="text-2xl font-black mb-2 italic uppercase">Reverse Calculator</h2>
-                <p class="text-slate-500 text-[10px] mb-8">أدخل الراتب الصافي المطلوب للحصول على الإجمالي</p>
-                <div class="space-y-6">
-                    <input type="number" id="target-net" class="w-full bg-slate-800 p-6 rounded-3xl font-black text-4xl text-emerald-400 text-center outline-none border-2 border-transparent focus:border-emerald-500 transition" placeholder="0.00">
-                    <button onclick="runNetToGross()" id="calc-btn" class="w-full bg-emerald-500 py-5 rounded-2xl font-black text-slate-900 text-xl active:scale-95 transition shadow-lg shadow-emerald-500/20">Run Prediction ⚡</button>
-                    <div id="calc-result" class="hidden mt-8 animate-fade-in">
-                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10">
-                            <p class="text-slate-400 text-[10px] uppercase mb-2">Estimated Gross Salary</p>
-                            <h4 id="result-gross" class="text-5xl font-black text-emerald-400">0.00</h4>
+            <div class="max-w-3xl mx-auto bg-slate-900 text-white p-6 md:p-12 rounded-[3rem] shadow-2xl text-center border-t-8 border-emerald-500">
+                <span class="bg-emerald-500/20 text-emerald-400 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Advanced Calculation Engine</span>
+                <h2 class="text-3xl font-black mt-4 mb-2 italic">NET TO GROSS ⚡</h2>
+                <p class="text-slate-500 text-xs mb-10">أدخل صافي الراتب المراد صرفه للموظف</p>
+                
+                <div class="space-y-8">
+                    <div class="relative">
+                        <span class="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 font-black text-xl">EGP</span>
+                        <input type="number" id="target-net" class="w-full bg-slate-800 p-8 rounded-[2rem] font-black text-5xl text-emerald-400 text-center outline-none border-4 border-transparent focus:border-emerald-500 transition shadow-inner" placeholder="0">
+                    </div>
+                    
+                    <button onclick="runNetToGross()" id="calc-btn" class="w-full bg-emerald-500 py-6 rounded-3xl font-black text-slate-900 text-2xl active:scale-95 transition shadow-xl shadow-emerald-500/30">حساب الراتب الشامل</button>
+                    
+                    <div id="calc-result" class="hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right">
+                            <p class="text-slate-500 text-[10px] uppercase font-bold mb-1">الراتب الشامل (Gross)</p>
+                            <h4 id="result-gross" class="text-3xl font-black text-emerald-400">0.00</h4>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right">
+                            <p class="text-slate-500 text-[10px] uppercase font-bold mb-1">الضريبة الشهرية</p>
+                            <h4 id="result-tax" class="text-3xl font-black text-rose-400">0.00</h4>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right">
+                            <p class="text-slate-500 text-[10px] uppercase font-bold mb-1">تأمينات الموظف</p>
+                            <h4 id="result-ins" class="text-3xl font-black text-blue-400">0.00</h4>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right">
+                            <p class="text-slate-500 text-[10px] uppercase font-bold mb-1">أجر الاشتراك التأميني</p>
+                            <h4 id="result-base" class="text-3xl font-black text-indigo-400">0.00</h4>
                         </div>
                     </div>
                 </div>
@@ -135,98 +164,99 @@
         </div>
 
         <div id="profile-view" class="hidden animate-fade-in">
-            <div class="flex justify-between items-center mb-6">
-                <button onclick="showHR()" class="text-indigo-600 font-bold text-sm">← عودة للقائمة</button>
-                <button onclick="delEmp()" class="text-rose-500 font-bold text-[10px] bg-rose-50 px-4 py-2 rounded-xl hover:bg-rose-100 transition">حذف الموظف 🗑️</button>
+            <div class="flex flex-wrap justify-between items-center mb-8 gap-4">
+                <button onclick="showHR()" class="text-indigo-600 font-black text-sm bg-indigo-50 px-6 py-3 rounded-2xl hover:bg-indigo-100 transition">← العودة لقائمة الموظفين</button>
+                <button onclick="delEmp()" class="text-rose-600 font-black text-[11px] bg-rose-50 px-6 py-3 rounded-2xl hover:bg-rose-100 transition uppercase">حذف الموظف نهائياً 🗑️</button>
             </div>
 
-            <div class="bg-white p-5 rounded-[2rem] shadow-sm border mb-6 grid grid-cols-2 md:grid-cols-5 gap-4 italic text-right">
+            <div class="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border mb-8 grid grid-cols-2 md:grid-cols-5 gap-6 text-right relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
                 <div class="col-span-2 md:col-span-1">
-                    <label class="text-[9px] text-slate-400 block uppercase">Full Name</label>
-                    <p id="p-name" class="font-black text-slate-800 truncate"></p>
+                    <label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Employee Name</label>
+                    <p id="p-name" class="font-black text-slate-800 text-lg truncate-custom"></p>
                 </div>
                 <div>
-                    <label class="text-[9px] text-indigo-600 block font-bold uppercase">Target Month</label>
-                    <input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg font-black text-xs outline-none">
+                    <label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Target Month</label>
+                    <input type="month" id="c-month" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none border border-indigo-100">
                 </div>
                 <div>
-                    <label class="text-[9px] text-slate-400 block uppercase">Hiring Date</label>
-                    <input type="date" id="p-hdate" class="w-full bg-slate-50 p-2 rounded-lg font-bold text-xs outline-none" readonly>
+                    <label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Hiring Date</label>
+                    <input type="date" id="p-hdate" class="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm outline-none" readonly>
                 </div>
                 <div>
-                    <label class="text-[9px] text-orange-500 block font-bold uppercase">Resign Date</label>
-                    <input type="date" id="c-resign" class="w-full bg-orange-50 p-2 rounded-lg font-bold text-xs outline-none">
+                    <label class="text-[10px] text-orange-500 block font-black uppercase mb-1">Resign Date</label>
+                    <input type="date" id="c-resign" class="w-full bg-orange-50 p-3 rounded-xl font-bold text-sm outline-none border border-orange-100">
                 </div>
                 <div>
-                    <label class="text-[9px] text-indigo-600 block font-bold uppercase">Work Days</label>
-                    <input type="number" id="c-days" value="30" class="w-full bg-indigo-50 p-2 rounded-lg font-black text-xs outline-none text-center">
+                    <label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Work Days</label>
+                    <input type="number" id="c-days" value="30" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none text-center border border-indigo-100">
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-[2rem] border mb-6">
-                <div class="grid grid-cols-2 gap-4">
+            <div class="bg-white p-8 rounded-[2.5rem] border mb-8 shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                        <label class="text-[10px] font-bold text-slate-400 mb-1 block">Contract Basic</label>
-                        <input type="number" id="c-fbasic" placeholder="Basic" class="w-full p-4 bg-slate-50 rounded-xl font-black text-center outline-none border-2 border-transparent focus:border-indigo-500 transition">
+                        <label class="text-xs font-black text-slate-500 mb-3 block">Contract Basic (الأساسي التعاقدي)</label>
+                        <input type="number" id="c-fbasic" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-2xl text-center outline-none border-2 border-transparent focus:border-indigo-500 transition shadow-inner">
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold text-slate-400 mb-1 block">Allowances</label>
-                        <input type="number" id="c-ftrans" placeholder="Trans" class="w-full p-4 bg-slate-50 rounded-xl font-black text-center outline-none border-2 border-transparent focus:border-indigo-500 transition">
+                        <label class="text-xs font-black text-slate-500 mb-3 block">Allowances (البدلات الثابتة)</label>
+                        <input type="number" id="c-ftrans" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-2xl text-center outline-none border-2 border-transparent focus:border-indigo-500 transition shadow-inner">
                     </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-right">
-                <div class="bg-indigo-950 text-white p-6 rounded-[2rem] shadow-xl">
-                    <div class="flex justify-between items-center mb-4 border-b border-indigo-900 pb-2">
-                        <h4 class="font-black italic text-indigo-300 text-sm">Additions (+)</h4>
-                        <button onclick="addRow('add-area')" class="text-[9px] bg-indigo-800 px-3 py-1 rounded-full hover:bg-indigo-700">+ Item</button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                <div class="bg-indigo-900 text-white p-8 rounded-[3rem] shadow-xl">
+                    <div class="flex justify-between items-center mb-6 border-b border-indigo-800 pb-4">
+                        <h4 class="font-black italic text-indigo-300 text-lg uppercase tracking-widest">Additions (+)</h4>
+                        <button onclick="addRow('add-area')" class="bg-indigo-700 px-5 py-2 rounded-xl text-xs font-black hover:bg-indigo-600 transition shadow-lg">+ Add Item</button>
                     </div>
-                    <div id="add-area" class="space-y-2"></div>
+                    <div id="add-area" class="space-y-3"></div>
                 </div>
-                <div class="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl flex flex-col">
-                    <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
-                        <h4 class="font-black italic text-rose-400 text-sm">Deductions (-)</h4>
-                        <button onclick="addRow('ded-area')" class="text-[9px] bg-slate-800 px-3 py-1 rounded-full hover:bg-slate-700">+ Item</button>
+                <div class="bg-slate-900 text-white p-8 rounded-[3rem] shadow-xl flex flex-col">
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                        <h4 class="font-black italic text-rose-400 text-lg uppercase tracking-widest">Deductions (-)</h4>
+                        <button onclick="addRow('ded-area')" class="bg-slate-800 px-5 py-2 rounded-xl text-xs font-black hover:bg-slate-700 transition shadow-lg">+ Add Item</button>
                     </div>
-                    <div id="ded-area" class="space-y-2"></div>
-                    <button onclick="runCalc()" class="w-full mt-6 bg-emerald-500 py-4 rounded-2xl font-black text-slate-900 shadow-lg active:scale-95 transition">RUN PAYROLL ⚡</button>
+                    <div id="ded-area" class="space-y-3"></div>
+                    <button onclick="runCalc()" id="run-btn" class="w-full mt-auto bg-emerald-500 py-6 rounded-2xl font-black text-slate-900 text-xl shadow-xl active:scale-95 transition hover:bg-emerald-400">RUN PAYROLL ENGINE ⚡</button>
                 </div>
             </div>
 
-            <div class="table-container bg-white border border-slate-200 shadow-sm">
-                <table class="text-[10px] text-center whitespace-nowrap" dir="ltr">
-                    <thead id="histHead" class="bg-slate-800 text-white"></thead>
+            <div class="table-container bg-white border border-slate-200 shadow-xl mb-10">
+                <table class="text-xs text-center whitespace-nowrap" dir="ltr">
+                    <thead id="histHead" class="bg-slate-900 text-white uppercase italic"></thead>
                     <tbody id="histBody" class="divide-y divide-slate-100 font-bold text-slate-600"></tbody>
                 </table>
             </div>
         </div>
     </main>
 
-    <div id="modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
-        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-fade-in">
-            <h3 class="text-2xl font-black mb-6 italic text-center">بيانات موظف جديد</h3>
-            <div class="space-y-4">
-                <input type="text" id="n-name" placeholder="الاسم بالكامل" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-right outline-none border-2 border-transparent focus:border-indigo-500">
-                <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center outline-none border-2 border-transparent focus:border-indigo-500">
-                <div class="grid grid-cols-2 gap-4">
+    <div id="modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
+        <div class="bg-white p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-fade-in border-t-8 border-indigo-600">
+            <h3 class="text-3xl font-black mb-8 italic text-center text-slate-800">بيانات موظف جديد</h3>
+            <div class="space-y-5">
+                <input type="text" id="n-name" placeholder="الاسم بالكامل" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-right outline-none border-2 border-transparent focus:border-indigo-500">
+                <input type="text" id="n-nid" placeholder="الرقم القومي (14 رقم)" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-center outline-none border-2 border-transparent focus:border-indigo-500">
+                <div class="grid grid-cols-2 gap-5">
                     <div class="text-right">
-                        <label class="text-[9px] text-slate-400 mr-2">تاريخ التعيين</label>
-                        <input type="date" id="n-hdate" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-xs outline-none">
+                        <label class="text-[10px] font-black text-slate-400 mr-2 mb-1 block uppercase">تاريخ التعيين</label>
+                        <input type="date" id="n-hdate" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-xs outline-none">
                     </div>
                     <div class="text-right">
-                        <label class="text-[9px] text-slate-400 mr-2">راتب التأمينات</label>
-                        <input type="number" id="n-ins" placeholder="Insurance" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center outline-none">
+                        <label class="text-[10px] font-black text-slate-400 mr-2 mb-1 block uppercase">أجر التأمين</label>
+                        <input type="number" id="n-ins" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-center outline-none">
                     </div>
                 </div>
-                <select id="n-type" class="w-full p-4 bg-slate-50 rounded-2xl font-black text-indigo-600 outline-none">
-                    <option>Full Time</option>
-                    <option>Part Time</option>
+                <select id="n-type" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-indigo-600 outline-none border-2 border-transparent focus:border-indigo-500">
+                    <option value="Full Time">Full Time (دوام كامل)</option>
+                    <option value="Part Time">Part Time (دوام جزئي)</option>
                 </select>
             </div>
-            <div class="flex gap-3 mt-8">
-                <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-indigo-500/20 active:scale-95 transition">حفظ البيانات</button>
-                <button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-400 py-4 rounded-2xl font-bold active:scale-95 transition">إلغاء</button>
+            <div class="flex gap-4 mt-10">
+                <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-lg hover:bg-indigo-700 active:scale-95 transition">حفظ الموظف</button>
+                <button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-400 py-5 rounded-2xl font-bold active:scale-95 transition">إلغاء</button>
             </div>
         </div>
     </div>
@@ -236,6 +266,7 @@
     <script>
         let TOKEN = localStorage.getItem('token');
 
+        // Central API Handler
         function apiFetch(url, options = {}) {
             options.headers = {
                 ...options.headers,
@@ -252,23 +283,22 @@
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
             const btn = document.getElementById('login-btn');
+            if(!email || !password) return alert("برجاء إدخال البريد الإلكتروني وكلمة المرور");
             
-            if(!email || !password) return alert("من فضلك أدخل البيانات");
             btn.innerText = "جاري التحقق..."; btn.disabled = true;
-
             try {
                 const res = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ email: email.toLowerCase(), password })
                 });
                 const data = await res.json();
                 if(data.token) {
                     localStorage.setItem('token', data.token);
                     TOKEN = data.token;
                     checkAuth();
-                } else { alert(data.error || "خطأ في الدخول"); }
-            } catch (e) { alert("السيرفر لا يستجيب"); }
+                } else { alert(data.error || "بيانات الدخول غير صحيحة"); }
+            } catch (e) { alert("تعذر الاتصال بالسيرفر"); }
             finally { btn.innerText = "دخول آمن 🔒"; btn.disabled = false; }
         }
 
@@ -276,32 +306,24 @@
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
             const btn = document.getElementById('reg-btn');
-
-            if(!email || !password) return alert("اكتب بريد وباسورد للتسجيل");
-            btn.innerText = "جاري الإنشاء..."; btn.disabled = true;
-
+            if(!email || !password) return alert("أدخل بريد وباسورد لإنشاء حساب الشركة");
+            
+            btn.innerText = "جاري إنشاء الشركة..."; btn.disabled = true;
             try {
                 const res = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ 
-                        email: email, 
-                        password: password, 
-                        adminEmail: email,
-                        companyName: "Seday New Co" 
+                        companyName: "SEDAY ERP New Client", 
+                        adminEmail: email.toLowerCase(), 
+                        password 
                     })
                 });
                 const data = await res.json();
-                if(res.ok) {
-                    alert("تم إنشاء الحساب بنجاح! تقدر تدخل دلوقتي");
-                } else {
-                    alert("خطأ: " + (data.error || "تعذر التسجيل"));
-                }
-            } catch (e) {
-                alert("السيرفر لا يستجيب، تأكد من إعدادات Vercel");
-            } finally {
-                btn.innerText = "إنشاء حساب شركة جديد 🏢"; btn.disabled = false;
-            }
+                if(res.ok) { alert("مبروك! تم إنشاء حساب الشركة بنجاح. سجل دخول دلوقتي."); }
+                else { alert(data.error || "خطأ في التسجيل"); }
+            } catch (e) { alert("خطأ في الاتصال"); }
+            finally { btn.innerText = "إنشاء حساب شركة جديد 🏢"; btn.disabled = false; }
         }
 
         function handleLogout() {
@@ -322,7 +344,13 @@
             }
         }
 
-        function hideAll() { ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => document.getElementById(id).classList.add('hidden')); }
+        function hideAll() { 
+            ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            window.scrollTo(0,0);
+        }
+
         function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
         function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
@@ -330,11 +358,20 @@
         async function load() {
             const data = await apiFetch('/api/employees');
             document.getElementById('empTable').innerHTML = data.map(e => `
-                <tr class="hover:bg-slate-50 cursor-pointer transition" onclick="openProfile('${e._id}')">
-                    <td class="p-4"><div class="flex items-center"><div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center font-black ml-3 text-xs">${e.name[0]}</div><div class="font-black text-slate-700 text-xs">${e.name}</div></div></td>
-                    <td class="p-4 text-center font-mono text-slate-400 text-[10px]">${e.nationalId}</td>
-                    <td class="p-4 text-center"><span class="${e.resignationDate ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"} px-3 py-1 rounded-full text-[8px] font-black uppercase">${e.resignationDate ? "Resigned" : "Active"}</span></td>
-                    <td class="p-4 text-center text-slate-300"><i class="fas fa-chevron-left"></i></td>
+                <tr class="hover:bg-indigo-50/50 cursor-pointer transition border-b border-slate-50" onclick="openProfile('${e._id}')">
+                    <td class="p-5">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black ml-4 shadow-sm">${e.name[0]}</div>
+                            <div class="font-black text-slate-800 text-sm">${e.name}</div>
+                        </div>
+                    </td>
+                    <td class="p-5 text-center font-mono text-slate-400 text-xs">${e.nationalId || '---'}</td>
+                    <td class="p-5 text-center">
+                        <span class="${e.resignationDate ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"} px-4 py-2 rounded-xl text-[9px] font-black uppercase">
+                            ${e.resignationDate ? "Resigned" : "Active"}
+                        </span>
+                    </td>
+                    <td class="p-5 text-center text-indigo-300"><i class="fas fa-arrow-left"></i></td>
                 </tr>`).join('');
         }
 
@@ -342,23 +379,42 @@
             hideAll(); document.getElementById('profile-view').classList.remove('hidden');
             document.getElementById('currId').value = id;
             const data = await apiFetch(`/api/employees/${id}/details`);
+            
+            // Populate Basic Data
             document.getElementById('p-name').innerText = data.emp.name;
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
+            document.getElementById('c-fbasic').value = data.emp.insSalary || 0;
 
-            let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-3">Month</th><th class="p-3">Days</th><th class="p-3">GROSS</th><th class="p-3">Ins 11%</th><th class="p-3">Taxable</th><th class="p-3 bg-rose-700">M.Tax</th><th class="p-3 bg-emerald-600">NET</th></tr>`;
+            // Table Headers
+            let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">GROSS</th><th class="p-4">Ins 11%</th><th class="p-4">Taxable</th><th class="p-4 bg-rose-800">Monthly Tax</th><th class="p-4 bg-emerald-600">NET SALARY</th></tr>`;
             document.getElementById('histHead').innerHTML = headHTML;
+            
+            // Table Body
             document.getElementById('histBody').innerHTML = data.history.map(r => `
-                <tr class="divide-x divide-slate-50">
-                    <td class="p-3 font-black">${r.month}</td><td>${r.payload.days}</td><td>${r.payload.gross.toLocaleString()}</td><td>${r.payload.insuranceEmployee.toLocaleString()}</td><td>${r.payload.currentTaxable.toLocaleString()}</td><td class="text-rose-600 font-black">${r.payload.monthlyTax.toLocaleString()}</td><td class="text-emerald-700 font-black">${r.payload.net.toLocaleString()}</td>
+                <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition">
+                    <td class="p-4 font-black text-slate-900">${r.month}</td>
+                    <td class="p-4">${r.payload.days}</td>
+                    <td class="p-4 font-black">${r.payload.gross.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="p-4">${r.payload.insuranceEmployee.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="p-4">${r.payload.currentTaxable.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="p-4 text-rose-600 font-black">${r.payload.monthlyTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="p-4 text-emerald-700 font-black text-lg">${r.payload.net.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>`).join('');
         }
 
         async function saveEmp() {
-            const body = { name: document.getElementById('n-name').value, nationalId: document.getElementById('n-nid').value, hiringDate: document.getElementById('n-hdate').value, insSalary: Number(document.getElementById('n-ins').value), jobType: document.getElementById('n-type').value };
+            const body = { 
+                name: document.getElementById('n-name').value, 
+                nationalId: document.getElementById('n-nid').value, 
+                hiringDate: document.getElementById('n-hdate').value, 
+                insSalary: Number(document.getElementById('n-ins').value), 
+                jobType: document.getElementById('n-type').value 
+            };
+            if(!body.name || !body.nationalId) return alert("أكمل البيانات الأساسية");
             await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(body) });
             document.getElementById('modal').classList.add('hidden');
             showHR();
@@ -366,30 +422,79 @@
 
         async function runNetToGross() {
             const net = Number(document.getElementById('target-net').value);
-            const data = await apiFetch('/api/payroll/net-to-gross', { method: 'POST', body: JSON.stringify({ targetNet: net }) });
-            document.getElementById('calc-result').classList.remove('hidden');
-            document.getElementById('result-gross').innerText = data.gross.toLocaleString();
+            if(!net) return;
+            const btn = document.getElementById('calc-btn');
+            btn.innerText = "Processing Logic..."; btn.disabled = true;
+
+            try {
+                const data = await apiFetch('/api/payroll/net-to-gross', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ targetNet: net }) 
+                });
+                document.getElementById('calc-result').classList.remove('hidden');
+                // Mapping data from server to HTML IDs
+                document.getElementById('result-gross').innerText = data.grossSalary.toLocaleString();
+                document.getElementById('result-tax').innerText = data.monthlyTax.toLocaleString();
+                document.getElementById('result-ins').innerText = data.insuranceEmployee.toLocaleString();
+                document.getElementById('result-base').innerText = data.insBase.toLocaleString();
+            } finally {
+                btn.innerText = "حساب الراتب الشامل"; btn.disabled = false;
+            }
         }
 
         async function runCalc() {
-            const getItems = (id) => Array.from(document.getElementById(id).children).map(r => ({ name: r.children[0].value, amount: Number(r.children[1].value), type: r.children[2].value }));
+            const btn = document.getElementById('run-btn');
+            btn.innerText = "RUNNING ENGINE..."; btn.disabled = true;
+            
+            const getItems = (id) => Array.from(document.getElementById(id).children).map(r => ({ 
+                name: r.children[0].value, 
+                amount: Number(r.children[1].value), 
+                type: r.children[2].value 
+            }));
+
             const body = {
-                empId: document.getElementById('currId').value, month: document.getElementById('c-month').value, days: Number(document.getElementById('c-days').value),
-                fullBasic: Number(document.getElementById('c-fbasic').value), fullTrans: Number(document.getElementById('c-ftrans').value),
-                hiringDate: document.getElementById('p-hdate').value, resignationDate: document.getElementById('c-resign').value,
-                additions: getItems('add-area'), deductions: getItems('ded-area'),
-                prevData: { pDays: Number(document.getElementById('pD').value), pTaxable: Number(document.getElementById('pTxbl').value), pTaxes: Number(document.getElementById('pTx').value) }
+                empId: document.getElementById('currId').value, 
+                month: document.getElementById('c-month').value, 
+                days: Number(document.getElementById('c-days').value),
+                fullBasic: Number(document.getElementById('c-fbasic').value), 
+                fullTrans: Number(document.getElementById('c-ftrans').value),
+                hiringDate: document.getElementById('p-hdate').value, 
+                resignationDate: document.getElementById('c-resign').value,
+                additions: getItems('add-area'), 
+                deductions: getItems('ded-area'),
+                prevData: { 
+                    pDays: Number(document.getElementById('pD').value), 
+                    pTaxable: Number(document.getElementById('pTxbl').value), 
+                    pTaxes: Number(document.getElementById('pTx').value) 
+                }
             };
-            await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) });
-            openProfile(body.empId);
+
+            try {
+                await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) });
+                await openProfile(body.empId);
+            } finally {
+                btn.innerText = "RUN PAYROLL ENGINE ⚡"; btn.disabled = false;
+            }
         }
 
-        async function delEmp() { if(confirm("هل أنت متأكد من حذف الموظف نهائياً؟")) { await apiFetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); showHR(); } }
+        async function delEmp() { 
+            if(confirm("تحذير: سيتم حذف كافة سجلات هذا الموظف. هل أنت متأكد؟")) { 
+                await apiFetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); 
+                showHR(); 
+            } 
+        }
 
         function addRow(areaId) {
             const div = document.createElement('div');
-            div.className = "flex gap-2 items-center bg-white/5 p-2 rounded-xl";
-            div.innerHTML = `<input type="text" placeholder="Name" class="flex-1 bg-transparent p-1 text-[10px] text-white outline-none border-b border-white/10"><input type="number" placeholder="0" class="w-16 bg-transparent p-1 text-[10px] text-emerald-400 font-black text-center outline-none border-b border-white/10"><select class="bg-slate-800 text-[8px] text-white rounded outline-none p-1"><option value="exempted">Exempted</option><option value="non-exempted">Taxed</option></select>`;
+            div.className = "flex gap-2 items-center bg-white/10 p-3 rounded-2xl animate-fade-in";
+            div.innerHTML = `
+                <input type="text" placeholder="Item Name" class="flex-1 bg-transparent p-1 text-xs text-white outline-none border-b border-white/20">
+                <input type="number" placeholder="0" class="w-20 bg-transparent p-1 text-xs text-emerald-400 font-black text-center outline-none border-b border-white/20">
+                <select class="bg-slate-800 text-[10px] text-white rounded-lg outline-none p-2">
+                    <option value="non-exempted">Taxed</option>
+                    <option value="exempted">Exempt</option>
+                </select>
+                <button onclick="this.parentElement.remove()" class="text-rose-500 px-2"><i class="fas fa-times"></i></button>`;
             document.getElementById(areaId).appendChild(div);
         }
 
