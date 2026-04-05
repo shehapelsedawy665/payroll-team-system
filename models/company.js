@@ -10,12 +10,36 @@ const GLOBAL_DEFAULTS = {
 };
 
 const companySchema = new mongoose.Schema({
-    name: { type: String, required: true, trim: true },
-    adminEmail: { type: String, required: true, unique: true },
+    // اسم الشركة
+    name: { 
+        type: String, 
+        required: [true, 'اسم الشركة مطلوب'], 
+        trim: true 
+    },
+    // إيميل الأدمن (الأساسي للتحقق)
+    adminEmail: { 
+        type: String, 
+        required: [true, 'إيميل الأدمن مطلوب'], 
+        unique: true,
+        lowercase: true,
+        trim: true 
+    },
+    // الإيميل المستخدم في تسجيل الدخول (Login Email)
+    email: {
+        type: String,
+        required: [true, 'بريد تسجيل الدخول مطلوب'],
+        unique: true,
+        lowercase: true,
+        trim: true
+    },
+    // كلمة المرور مشفرة
+    password: {
+        type: String,
+        required: [true, 'كلمة المرور مطلوبة']
+    },
     
-    // الإعدادات هنا بقت مرنة جداً
+    // الإعدادات المرنة للشركة
     settings: {
-        // لو القيمة null، السيستم أوتوماتيكياً هيستخدم الـ Global Default
         insEmployeePercent: { 
             type: Number, 
             default: GLOBAL_DEFAULTS.INS_EE_PERCENT 
@@ -28,18 +52,21 @@ const companySchema = new mongoose.Schema({
             type: Number, 
             default: GLOBAL_DEFAULTS.PERSONAL_EXEMPTION 
         },
-        // حقل جديد عشان لو حبيت توقف شركة معينة عن العمل مؤقتاً
-        isActive: { type: Boolean, default: true }
+        isActive: { 
+            type: Boolean, 
+            default: true 
+        }
     },
     
-    // تاريخ آخر تحديث للإعدادات
+    createdAt: { type: Date, default: Date.now },
     lastSettingsUpdate: { type: Date, default: Date.now }
 });
 
-// "Magic Function" - بتشتغل قبل ما البيانات تتحفظ
+// تحديث تاريخ التعديل قبل الحفظ
 companySchema.pre('save', function(next) {
     this.lastSettingsUpdate = Date.now();
     next();
 });
 
-module.exports = mongoose.model('Company', companySchema);
+// تصدير الموديل مع التأكد من اسم المجموعة في قاعدة البيانات
+module.exports = mongoose.models.Company || mongoose.model('Company', companySchema);
