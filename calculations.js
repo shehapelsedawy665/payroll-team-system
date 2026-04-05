@@ -112,8 +112,8 @@ function runPayrollLogic(input, prev, emp) {
         proratedBasic,
         proratedTrans,
         totalAdditions,
-        additions, // زدت السطر ده عشان الأسماء تظهر في الجدول
-        deductions, // زدت السطر ده عشان الأسماء تظهر في الجدول
+        additions, // مفتاح أساسي للعرض الديناميكي
+        deductions, // مفتاح أساسي للعرض الديناميكي
         gross,
         insBase: insSalary,
         insuranceEmployee,
