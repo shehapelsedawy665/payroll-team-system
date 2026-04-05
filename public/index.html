@@ -160,7 +160,7 @@
                 </div>
                 <div>
                     <label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Target Month</label>
-                    <input type="month" id="c-month" onchange="validateResignationDate()" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none border border-indigo-100">
+                    <input type="month" id="c-month" onchange="handleMonthChange()" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none border border-indigo-100">
                 </div>
                 <div>
                     <label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Hiring Date</label>
@@ -172,7 +172,7 @@
                 </div>
                 <div>
                     <label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Work Days</label>
-                    <input type="number" id="c-days" value="30" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none text-center border border-indigo-100">
+                    <input type="number" id="c-days" value="30" max="30" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none text-center border border-indigo-100">
                 </div>
             </div>
 
@@ -261,7 +261,7 @@
             });
         }
 
-        // --- Logic: منع تاريخ الاستقالة قبل الشهر المختار أو العكس ---
+        // --- Logic: منع تاريخ الاستقالة قبل الشهر المختار ---
         function validateResignationDate() {
             const monthInput = document.getElementById('c-month').value;
             const resignInput = document.getElementById('c-resign');
@@ -269,9 +269,19 @@
                 const monthDate = new Date(monthInput + "-01");
                 const resignDate = new Date(resignInput.value);
                 if (resignDate < monthDate) {
-                    alert("⚠️ تاريخ الاستقالة لا يمكن أن يكون قبل بداية شهر الحساب المختار.");
+                    alert("⚠️ تاريخ الاستقالة لا يمكن أن يكون قبل شهر الحساب.");
                     resignInput.value = "";
                 }
+            }
+        }
+
+        // --- Logic: منع تخطي الشهور (Sequential Logic) ---
+        function handleMonthChange() {
+            const selectedMonth = document.getElementById('c-month').value;
+            const minAllowed = document.getElementById('c-month').min;
+            if (selectedMonth < minAllowed) {
+                alert("⚠️ لا يمكن اختيار شهر تم حسابه سابقاً أو قبل تاريخ التعيين.");
+                document.getElementById('c-month').value = minAllowed;
             }
         }
 
@@ -295,7 +305,7 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ companyName: "SEDAY ERP Client", adminEmail: email.toLowerCase(), password })
             });
-            if(res.ok) alert("تم إنشاء الشركة!"); else alert("خطأ في التسجيل");
+            if(res.ok) alert("تم إنشاء الشركة! يمكنك الآن تسجيل الدخول."); else alert("خطأ في التسجيل");
         }
 
         function handleLogout() { localStorage.removeItem('token'); location.reload(); }
@@ -348,9 +358,21 @@
             document.getElementById('pTxbl').value = data.prevData.pTaxable || 0;
             document.getElementById('pTx').value = data.prevData.pTaxes || 0;
 
-            // Sequential Logic: منع اختيار شهر قبل تاريخ التعيين
-            const hDateStr = data.emp.hiringDate.substring(0, 7);
-            document.getElementById('c-month').min = hDateStr;
+            // --- [تطوير المنطق المتتالي للشهور] ---
+            const hDateStr = data.emp.hiringDate.substring(0, 7); // yyyy-mm
+            let nextMonthStr = hDateStr;
+
+            if (data.history.length > 0) {
+                // ترتيب التاريخ لمعرفة أحدث شهر محسوب
+                const sortedHistory = data.history.sort((a, b) => new Date(b.month) - new Date(a.month));
+                const lastMonth = new Date(sortedHistory[0].month + "-01");
+                lastMonth.setMonth(lastMonth.getMonth() + 1);
+                nextMonthStr = lastMonth.toISOString().substring(0, 7);
+            }
+
+            const monthInput = document.getElementById('c-month');
+            monthInput.min = nextMonthStr; // لا يسمح باختيار أي شهر قبل هذا
+            monthInput.value = nextMonthStr; // يقترح الشهر اللي عليه الدور أوتوماتيك
 
             // بناء الجدول التاريخي
             let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">الشهر</th><th class="p-4">الأيام</th><th class="p-4">الإجمالي</th><th class="p-4">تأمينات</th><th class="p-4 bg-rose-800">ضريبة</th><th class="p-4 bg-emerald-600">الصافي</th></tr>`;
@@ -359,10 +381,10 @@
                 <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition">
                     <td class="p-4 font-black text-slate-900">${r.month}</td>
                     <td class="p-4">${r.payload.days}</td>
-                    <td class="p-4">${r.payload.gross.toFixed(2)}</td>
-                    <td class="p-4">${r.payload.insuranceEmployee.toFixed(2)}</td>
-                    <td class="p-4 text-rose-600">${r.payload.monthlyTax.toFixed(2)}</td>
-                    <td class="p-4 text-emerald-700 font-black">${r.payload.net.toFixed(2)}</td>
+                    <td class="p-4">${r.payload.gross.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="p-4">${r.payload.insuranceEmployee.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="p-4 text-rose-600">${r.payload.monthlyTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="p-4 text-emerald-700 font-black">${r.payload.net.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>`).join('');
         }
 
@@ -386,6 +408,14 @@
             const month = document.getElementById('c-month').value;
             if(!month) return alert("اختر الشهر أولاً");
             
+            // تحقق إذا كان الموظف قد استقال قبل هذا الشهر
+            const resignDateStr = document.getElementById('c-resign').value;
+            if (resignDateStr) {
+                const rDate = new Date(resignDateStr);
+                const mDate = new Date(month + "-01");
+                if (rDate < mDate) return alert("❌ هذا الموظف مستقيل، لا يمكن حساب مرتب له في هذا التاريخ.");
+            }
+
             btn.innerText = "RUNNING..."; btn.disabled = true;
             const getItems = (id) => Array.from(document.getElementById(id).children).map(r => ({ 
                 name: r.children[0].value, amount: Number(r.children[1].value), type: r.children[2].value 
@@ -408,6 +438,8 @@
             try {
                 await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) });
                 await openProfile(body.empId);
+                document.getElementById('add-area').innerHTML = "";
+                document.getElementById('ded-area').innerHTML = "";
             } finally { btn.innerText = "RUN PAYROLL ENGINE ⚡"; btn.disabled = false; }
         }
 
@@ -419,13 +451,14 @@
                 insSalary: Number(document.getElementById('n-ins').value), 
                 jobType: document.getElementById('n-type').value 
             };
+            if(!body.name || !body.hiringDate) return alert("الاسم وتاريخ التعيين مطلوبان");
             await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(body) });
             document.getElementById('modal').classList.add('hidden');
             showHR();
         }
 
         async function delEmp() { 
-            if(confirm("حذف نهائي؟")) { 
+            if(confirm("هل أنت متأكد من حذف الموظف وكل سجلاته التاريخية؟")) { 
                 await apiFetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); 
                 showHR(); 
             } 
