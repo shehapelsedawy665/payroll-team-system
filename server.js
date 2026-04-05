@@ -18,8 +18,8 @@ const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", new mongoos
     employeeId: mongoose.Schema.Types.ObjectId, month: String, payload: Object 
 }));
 
+// APIs
 app.get("/api/employees", async (req, res) => res.json(await Employee.find().sort({_id: -1})));
-
 app.post("/api/employees", async (req, res) => res.json(await new Employee(req.body).save()));
 
 app.get("/api/employees/:id/details", async (req, res) => {
@@ -42,8 +42,15 @@ app.post("/api/payroll/calculate", async (req, res) => {
     res.json(record);
 });
 
+// مسح الموظف تماماً
 app.delete("/api/employees/:id", async (req, res) => {
     await Employee.findByIdAndDelete(req.params.id);
+    await Payroll.deleteMany({ employeeId: req.params.id });
+    res.json({ success: true });
+});
+
+// الاستقالة (مسح السجل المالي فقط مع بقاء الموظف أو العكس حسب رغبتك - هنا هنمسح السجل المالي ونصفر التراكمي)
+app.post("/api/employees/:id/resign", async (req, res) => {
     await Payroll.deleteMany({ employeeId: req.params.id });
     res.json({ success: true });
 });
