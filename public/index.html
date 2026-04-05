@@ -14,6 +14,8 @@
         #sidebar:hover .nav-text { opacity: 1; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* تحسين التمرير العرضي للجدول */
+        .table-container { max-width: 100%; overflow-x: auto; border-radius: 2.5rem; shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
     </style>
 </head>
 <body class="bg-slate-100 flex min-h-screen">
@@ -153,15 +155,10 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border border-slate-200">
+            <div class="table-container bg-white border border-slate-200">
                 <table class="w-full text-[9px] text-center whitespace-nowrap" dir="ltr">
-                    <thead class="bg-slate-800 text-white">
-                        <tr class="divide-x divide-slate-700 italic uppercase">
-                            <th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">F.Basic</th><th class="p-4">F.Trans</th><th class="p-4">P.Basic</th><th class="p-4">P.Trans</th><th class="p-4 text-emerald-400">Adds & Details</th><th class="p-4 bg-indigo-700">GROSS</th>
-                            <th class="p-4">Ins 11%</th><th class="p-4">Taxable</th><th class="p-4">Pool YTD</th><th class="p-4 italic text-slate-400">Floor</th>
-                            <th class="p-4 bg-rose-700">M.Tax</th><th class="p-4">Martyrs</th><th class="p-4">Total Ded</th><th class="p-4 bg-emerald-600 text-[12px] font-black italic">NET SALARY</th>
-                        </tr>
-                    </thead>
+                    <thead id="histHead" class="bg-slate-800 text-white">
+                        </thead>
                     <tbody id="histBody" class="divide-y divide-slate-100 font-bold text-slate-600 italic"></tbody>
                 </table>
             </div>
@@ -187,7 +184,6 @@
     <input type="hidden" id="currId"><input type="hidden" id="pD"><input type="hidden" id="pTxbl"><input type="hidden" id="pTx">
 
     <script>
-        // NAVIGATION
         function hideAll() {
             ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => {
                 const el = document.getElementById(id);
@@ -198,7 +194,6 @@
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
         function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
 
-        // HELPERS
         function addRow(areaId) {
             const div = document.createElement('div');
             div.className = "flex gap-2 animate-fade-in";
@@ -211,17 +206,13 @@
             const data = await res.json();
             document.getElementById('empTable').innerHTML = data.map(e => {
                 const isResigned = e.resignationDate && e.resignationDate !== "";
-                const statusLabel = isResigned ? "Resigned" : "Active";
-                const statusClass = isResigned ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600";
-                
                 return `
                 <tr class="hover:bg-slate-50 cursor-pointer group transition" onclick="openProfile('${e._id}')">
                     <td class="p-6"><div class="flex items-center"><div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black ml-4 transition group-hover:rotate-12">${e.name[0]}</div><div class="font-black text-slate-700">${e.name}</div></div></td>
                     <td class="p-6 text-center font-mono text-slate-400 font-bold italic">${e.nationalId}</td>
-                    <td class="p-6 text-center"><span class="${statusClass} px-4 py-1 rounded-full text-[10px] font-black uppercase">${statusLabel}</span></td>
+                    <td class="p-6 text-center"><span class="${isResigned ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"} px-4 py-1 rounded-full text-[10px] font-black uppercase">${isResigned ? "Resigned" : "Active"}</span></td>
                     <td class="p-6 text-center"><i class="fas fa-chevron-left text-slate-300 group-hover:text-indigo-600 transition translate-x-0 group-hover:-translate-x-2"></i></td>
-                </tr>
-            `}).join('');
+                </tr>`}).join('');
         }
 
         async function openProfile(id) {
@@ -242,46 +233,61 @@
                 let [y, m] = lastMonth.split('-').map(Number);
                 m++; if(m > 12) { m = 1; y++; }
                 nextMonth = `${y}-${String(m).padStart(2, '0')}`;
-            } else {
-                nextMonth = data.emp.hiringDate.substring(0, 7);
-            }
+            } else { nextMonth = data.emp.hiringDate.substring(0, 7); }
             document.getElementById('c-month').value = nextMonth;
             
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
 
+            // --- بناء العماويد الديناميكية (Infinity Columns) ---
+            const allAddKeys = new Set();
+            const allDedKeys = new Set();
+            data.history.forEach(r => {
+                if(r.payload.additions) r.payload.additions.forEach(a => allAddKeys.add(a.name));
+                if(r.payload.deductions) r.payload.deductions.forEach(d => allDedKeys.add(d.name));
+            });
+            const dynamicAdds = Array.from(allAddKeys);
+            const dynamicDeds = Array.from(allDedKeys);
+
+            // 1. Build Header
+            let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase">
+                <th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">F.Basic</th><th class="p-4">F.Trans</th><th class="p-4">P.Basic</th><th class="p-4">P.Trans</th>`;
+            dynamicAdds.forEach(key => headHTML += `<th class="p-4 text-emerald-400 bg-emerald-950/20">${key}</th>`);
+            headHTML += `<th class="p-4 bg-indigo-700">GROSS</th><th class="p-4">Ins 11%</th><th class="p-4">Taxable</th><th class="p-4">Pool YTD</th><th class="p-4 italic text-slate-400">Floor</th><th class="p-4 bg-rose-700">M.Tax</th><th class="p-4">Martyrs</th>`;
+            dynamicDeds.forEach(key => headHTML += `<th class="p-4 text-rose-400 bg-rose-950/20">${key}</th>`);
+            headHTML += `<th class="p-4">Total Ded</th><th class="p-4 bg-emerald-600 text-[12px] font-black italic">NET SALARY</th></tr>`;
+            document.getElementById('histHead').innerHTML = headHTML;
+
+            // 2. Build Body
             document.getElementById('histBody').innerHTML = data.history.map(r => {
                 const d = r.payload;
-                
-                // --- منطق عرض التفاصيل لكل بند ---
-                const addDetailsArr = [];
-                if (d.additions && Array.isArray(d.additions)) {
-                    d.additions.forEach(a => { if(a.amount > 0) addDetailsArr.push(`${a.name || 'Extra'}: ${a.amount}`); });
-                }
-                if (d.deductions && Array.isArray(d.deductions)) {
-                    d.deductions.forEach(de => { if(de.amount > 0) addDetailsArr.push(`-${de.name || 'Ded'}: ${de.amount}`); });
-                }
-                const addDetailsStr = addDetailsArr.length > 0 ? addDetailsArr.join(' | ') : 'None';
-
-                return `<tr class="divide-x divide-slate-50 transition hover:bg-slate-50/50">
+                let rowHTML = `<tr class="divide-x divide-slate-50 transition hover:bg-slate-50/50">
                     <td class="p-4 bg-slate-50/50 text-slate-950 font-black">${r.month}</td>
                     <td class="text-indigo-500 font-black">${d.days || 30}</td>
-                    <td>${d.fullBasic.toLocaleString()}</td>
-                    <td>${d.fullTrans.toLocaleString()}</td>
-                    <td>${d.proratedBasic.toLocaleString()}</td>
-                    <td>${d.proratedTrans.toLocaleString()}</td>
-                    <td class="text-indigo-600 max-w-[150px] truncate px-2 font-bold" title="${addDetailsStr}">${addDetailsStr}</td>
-                    <td class="bg-indigo-50 font-black">${d.gross.toLocaleString()}</td>
+                    <td>${d.fullBasic.toLocaleString()}</td><td>${d.fullTrans.toLocaleString()}</td>
+                    <td>${d.proratedBasic.toLocaleString()}</td><td>${d.proratedTrans.toLocaleString()}</td>`;
+                
+                dynamicAdds.forEach(key => {
+                    const found = d.additions ? d.additions.find(a => a.name === key) : null;
+                    rowHTML += `<td class="text-emerald-600">${found ? found.amount.toLocaleString() : 0}</td>`;
+                });
+
+                rowHTML += `<td class="bg-indigo-50 font-black">${d.gross.toLocaleString()}</td>
                     <td class="text-orange-500">${d.insuranceEmployee.toLocaleString()}</td>
-                    <td>${d.currentTaxable.toLocaleString()}</td>
-                    <td>${d.taxPoolYTD.toLocaleString()}</td>
+                    <td>${d.currentTaxable.toLocaleString()}</td><td>${d.taxPoolYTD.toLocaleString()}</td>
                     <td class="text-[8px] text-slate-300">${d.annualProjected.toLocaleString()}</td>
                     <td class="bg-rose-50 text-rose-600 font-black">${d.monthlyTax.toLocaleString()}</td>
-                    <td>${d.martyrs.toLocaleString()}</td>
-                    <td>${d.totalAllDeductions.toLocaleString()}</td>
-                    <td class="bg-emerald-50 text-emerald-700 text-[12px] font-black border-l-4 border-emerald-500">${d.net.toLocaleString()}</td>
-                </tr>`;
+                    <td>${d.martyrs.toLocaleString()}</td>`;
+                
+                dynamicDeds.forEach(key => {
+                    const found = d.deductions ? d.deductions.find(de => de.name === key) : null;
+                    rowHTML += `<td class="text-rose-600">${found ? found.amount.toLocaleString() : 0}</td>`;
+                });
+
+                rowHTML += `<td>${d.totalAllDeductions.toLocaleString()}</td>
+                    <td class="bg-emerald-50 text-emerald-700 text-[12px] font-black border-l-4 border-emerald-500">${d.net.toLocaleString()}</td></tr>`;
+                return rowHTML;
             }).join('');
         }
 
