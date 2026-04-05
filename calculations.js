@@ -1,6 +1,12 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-function runPayrollLogic(input, prev, emp) {
+/**
+ * @param {Object} input - بيانات الشهر الحالي
+ * @param {Object} prev - بيانات الشهور السابقة (YTD)
+ * @param {Object} emp - بيانات الموظف (التأمينات)
+ * @param {Object} settings - إعدادات الشركة الديناميكية
+ */
+function runPayrollLogic(input, prev, emp, settings = {}) {
     const { 
         fullBasic, 
         fullTrans, 
@@ -11,6 +17,13 @@ function runPayrollLogic(input, prev, emp) {
         resignationDate, 
         month            
     } = input;
+
+    // --- [تحميل الإعدادات الديناميكية أو استخدام الافتراضي] ---
+    const insEEPercent = settings.insEmployeePercent || 0.11;
+    const maxInsLimit = settings.maxInsSalary || 16700;
+    const minInsLimit = settings.minInsSalary || 2325;
+    const annualPersonalExemption = settings.personalExemption || 15000; // الإعفاء الشخصي السنوي
+    const medicalLimitAnnual = 10000; // ممكن تخليها settings.medicalLimit لو حبيت
 
     // --- [حساب الأيام بناءً على التواريخ] ---
     const currentMonthDate = new Date(month + "-01");
@@ -31,16 +44,21 @@ function runPayrollLogic(input, prev, emp) {
     if (autoDays > 30) autoDays = 30;
     let finalDays = (manualDays !== undefined && Number(manualDays) !== 30) ? Number(manualDays) : autoDays;
 
-    // --- [منطق التأمينات] ---
+    // --- [منطق التأمينات الديناميكي] ---
     const isHiredAfterFirst = hDate && hDate.getDate() > 1 && hDate.getMonth() === currentMonthDate.getMonth();
     const isResignedSameMonth = rDate && rDate.getMonth() === currentMonthDate.getMonth();
     
     let insuranceEmployee = 0;
-    const insSalary = Number(emp.insSalary) || 0;
+    let insSalary = Number(emp.insSalary) || 0;
+    
+    // تطبيق الحدود الدنيا والقصوى ديناميكياً
+    if (insSalary > maxInsLimit) insSalary = maxInsLimit;
+    if (insSalary < minInsLimit && insSalary > 0) insSalary = minInsLimit;
+
     if (isHiredAfterFirst && !isResignedSameMonth) {
         insuranceEmployee = 0;
     } else {
-        insuranceEmployee = R(insSalary * 0.11);
+        insuranceEmployee = R(insSalary * insEEPercent);
     }
 
     // --- [الحسابات المالية الأساسية] ---
@@ -48,38 +66,30 @@ function runPayrollLogic(input, prev, emp) {
     const proratedTrans = R((fullTrans / 30) * finalDays);
     const gross = R(proratedBasic + proratedTrans + additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
 
-    // --- [منطق الإعفاءات الطبية والـ Drop-down] ---
-    
-    // 1. الإضافات اللي بتزود الوعاء الضريبي (لو الموظف اختار Exempted هنا معناها إنها "معفاة من الضريبة" فمش هنزودها في الوعاء)
-    // ملحوظة: حسب طلبك لو اختار exempted يقلل الضريبة يعني "لا تضاف للوعاء"
+    // --- [منطق الإعفاءات والـ Drop-down] ---
     const taxableAdditions = additions.reduce((sum, item) => {
         return sum + (item.type === 'non-exempted' ? (Number(item.amount) || 0) : 0);
     }, 0);
 
-    // 2. الخصومات اللي بتقلل الوعاء الضريبي (لو اختار Exempted يقلل الوعاء)
     let medicalExemption = 0;
     const taxableDeductions = deductions.reduce((sum, item) => {
         const amt = Number(item.amount) || 0;
-        const name = item.name.toLowerCase();
+        const name = (item.name || "").toLowerCase();
 
-        // لو البند طبي (Medical) بنطبق معادلة الـ 15% أو الـ 833.33 جنيه
         if (name.includes("medical")) {
-            const limit1 = R(gross * 0.15); // 15% من الإجمالي
-            const limit2 = R((10000 / 360) * finalDays); // سقف الـ 10000 سنوياً متوزع ع الأيام
+            const limit1 = R(gross * 0.15); 
+            const limit2 = R((medicalLimitAnnual / 360) * finalDays); 
             medicalExemption += Math.min(amt, limit1, limit2);
             return sum + (item.type === 'exempted' ? (amt - medicalExemption) : 0); 
         }
-
-        // لو بند عادي واختار Exempted يقلل الوعاء الضريبي
         return sum + (item.type === 'exempted' ? amt : 0);
     }, 0);
 
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
-    // --- [حساب الضرائب - الوعاء الضريبي المعدل] ---
-    const personalExemption = R((20000 / 360) * finalDays); 
+    // --- [حساب الضرائب - الوعاء الضريبي المعدل ديناميكياً] ---
+    const personalExemption = R((annualPersonalExemption / 360) * finalDays); 
     
-    // الوعاء = (الأساسي + البدلات الخاضعة) - التأمينات - الإعفاء الشخصي - الخصومات المعفاة - إعفاء الطبي
     const currentTaxable = R(Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee - personalExemption - taxableDeductions - medicalExemption));
     
     const totalDaysYTD = Number(finalDays) + (Number(prev.pDays) || 0);
