@@ -63,7 +63,7 @@
 
             <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8 grid grid-cols-1 md:grid-cols-5 gap-4 italic">
                 <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-slate-400 block mb-1 uppercase">Name</label><p id="p-name" class="font-black text-lg text-slate-800"></p></div>
-                <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-slate-400 block mb-1 uppercase">Month</label><input type="month" id="c-month" class="w-full bg-slate-50 p-2 rounded-lg border-none font-bold outline-none"></div>
+                <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-indigo-600 block mb-1 uppercase font-bold">Payroll Month (Locked)</label><input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg border-none font-black outline-none" readonly></div>
                 <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-slate-400 block mb-1 uppercase">Hiring Date</label><input type="date" id="p-hdate" class="w-full bg-slate-50 p-2 rounded-lg border-none font-bold outline-none" readonly></div>
                 <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-orange-500 block mb-1 uppercase font-bold">Resign Date</label><input type="date" id="c-resign" class="w-full bg-orange-50 p-2 rounded-lg border-none font-bold outline-none focus:ring-1 ring-orange-300"></div>
                 <div class="pl-4"><label class="text-[10px] text-indigo-600 block mb-1 uppercase font-bold">Work Days</label><input type="number" id="c-days" value="30" class="w-full bg-indigo-50 p-2 rounded-lg border-none font-black outline-none"></div>
@@ -149,19 +149,25 @@
             document.getElementById('currId').value = id;
             document.getElementById('list-view').classList.add('hidden');
             document.getElementById('profile-view').classList.remove('hidden');
+            
             const res = await fetch(`/api/employees/${id}/details`);
             const data = await res.json();
             
             document.getElementById('p-name').innerText = data.emp.name;
-            document.getElementById('p-hdate').value = data.emp.hiringDate; // تعيين تاريخ التوظيف للعرض
-            
-            let lastMonth = data.history.length > 0 ? data.history[data.history.length - 1].month : data.emp.hiringDate.substring(0, 7);
+            document.getElementById('p-hdate').value = data.emp.hiringDate;
+
+            // Sequential Month Locking Logic
+            let nextMonth;
             if (data.history.length > 0) {
+                const lastMonth = data.history[data.history.length - 1].month;
                 let [y, m] = lastMonth.split('-').map(Number);
                 m++; if(m > 12) { m = 1; y++; }
-                lastMonth = `${y}-${m.toString().padStart(2, '0')}`;
+                nextMonth = `${y}-${String(m).padStart(2, '0')}`;
+            } else {
+                nextMonth = data.emp.hiringDate.substring(0, 7);
             }
-            document.getElementById('c-month').value = lastMonth;
+            document.getElementById('c-month').value = nextMonth;
+            
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
@@ -223,8 +229,12 @@
                 }
             };
             const res = await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-            if(res.ok) openProfile(body.empId);
-            else alert("حدث خطأ في الحسابات!");
+            if(res.ok) {
+                // Clear inputs after success
+                document.getElementById('add-area').innerHTML = '';
+                document.getElementById('ded-area').innerHTML = '';
+                openProfile(body.empId);
+            } else alert("حدث خطأ في الحسابات!");
         }
 
         async function delEmp() { if(confirm("حذف الموظف؟ لا يمكن التراجع!")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); location.reload(); } }
