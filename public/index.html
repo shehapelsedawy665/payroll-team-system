@@ -12,6 +12,8 @@
         #sidebar:hover { width: 240px; }
         .nav-text { opacity: 0; transition: opacity 0.3s; }
         #sidebar:hover .nav-text { opacity: 1; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-slate-100 flex min-h-screen">
@@ -21,10 +23,16 @@
             <i class="fas fa-bolt ml-4"></i> <span class="nav-text italic">SYSTEM</span>
         </div>
         <nav class="flex-1">
-            <div onclick="location.reload()" class="p-4 hover:bg-indigo-600 flex items-center cursor-pointer transition">
+            <div onclick="showDash()" class="p-4 hover:bg-indigo-600 flex items-center cursor-pointer transition">
                 <i class="fas fa-home ml-4 text-xl"></i> <span class="nav-text">الرئيسية</span>
             </div>
-            <div onclick="document.getElementById('modal').classList.remove('hidden')" class="p-4 hover:bg-indigo-600 flex items-center cursor-pointer transition text-emerald-400">
+            <div onclick="showHR()" class="p-4 hover:bg-indigo-600 flex items-center cursor-pointer transition">
+                <i class="fas fa-users ml-4 text-xl"></i> <span class="nav-text">إدارة الموظفين</span>
+            </div>
+            <div onclick="showCalc()" class="p-4 hover:bg-indigo-600 flex items-center cursor-pointer transition text-emerald-400">
+                <i class="fas fa-calculator ml-4 text-xl"></i> <span class="nav-text">Net to Gross</span>
+            </div>
+            <div onclick="document.getElementById('modal').classList.remove('hidden')" class="p-4 hover:bg-emerald-600 flex items-center cursor-pointer transition text-white mt-4 bg-emerald-500/10">
                 <i class="fas fa-user-plus ml-4 text-xl"></i> <span class="nav-text">إضافة موظف</span>
             </div>
         </nav>
@@ -35,9 +43,33 @@
 
     <main class="flex-1 mr-[60px] p-8 lg:p-12">
         
-        <div id="list-view">
+        <div id="dashboard-view" class="animate-fade-in">
+            <h1 class="text-4xl font-black text-slate-800 mb-10 italic">لوحة <span class="text-indigo-600">التحكم</span></h1>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div onclick="showHR()" class="bg-white p-8 rounded-[2.5rem] shadow-xl border-4 border-transparent hover:border-indigo-500 cursor-pointer transition-all group">
+                    <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
+                    <h3 class="text-2xl font-black mb-2 text-slate-800">إدارة الموظفين</h3>
+                    <p class="text-slate-400 text-sm font-bold">عرض البيانات، حساب الرواتب، وإدارة الاستقالات.</p>
+                </div>
+
+                <div onclick="showCalc()" class="bg-white p-8 rounded-[2.5rem] shadow-xl border-4 border-transparent hover:border-emerald-500 cursor-pointer transition-all group">
+                    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition">
+                        <i class="fas fa-calculator"></i>
+                    </div>
+                    <h3 class="text-2xl font-black mb-2 text-slate-800">Net to Gross</h3>
+                    <p class="text-slate-400 text-sm font-bold">حساب الشامل من الصافي بمعادلات تكرارية دقيقة.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="list-view" class="hidden animate-fade-in">
             <div class="flex justify-between items-center mb-10">
-                <h1 class="text-3xl font-black text-slate-800">قائمة الموارد البشرية</h1>
+                <div>
+                    <button onclick="showDash()" class="text-indigo-600 font-bold mb-2 block">← العودة للرئيسية</button>
+                    <h1 class="text-3xl font-black text-slate-800">قائمة الموارد البشرية</h1>
+                </div>
                 <div class="bg-white p-2 rounded-xl shadow-sm border flex gap-4 text-xs font-bold">
                     <span class="text-indigo-600">Company View: Enabled</span>
                 </div>
@@ -52,32 +84,61 @@
             </div>
         </div>
 
+        <div id="net-gross-view" class="hidden animate-fade-in">
+            <button onclick="showDash()" class="text-emerald-600 font-bold mb-6 block">← العودة للرئيسية</button>
+            <div class="max-w-2xl mx-auto bg-slate-900 text-white p-10 rounded-[3rem] shadow-2xl">
+                <h2 class="text-3xl font-black mb-8 text-center italic underline decoration-emerald-500">Net To Gross Tool</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2 text-center">Target Net Salary (الصافي المستهدف)</label>
+                        <input type="number" id="target-net" class="w-full bg-slate-800 p-6 rounded-2xl border-none outline-none font-black text-4xl text-emerald-400 text-center" placeholder="0.00">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Ins. Salary</label>
+                            <input type="number" id="calc-ins" value="0" class="w-full bg-slate-800 p-4 rounded-2xl border-none outline-none font-bold text-center">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Days</label>
+                            <input type="number" id="calc-days" value="30" class="w-full bg-slate-800 p-4 rounded-2xl border-none outline-none font-bold text-center">
+                        </div>
+                    </div>
+                    <button onclick="runNetToGross()" id="calc-btn" class="w-full bg-emerald-500 hover:bg-emerald-400 py-6 rounded-2xl font-black text-slate-900 text-xl transition active:scale-95">REVERSE CALCULATE ⚡</button>
+                    
+                    <div id="calc-result" class="hidden mt-8 p-8 bg-white/5 border border-white/10 rounded-3xl text-center">
+                        <p class="text-slate-400 font-bold text-xs uppercase mb-2">Required Gross Salary</p>
+                        <h4 id="result-gross" class="text-5xl font-black text-emerald-400">0.00</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="profile-view" class="hidden animate-fade-in">
             <div class="flex justify-between items-start mb-8">
-                <button onclick="location.reload()" class="text-indigo-600 font-bold hover:translate-x-2 transition inline-block">← العودة للقائمة</button>
+                <button onclick="showHR()" class="text-indigo-600 font-bold hover:translate-x-2 transition inline-block">← العودة للقائمة</button>
                 <div class="flex gap-2">
                     <button onclick="handleResign()" class="bg-orange-100 text-orange-600 px-4 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-orange-200">تأكيد الاستقالة</button>
                     <button onclick="delEmp()" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-red-200">حذف نهائي</button>
                 </div>
             </div>
 
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8 grid grid-cols-1 md:grid-cols-5 gap-4 italic">
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8 grid grid-cols-1 md:grid-cols-5 gap-4 italic text-right" dir="rtl">
                 <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-slate-400 block mb-1 uppercase">Name</label><p id="p-name" class="font-black text-lg text-slate-800"></p></div>
-                <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-indigo-600 block mb-1 uppercase font-bold">Payroll Month (Locked)</label><input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg border-none font-black outline-none" readonly></div>
+                <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-indigo-600 block mb-1 uppercase font-bold">Payroll Month</label><input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg border-none font-black outline-none" readonly></div>
                 <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-slate-400 block mb-1 uppercase">Hiring Date</label><input type="date" id="p-hdate" class="w-full bg-slate-50 p-2 rounded-lg border-none font-bold outline-none" readonly></div>
-                <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-orange-500 block mb-1 uppercase font-bold">Resign Date</label><input type="date" id="c-resign" class="w-full bg-orange-50 p-2 rounded-lg border-none font-bold outline-none focus:ring-1 ring-orange-300"></div>
+                <div class="border-l border-slate-100 pl-4"><label class="text-[10px] text-orange-500 block mb-1 uppercase font-bold">Resign Date</label><input type="date" id="c-resign" class="w-full bg-orange-50 p-2 rounded-lg border-none font-bold outline-none"></div>
                 <div class="pl-4"><label class="text-[10px] text-indigo-600 block mb-1 uppercase font-bold">Work Days</label><input type="number" id="c-days" value="30" class="w-full bg-indigo-50 p-2 rounded-lg border-none font-black outline-none"></div>
             </div>
 
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8">
-                <label class="text-[10px] text-slate-400 block mb-2 uppercase font-bold text-center italic">Contract Value (Basic / Trans)</label>
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 mb-8 text-center">
+                <label class="text-[10px] text-slate-400 block mb-2 uppercase font-bold italic">Contract Value (Basic / Trans)</label>
                 <div class="flex gap-4 justify-center">
                     <input type="number" id="c-fbasic" placeholder="Fixed Basic" class="w-1/3 p-4 bg-slate-50 rounded-2xl outline-none font-black text-center border-2 border-transparent focus:border-indigo-500 transition">
                     <input type="number" id="c-ftrans" placeholder="Fixed Trans" class="w-1/3 p-4 bg-slate-50 rounded-2xl outline-none font-black text-center border-2 border-transparent focus:border-indigo-500 transition">
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 text-right">
                 <div class="bg-indigo-950 text-white p-8 rounded-[2.5rem] shadow-xl">
                     <div class="flex justify-between items-center mb-6 border-b border-indigo-900 pb-4"><h4 class="font-black italic text-indigo-300 underline">Additions (+)</h4><button onclick="addRow('add-area')" class="text-[10px] bg-indigo-800 px-4 py-1 rounded-full hover:bg-indigo-700">+ Add Item</button></div>
                     <div id="add-area" class="space-y-3 min-h-[100px]"></div>
@@ -87,12 +148,12 @@
                         <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4"><h4 class="font-black italic text-rose-400 underline">Deductions (-)</h4><button onclick="addRow('ded-area')" class="text-[10px] bg-slate-800 px-4 py-1 rounded-full hover:bg-slate-700">+ Add Ded</button></div>
                         <div id="ded-area" class="space-y-3 min-h-[100px]"></div>
                     </div>
-                    <button onclick="runCalc()" class="w-full mt-10 bg-emerald-500 hover:bg-emerald-400 py-6 rounded-[2rem] font-black text-2xl shadow-lg transition-all transform active:scale-95 text-slate-900 flex items-center justify-center gap-3 italic">RUN PAYROLL ⚡</button>
+                    <button onclick="runCalc()" class="w-full mt-10 bg-emerald-500 hover:bg-emerald-400 py-6 rounded-[2rem] font-black text-2xl shadow-lg transition-all transform active:scale-95 text-slate-900 flex items-center justify-center gap-3 italic text-center">RUN PAYROLL ⚡</button>
                 </div>
             </div>
 
             <div class="bg-white rounded-[2.5rem] shadow-xl overflow-x-auto border border-slate-200">
-                <table class="w-full text-[9px] text-center whitespace-nowrap">
+                <table class="w-full text-[9px] text-center whitespace-nowrap" dir="ltr">
                     <thead class="bg-slate-800 text-white">
                         <tr class="divide-x divide-slate-700 italic uppercase">
                             <th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">F.Basic</th><th class="p-4">F.Trans</th><th class="p-4">P.Basic</th><th class="p-4">P.Trans</th><th class="p-4 text-emerald-400">Adds</th><th class="p-4 bg-indigo-700">GROSS</th>
@@ -110,11 +171,11 @@
         <div class="bg-white p-10 rounded-[3rem] w-full max-w-lg shadow-2xl border border-white/20">
             <h3 class="text-3xl font-black mb-8 text-slate-800 italic underline decoration-indigo-500">New Employee</h3>
             <div class="space-y-4">
-                <input type="text" id="n-name" placeholder="Full Name" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 ring-indigo-500">
-                <input type="text" id="n-nid" placeholder="National ID (14 digits)" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 ring-indigo-500">
+                <input type="text" id="n-name" placeholder="Full Name" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 ring-indigo-500 text-right">
+                <input type="text" id="n-nid" placeholder="National ID (14 digits)" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 ring-indigo-500 text-center">
                 <div class="flex gap-4">
                     <input type="date" id="n-hdate" title="Hiring Date" class="flex-1 p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none">
-                    <input type="number" id="n-ins" placeholder="Insurance Salary" class="flex-1 p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none">
+                    <input type="number" id="n-ins" placeholder="Insurance Salary" class="flex-1 p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none text-center">
                 </div>
                 <select id="n-type" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-black text-indigo-600 outline-none"><option>Full Time</option><option>Part Time</option></select>
             </div>
@@ -125,6 +186,17 @@
     <input type="hidden" id="currId"><input type="hidden" id="pD"><input type="hidden" id="pTxbl"><input type="hidden" id="pTx">
 
     <script>
+        // Navigation Functions
+        function hideAll() {
+            ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+        }
+
+        function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
+        function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
+        function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
+
         function addRow(areaId) {
             const div = document.createElement('div');
             div.className = "flex gap-2 animate-fade-in";
@@ -146,9 +218,9 @@
         }
 
         async function openProfile(id) {
-            document.getElementById('currId').value = id;
-            document.getElementById('list-view').classList.add('hidden');
+            hideAll();
             document.getElementById('profile-view').classList.remove('hidden');
+            document.getElementById('currId').value = id;
             
             const res = await fetch(`/api/employees/${id}/details`);
             const data = await res.json();
@@ -156,7 +228,6 @@
             document.getElementById('p-name').innerText = data.emp.name;
             document.getElementById('p-hdate').value = data.emp.hiringDate;
 
-            // Sequential Month Locking Logic
             let nextMonth;
             if (data.history.length > 0) {
                 const lastMonth = data.history[data.history.length - 1].month;
@@ -202,12 +273,34 @@
             location.reload();
         }
 
+        async function runNetToGross() {
+            const net = Number(document.getElementById('target-net').value);
+            const ins = Number(document.getElementById('calc-ins').value);
+            const days = Number(document.getElementById('calc-days').value);
+            const btn = document.getElementById('calc-btn');
+
+            if(!net) return alert("دخل الصافي الأول!");
+
+            btn.innerText = "CALCULATING... ⏳";
+            btn.disabled = true;
+
+            const res = await fetch('/api/payroll/net-to-gross', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ targetNet: net, insSalary: ins, days: days })
+            });
+            const data = await res.json();
+            
+            btn.innerText = "REVERSE CALCULATE ⚡";
+            btn.disabled = false;
+            document.getElementById('calc-result').classList.remove('hidden');
+            document.getElementById('result-gross').innerText = data.gross.toLocaleString();
+        }
+
         function handleResign() {
             const rDate = document.getElementById('c-resign').value;
             if(!rDate) return alert("حدد تاريخ الاستقالة أولاً!");
-            if(confirm("هل أنت متأكد من تصفية الموظف في هذا التاريخ؟ سيتم حساب الأيام أوتوماتيكياً.")) {
-                runCalc();
-            }
+            if(confirm("هل أنت متأكد من تصفية الموظف؟")) runCalc();
         }
 
         async function runCalc() {
@@ -230,7 +323,6 @@
             };
             const res = await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
             if(res.ok) {
-                // Clear inputs after success
                 document.getElementById('add-area').innerHTML = '';
                 document.getElementById('ded-area').innerHTML = '';
                 openProfile(body.empId);
@@ -239,7 +331,7 @@
 
         async function delEmp() { if(confirm("حذف الموظف؟ لا يمكن التراجع!")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); location.reload(); } }
 
-        window.onload = load;
+        window.onload = showDash;
     </script>
 </body>
 </html>
