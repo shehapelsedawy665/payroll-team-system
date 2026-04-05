@@ -7,7 +7,6 @@ const jwt = require("jsonwebtoken");
 const connectDB = require("./db");
 const { runPayrollLogic } = require("./calculations");
 const auth = require("./middleware/auth"); 
-// تأكد أن اسم الملف في GitHub هو company.js بحروف صغيرة كما في الصورة
 const Company = require("./models/company"); 
 
 const app = express();
@@ -17,14 +16,14 @@ app.use(express.json());
 // 1. الاتصال بقاعدة البيانات
 connectDB();
 
-// 2. التعريفات (Schemas) داخل الملف
+// 2. التعريفات (Schemas)
 const employeeSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     name: { type: String, required: true },
     email: { type: String, unique: true },
-    password: { type: String }, // للباسورد الخاص بالـ Login
+    password: { type: String }, 
     role: { type: String, enum: ['Admin', 'HR', 'Employee'], default: 'Employee' },
-    nationalId: String, // التأكد من كتابتها هكذا لتجنب undefined في الـ Frontend
+    nationalId: String, 
     hiringDate: String, 
     resignationDate: String, 
     insSalary: Number, 
@@ -42,13 +41,11 @@ const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSche
 
 // --- [Auth APIs] ---
 
-// تسجيل شركة جديدة وأدمن للشركة
 app.post("/api/auth/register", async (req, res) => {
     try {
         const { companyName, adminEmail, password } = req.body;
-        
         if (!companyName || !adminEmail || !password) {
-            return res.status(400).json({ error: "برجاء إدخال اسم الشركة، البريد، وكلمة المرور" });
+            return res.status(400).json({ error: "برجاء إدخال البيانات كاملة" });
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -68,21 +65,16 @@ app.post("/api/auth/register", async (req, res) => {
             email: adminEmail.toLowerCase(),
             password: hashedPassword,
             role: "Admin",
-            nationalId: "N/A" // قيمة افتراضية للأدمن
+            nationalId: "N/A"
         });
         await adminUser.save();
-
-        res.json({ success: true, message: "تم إنشاء الشركة وحساب المسؤول بنجاح!" });
+        res.json({ success: true, message: "تم التسجيل بنجاح" });
     } catch (err) {
-        console.error("Register Error:", err.message);
-        if (err.code === 11000) {
-            return res.status(400).json({ error: "هذا البريد الإلكتروني مسجل بالفعل" });
-        }
+        if (err.code === 11000) return res.status(400).json({ error: "البريد مسجل بالفعل" });
         res.status(500).json({ error: err.message });
     }
 });
 
-// تسجيل الدخول
 app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -90,23 +82,17 @@ app.post("/api/auth/login", async (req, res) => {
         if (!user) return res.status(400).json({ error: "الحساب غير موجود" });
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ error: "بيانات الدخول غير صحيحة" });
+        if (!isMatch) return res.status(400).json({ error: "خطأ في كلمة المرور" });
 
         const secret = process.env.JWT_SECRET || 'SEDAY_ERP_SECRET_2026';
-        const payload = { 
-            user: { 
-                id: user.id, 
-                companyId: user.companyId, 
-                role: user.role 
-            } 
-        };
+        const payload = { user: { id: user.id, companyId: user.companyId, role: user.role } };
 
         jwt.sign(payload, secret, { expiresIn: "10h" }, (err, token) => {
             if (err) throw err;
             res.json({ token, role: user.role });
         });
     } catch (err) {
-        res.status(500).json({ error: "فشل عملية تسجيل الدخول" });
+        res.status(500).json({ error: "فشل تسجيل الدخول" });
     }
 });
 
@@ -117,7 +103,7 @@ app.get("/api/employees", auth, async (req, res) => {
         const employees = await Employee.find({ companyId: req.user.companyId }).sort({_id: -1});
         res.json(employees);
     } catch (err) {
-        res.status(500).json({ error: "Error fetching employees" });
+        res.status(500).json({ error: "خطأ في جلب الموظفين" });
     }
 });
 
@@ -127,16 +113,19 @@ app.post("/api/employees", auth, async (req, res) => {
         const newEmp = new Employee(data);
         res.json(await newEmp.save());
     } catch (err) {
-        res.status(500).json({ error: "Save failed" });
+        res.status(500).json({ error: "فشل الحفظ" });
     }
 });
 
 app.get("/api/employees/:id/details", auth, async (req, res) => {
     try {
         const emp = await Employee.findOne({ _id: req.params.id, companyId: req.user.companyId });
-        if (!emp) return res.status(404).json({ error: "Not found" });
+        if (!emp) return res.status(404).json({ error: "الموظف غير موجود" });
 
-        const history = await Payroll.find({ employeeId: req.params.id, companyId: req.user.companyId }).sort({ month: 1 });
+        const history = await Payroll.find({ 
+            employeeId: req.params.id, 
+            companyId: req.user.companyId 
+        }).sort({ month: 1 });
         
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => { 
@@ -147,7 +136,7 @@ app.get("/api/employees/:id/details", auth, async (req, res) => {
         
         res.json({ emp, history, prevData: { pDays, pTaxable, pTaxes } });
     } catch (err) {
-        res.status(404).json({ error: "Process failed" });
+        res.status(500).json({ error: "فشل جلب البيانات" });
     }
 });
 
@@ -159,18 +148,22 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
             Company.findById(req.user.companyId)
         ]);
 
-        if (!emp || !company) return res.status(404).json({ error: "بيانات غير مكتملة" });
+        if (!emp || !company) return res.status(404).json({ error: "بيانات ناقصة" });
 
+        // تحديث تاريخ الاستقالة لو موجود
         if (resignationDate) {
-            await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
+            await Employee.findByIdAndUpdate(empId, { resignationDate });
         }
 
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
             prevData, 
             emp.toObject(),
-            company.settings 
+            company.settings || {}
         );
+
+        // مسح أي حسابات قديمة لنفس الشهر لتجنب التكرار
+        await Payroll.deleteOne({ employeeId: empId, month, companyId: req.user.companyId });
 
         const record = await new Payroll({ 
             companyId: req.user.companyId,
@@ -181,7 +174,6 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
         
         res.json(record);
     } catch (err) {
-        console.error(err);
         res.status(500).json({ error: "خطأ في حساب المرتب" });
     }
 });
@@ -191,17 +183,17 @@ app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
         const { targetNet } = req.body;
         const company = await Company.findById(req.user.companyId);
         
-        // إعدادات افتراضية لو الإعدادات مش موجودة في الشركة
-        const settings = company.settings || { 
+        const settings = company?.settings || { 
             insEmployeePercent: 0.11, 
             maxInsSalary: 16700, 
-            personalExemption: 15000 
+            personalExemption: 20000 
         };
 
         let estimateGross = Number(targetNet);
         let finalResult = {};
         
-        for (let i = 0; i < 100; i++) {
+        // Loop تقاربي للوصول للصافي المطلوب بدقة 100%
+        for (let i = 0; i < 50; i++) {
             finalResult = runPayrollLogic({
                 fullBasic: estimateGross, 
                 days: 30, 
@@ -211,21 +203,19 @@ app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
             }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross }, settings);
 
             let diff = Number(targetNet) - finalResult.net;
-            if (Math.abs(diff) < 0.01) break; 
+            if (Math.abs(diff) < 0.05) break; 
             estimateGross += diff; 
         }
 
-        // إرجاع البيانات بالمسميات التي يتوقعها الـ UI في الصور المرفقة
         res.json({
-            grossSalary: Math.round(estimateGross * 100) / 100, // ليظهر في خانة Gross Salary
-            insBase: finalResult.insBase, // ليظهر في خانة Insurance Salary
-            insuranceEmployee: finalResult.insuranceEmployee, // ليظهر في خانة التأمينات
-            monthlyTax: finalResult.monthlyTax, // ليظهر في خانة الضرائب
+            grossSalary: Math.round(estimateGross), 
+            insBase: finalResult.insBase,
+            insuranceEmployee: finalResult.insuranceEmployee,
+            monthlyTax: finalResult.monthlyTax,
             net: finalResult.net
         });
     } catch (err) {
-        console.error("Net to Gross Error:", err);
-        res.status(500).json({ error: "Net to Gross conversion failed" });
+        res.status(500).json({ error: "فشل التحويل العكسي" });
     }
 });
 
@@ -235,7 +225,7 @@ app.delete("/api/employees/:id", auth, async (req, res) => {
         if (deleted) await Payroll.deleteMany({ employeeId: req.params.id, companyId: req.user.companyId });
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: "Delete failed" });
+        res.status(500).json({ error: "فشل الحذف" });
     }
 });
 
