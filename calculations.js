@@ -1,30 +1,5 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-function calculateEgyptianTax(annualProjected) {
-    let tax = 0;
-    const ai = annualProjected; 
-    let start0 = ai > 600000 ? 0 : 40000;
-    let remainder = ai - start0;
-    if (remainder <= 0) return 0;
-
-    const brackets = [
-        { limit: 15000, rate: 0.10 },
-        { limit: 15000, rate: 0.15 },
-        { limit: 130000, rate: 0.20 },
-        { limit: 200000, rate: 0.225 },
-        { limit: 800000, rate: 0.25 },
-        { limit: Infinity, rate: 0.275 }
-    ];
-
-    for (let b of brackets) {
-        if (remainder <= 0) break;
-        let chunk = Math.min(remainder, b.limit);
-        tax += chunk * b.rate;
-        remainder -= chunk;
-    }
-    return tax;
-}
-
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
@@ -42,25 +17,88 @@ function runPayrollLogic(input, prev, emp) {
     const martyrs = R(gross * 0.0005);
     const personalExemption = R((20000 / 360) * days); 
     
-    // التقريب الصارم للـ Taxable
+    // AH9: Taxable
     const currentTaxable = R(Math.max(0, (gross - insuranceEmployee) - personalExemption));
     
-    const totalDaysYTD = days + (prev.pDays || 0);
-    const totalTaxableYTD = R(currentTaxable + (prev.pTaxable || 0));
+    const totalDaysYTD = days + (Number(prev.pDays) || 0); // AF7
+    const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0)); // AH7
     
-    // معادلة الـ Tax Pool مطابقة للإكسيل
-    const rawAnnual = R((totalTaxableYTD / totalDaysYTD) * 360);
-    const floorAnnual = Math.floor(rawAnnual / 10) * 10;
-    const taxPoolYTD = R((floorAnnual / 360) * totalDaysYTD);
+    // AI7: Taxpool = (IFERROR(FLOOR(AH7/AF7*360,10),FLOOR(AH7*12,10)))/360*AF7
+    let rawAnnual = totalDaysYTD > 0 ? (totalTaxableYTD / totalDaysYTD) * 360 : 0;
+    let floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
+    let taxPoolYTD = totalDaysYTD > 0 ? R((floorAnnual / 360) * totalDaysYTD) : 0;
     
-    const totalAnnualTax = calculateEgyptianTax(floorAnnual);
-    const taxUntilNow = R((totalAnnualTax / 360) * totalDaysYTD);
-    const monthlyTax = R(Math.max(0, taxUntilNow - (prev.pTaxes || 0)));
+    // --- ترجمة معادلات الإكسيل الخاصة بالشرائح (Brackets) بالحرف ---
+    let ai = taxPoolYTD;       // AI7
+    let af = totalDaysYTD;     // AF7
+    let L = (val) => af > 0 ? (val / 360) * af : 0; // اختصار لجزء: value / 360 * AF7
+    
+    let AJ = 0, AK = 0, AL = 0, AM = 0, AN = 0, AO = 0, AP = 0;
+    
+    if (ai > 0 && af > 0) {
+        // 0% (AJ7) - بإشارة موجبة لتسهيل الطرح في الكود
+        if (ai > L(600000)) AJ = 0;
+        else AJ = L(40000);
+
+        // 10% (AK7)
+        if (ai > L(600000) && ai <= L(700000)) AK = L(55000) * 0.1;
+        else if (ai > L(700000)) AK = 0;
+        else {
+            if ((ai - AJ) <= L(15000)) AK = Math.max(0, (ai - AJ) * 0.1);
+            else AK = L(15000) * 0.1;
+        }
+
+        // 15% (AL7)
+        if (ai > L(700000) && ai <= L(800000)) AL = L(70000) * 0.15;
+        else if (ai > L(800000)) AL = 0;
+        else {
+            let rem15 = ai - AJ - (AK / 0.1);
+            if (rem15 <= L(15000)) AL = Math.max(0, rem15 * 0.15);
+            else AL = L(15000) * 0.15;
+        }
+
+        // 20% (AM7)
+        if (ai > L(800000) && ai <= L(900000)) AM = L(200000) * 0.2;
+        else if (ai > L(900000)) AM = 0;
+        else {
+            let rem20 = ai - AJ - (AK / 0.1) - (AL / 0.15);
+            if (rem20 <= L(130000)) AM = Math.max(0, rem20 * 0.2);
+            else AM = L(130000) * 0.2;
+        }
+
+        // 22.5% (AN7)
+        if (ai > L(900000) && ai <= L(1200000)) AN = L(400000) * 0.225;
+        else if (ai > L(1200000)) AN = 0;
+        else {
+            let rem225 = ai - AJ - (AK / 0.1) - (AL / 0.15) - (AM / 0.2);
+            if (rem225 <= L(200000)) AN = Math.max(0, rem225 * 0.225);
+            else AN = L(200000) * 0.225;
+        }
+
+        // 25% (AO7)
+        if (ai > L(1200000)) AO = L(1200000) * 0.25;
+        else {
+            let rem25 = ai - AJ - (AK / 0.1) - (AL / 0.15) - (AM / 0.2) - (AN / 0.225);
+            if (rem25 <= L(800000)) AO = Math.max(0, rem25 * 0.25);
+            else AO = L(800000) * 0.25;
+        }
+
+        // 27.5% (AP7)
+        if (ai > L(1200000)) AP = Math.max(0, (ai - L(1200000)) * 0.275);
+        else AP = 0;
+    }
+
+    // AQ7: Total Taxes
+    const taxUntilNow = R(AK + AL + AM + AN + AO + AP);
+    
+    // AS7: Taxes of the month (AQ7 - AR7)
+    const prevTaxes = Number(prev.pTaxes) || 0;
+    const monthlyTax = R(Math.max(0, taxUntilNow - prevTaxes));
 
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
-    // الـ return رجع زي ما كان بالظبط عشان الـ HTML يشتغل
+    // الـ Return زي ما هو متغيرش فيه حرف
     return {
         fullBasic, fullTrans, days, 
         proratedBasic, proratedTrans, 
@@ -72,7 +110,7 @@ function runPayrollLogic(input, prev, emp) {
         currentTaxable,
         taxPoolYTD: taxPoolYTD,
         annualProjected: floorAnnual,
-        totalAnnualTax,
+        totalAnnualTax: taxUntilNow, 
         prevTaxes: prev.pTaxes || 0,
         monthlyTax,
         martyrs,
