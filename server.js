@@ -17,7 +17,7 @@ const employeeSchema = new mongoose.Schema({
     name: String, 
     nationalId: String, 
     hiringDate: String, 
-    resignationDate: String, // حقل تاريخ الاستقالة
+    resignationDate: String, 
     insSalary: Number, 
     jobType: String
 });
@@ -26,7 +26,7 @@ const Employee = mongoose.models.Employee || mongoose.model("Employee", employee
 const payrollSchema = new mongoose.Schema({
     employeeId: mongoose.Schema.Types.ObjectId, 
     month: String, 
-    payload: Object // هنا بيتحفظ الـ additions والـ deductions كاملين بأساميهم
+    payload: Object // هنا بيتحفظ الـ additions والـ deductions بأساميهم وأنواعهم (exempted/non)
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
@@ -51,7 +51,7 @@ app.get("/api/employees/:id/details", async (req, res) => {
         const emp = await Employee.findById(req.params.id);
         const history = await Payroll.find({ employeeId: req.params.id }).sort({ month: 1 });
         
-        // حساب البيانات التراكمية (YTD) بدقة
+        // حساب البيانات التراكمية (YTD) بدقة من الـ payload المحفوظ
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => { 
             pDays += (Number(r.payload.days) || 0); 
@@ -70,32 +70,30 @@ app.post("/api/payroll/calculate", async (req, res) => {
         const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
         const emp = await Employee.findById(empId);
 
-        // 1. تطبيق حدود التأمينات القانونية (Min/Max) لعام 2024/2025/2026
+        // 1. تطبيق حدود التأمينات القانونية
         const MAX_INS = 16700;
         const MIN_INS = 5384.62;
         let effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
         
-        // كائن موظف مؤقت للحسبة
         const empForCalc = { ...emp.toObject(), insSalary: effectiveInsSalary };
 
-        // 2. تحديث تاريخ الاستقالة في قاعدة البيانات إذا وجد
+        // 2. تحديث تاريخ الاستقالة إذا وجد
         if (resignationDate) {
             await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
         }
 
-        // 3. تنفيذ الحسبة - نمرر الـ additions والـ deductions كما هي ليتم معالجتها في calculations.js
+        // 3. تنفيذ الحسبة - الـ additions و الـ deductions دلوقتى واصلين بالـ Type بتاعهم
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
             prevData, 
             empForCalc
         );
 
-        // 4. التحقق من وجود سجل لنفس الشهر للموظف (اختياري: تحديث بدل إضافة جديد)
-        // هنا الكود الحالي يضيف سجلاً جديداً دائماً بناءً على طلبك
+        // 4. حفظ السجل في قاعدة البيانات
         const record = await new Payroll({ 
             employeeId: empId, 
             month, 
-            payload: result // يحتوي على تفاصيل الإضافات والخصومات للعرض الديناميكي
+            payload: result 
         }).save();
         
         res.json(record);
@@ -115,7 +113,6 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
         const MAX_INS = 16700; 
         const MIN_INS = 5384.62;
 
-        // Loop تكراري للوصول لأدق رقم (Iterative Calculation)
         for (let i = 0; i < 100; i++) {
             let cappedIns = Math.min(MAX_INS, Math.max(MIN_INS, estimateGross));
 
@@ -131,7 +128,7 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
             }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: cappedIns });
 
             let diff = Number(targetNet) - finalResult.net;
-            if (Math.abs(diff) < 0.01) break; // توقف عند دقة 1 قرش
+            if (Math.abs(diff) < 0.01) break; 
             estimateGross += diff; 
         }
 
@@ -158,7 +155,6 @@ app.delete("/api/employees/:id", async (req, res) => {
     }
 });
 
-// إعداد ملفات الـ Static والـ Routing للـ Frontend
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 app.get("*", (req, res) => { 
