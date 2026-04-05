@@ -2,89 +2,72 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Payroll Master - Company View</title>
+    <title>Payroll Enterprise - Company View</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap'); body { font-family: Cairo, sans-serif; }</style>
 </head>
 <body class="bg-slate-100 flex min-h-screen">
-
-    <aside class="w-20 hover:w-64 bg-slate-900 text-white transition-all duration-300 p-4 fixed h-full z-50 overflow-hidden">
-        <div class="mb-10 text-2xl font-black text-indigo-500 italic">ERP</div>
-        <div onclick="location.reload()" class="p-4 hover:bg-indigo-600 rounded-xl cursor-pointer flex items-center"><i class="fas fa-users"></i></div>
-    </aside>
-
-    <main class="flex-1 mr-20 p-10">
+    <main class="flex-1 p-10">
         <div id="list-view">
-            <div class="flex justify-between items-center mb-10">
-                <h1 class="text-3xl font-black">إدارة الكوادر (Company Dashboard)</h1>
-                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold">إضافة موظف +</button>
+            <div class="flex justify-between items-center mb-10 text-slate-800">
+                <h1 class="text-3xl font-black">نظام إدارة الرواتب الاستراتيجي</h1>
+                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg">إضافة موظف +</button>
             </div>
-            <div class="bg-white rounded-3xl shadow-xl overflow-hidden">
-                <table class="w-full text-right"><thead class="bg-slate-50 border-b"><tr><th class="p-6">الموظف</th><th class="p-6">الرقم القومي</th><th class="p-6 text-center">العمليات</th></tr></thead><tbody id="empTable"></tbody></table>
+            <div class="bg-white rounded-3xl shadow-xl overflow-hidden border">
+                <table class="w-full text-right"><thead class="bg-slate-800 text-white"><tr><th class="p-6">الموظف</th><th class="p-6">الرقم القومي</th><th class="p-6 text-center">إدارة</th></tr></thead><tbody id="empTable" class="divide-y"></tbody></table>
             </div>
         </div>
 
         <div id="profile-view" class="hidden">
-            <button onclick="location.reload()" class="mb-5 text-indigo-600 font-bold">← عودة للقائمة</button>
-            
+            <button onclick="location.reload()" class="mb-5 text-indigo-600 font-bold">← العودة</button>
             <div class="bg-white p-8 rounded-3xl shadow-lg mb-8 grid grid-cols-4 gap-6">
                 <div><label class="text-xs text-slate-400">الاسم</label><p id="p-name" class="font-black text-xl"></p></div>
-                <div><label class="text-xs text-slate-400">الرقم القومي</label><p id="p-nid" class="font-mono"></p></div>
-                <div><label class="text-xs text-slate-400">أيام العمل</label><input type="number" id="c-days" value="30" class="w-full bg-slate-50 p-2 rounded-lg border"></div>
-                <div><label class="text-xs text-slate-400">الشهر</label><input type="month" id="c-month" class="w-full bg-slate-50 p-2 rounded-lg border"></div>
+                <div><label class="text-xs text-slate-400">الشهر المستحق</label><input type="month" id="c-month" class="w-full bg-slate-50 p-2 rounded-lg border font-bold" readonly></div>
+                <div><label class="text-xs text-slate-400">عدد الأيام</label><input type="number" id="c-days" value="30" class="w-full bg-slate-50 p-2 rounded-lg border"></div>
+                <div><label class="text-xs text-slate-400">Basic & Trans</label><div class="flex gap-1"><input type="number" id="c-fbasic" placeholder="Basic" class="w-1/2 p-2 border rounded-lg"><input type="number" id="c-ftrans" placeholder="Trans" class="w-1/2 p-2 border rounded-lg"></div></div>
             </div>
 
             <div class="grid grid-cols-2 gap-6 mb-8">
-                <div class="bg-indigo-900 text-white p-8 rounded-3xl space-y-4">
-                    <h4 class="font-black border-b border-indigo-800 pb-2">عناصر الراتب الأساسي</h4>
-                    <div class="flex gap-4">
-                        <input type="number" id="c-fbasic" placeholder="Full Basic" class="flex-1 bg-indigo-800 p-3 rounded-xl outline-none">
-                        <input type="number" id="c-ftrans" placeholder="Full Trans" class="flex-1 bg-indigo-800 p-3 rounded-xl outline-none">
-                    </div>
-                    <h4 class="font-black pt-4 border-b border-indigo-800 pb-2">إضافات أخرى (Additions)</h4>
+                <div class="bg-slate-900 text-white p-6 rounded-3xl">
+                    <h4 class="font-bold border-b border-slate-700 pb-2 mb-4">Additions</h4>
                     <div id="add-area" class="space-y-2"></div>
-                    <button onclick="addRow('add-area')" class="text-xs bg-indigo-700 px-3 py-1 rounded">+ إضافة بند جديد</button>
+                    <button onclick="addRow('add-area')" class="mt-4 text-xs bg-slate-700 px-3 py-1 rounded">+ بند جديد</button>
                 </div>
-                <div class="bg-rose-900 text-white p-8 rounded-3xl space-y-4">
-                    <h4 class="font-black border-b border-rose-800 pb-2">خصومات إدارية (Deductions)</h4>
+                <div class="bg-slate-900 text-white p-6 rounded-3xl">
+                    <h4 class="font-bold border-b border-slate-700 pb-2 mb-4">Deductions</h4>
                     <div id="ded-area" class="space-y-2"></div>
-                    <button onclick="addRow('ded-area')" class="text-xs bg-rose-800 px-3 py-1 rounded">+ إضافة خصم جديد</button>
-                    <div class="pt-10"><button onclick="runCalc()" class="w-full bg-emerald-500 py-5 rounded-2xl font-black text-xl shadow-xl">اعتماد وحساب الراتب النهائي</button></div>
+                    <button onclick="addRow('ded-area')" class="mt-4 text-xs bg-slate-700 px-3 py-1 rounded">+ خصم جديد</button>
+                    <button onclick="runCalc()" class="w-full mt-6 bg-emerald-500 py-4 rounded-xl font-black text-lg">حساب التراكمي الآن</button>
                 </div>
             </div>
 
-            <div class="bg-white rounded-3xl shadow-xl overflow-x-auto border">
-                <table class="w-full text-[10px] text-center border-collapse">
-                    <thead class="bg-slate-800 text-white whitespace-nowrap">
+            <div class="bg-white rounded-3xl shadow-2xl overflow-x-auto border">
+                <table class="w-full text-[9px] text-center whitespace-nowrap">
+                    <thead class="bg-slate-900 text-white">
                         <tr>
-                            <th class="p-3 border">الشهر</th><th class="p-3 border">Full Basic</th><th class="p-3 border">Full Trans</th>
-                            <th class="p-3 border">Days</th><th class="p-3 border">Prorated Basic</th><th class="p-3 border">Prorated Trans</th>
-                            <th class="p-3 border">Additions</th><th class="p-3 border bg-indigo-700">GROSS</th>
-                            <th class="p-3 border">Ins Salary</th><th class="p-3 border">Ins Code (11%)</th>
-                            <th class="p-3 border">Prev Days</th><th class="p-3 border">Current Taxable</th><th class="p-3 border">Tax Pool (YTD)</th>
-                            <th class="p-3 border">Ann. Project</th><th class="p-3 border">Total Taxes</th><th class="p-3 border">Prev Taxes</th>
-                            <th class="p-3 border bg-rose-700">Month Tax</th><th class="p-3 border">Martyrs</th><th class="p-3 border">Total Ded.</th>
-                            <th class="p-3 border bg-emerald-600 text-sm">NET SALARY</th>
+                            <th class="p-3">Month</th><th class="p-3">F.Basic</th><th class="p-3">F.Trans</th><th class="p-3">P.Basic</th><th class="p-3">P.Trans</th><th class="p-3">Additions</th><th class="p-3 bg-indigo-600">GROSS</th>
+                            <th class="p-3">Ins Sal</th><th class="p-3">Ins 11%</th><th class="p-3">Taxable</th><th class="p-3">YTD Pool</th><th class="p-3">Ann. Floor</th>
+                            <th class="p-3 bg-rose-600">Month Tax</th><th class="p-3">Martyrs</th><th class="p-3">Total Ded</th><th class="p-3 bg-emerald-600 text-[12px]">NET</th>
                         </tr>
                     </thead>
-                    <tbody id="histBody" class="divide-y font-bold text-slate-700"></tbody>
+                    <tbody id="histBody" class="divide-y font-bold"></tbody>
                 </table>
             </div>
         </div>
     </main>
 
-    <div id="modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100]">
-        <div class="bg-white p-10 rounded-[2rem] w-full max-w-lg">
-            <h3 class="text-2xl font-black mb-6">تسجيل موظف</h3>
+    <div id="modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[100]">
+        <div class="bg-white p-10 rounded-3xl w-full max-w-lg shadow-2xl">
+            <h3 class="text-2xl font-black mb-6">إضافة موظف</h3>
             <div class="space-y-4">
-                <input type="text" id="n-name" placeholder="الاسم" class="w-full p-4 bg-slate-50 border rounded-xl">
-                <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-4 bg-slate-50 border rounded-xl">
-                <input type="date" id="n-hdate" class="w-full p-4 bg-slate-50 border rounded-xl">
-                <input type="number" id="n-ins" placeholder="الراتب التأميني" class="w-full p-4 bg-slate-50 border rounded-xl">
-                <select id="n-type" class="w-full p-4 bg-slate-50 border rounded-xl"><option>Full Time</option><option>Part Time</option></select>
+                <input type="text" id="n-name" placeholder="الاسم" class="w-full p-4 bg-slate-50 border rounded-xl font-bold">
+                <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-4 bg-slate-50 border rounded-xl font-bold">
+                <input type="date" id="n-hdate" class="w-full p-4 bg-slate-50 border rounded-xl font-bold">
+                <input type="number" id="n-ins" placeholder="التأميني" class="w-full p-4 bg-slate-50 border rounded-xl font-bold">
+                <select id="n-type" class="w-full p-4 bg-slate-50 border rounded-xl font-bold"><option>Full Time</option><option>Part Time</option></select>
             </div>
-            <div class="flex gap-4 mt-8"><button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-bold">حفظ</button><button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 py-4 rounded-xl font-bold">إلغاء</button></div>
+            <div class="flex gap-4 mt-8"><button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-black">حفظ</button><button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 py-4 rounded-xl font-bold text-slate-400">إلغاء</button></div>
         </div>
     </div>
 
@@ -93,8 +76,8 @@
     <script>
         function addRow(areaId) {
             const div = document.createElement('div');
-            div.className = "flex gap-2 mb-2";
-            div.innerHTML = `<input type="text" placeholder="الاسم" class="flex-1 bg-black/20 p-2 rounded-lg text-xs outline-none"><input type="number" placeholder="المبلغ" class="w-24 bg-black/20 p-2 rounded-lg text-xs outline-none">`;
+            div.className = "flex gap-2";
+            div.innerHTML = `<input type="text" placeholder="البند" class="flex-1 bg-slate-800 p-2 rounded-lg text-[10px] outline-none"><input type="number" placeholder="المبلغ" class="w-20 bg-slate-800 p-2 rounded-lg text-[10px] outline-none">`;
             document.getElementById(areaId).appendChild(div);
         }
 
@@ -102,10 +85,10 @@
             const res = await fetch('/api/employees');
             const data = await res.json();
             document.getElementById('empTable').innerHTML = data.map(e => `
-                <tr class="hover:bg-slate-50 cursor-pointer border-b" onclick="openProfile('${e._id}')">
+                <tr class="hover:bg-slate-50 cursor-pointer" onclick="openProfile('${e._id}')">
                     <td class="p-6 font-black text-slate-700">${e.name}</td>
-                    <td class="p-6 text-slate-400 font-mono">${e.nationalId}</td>
-                    <td class="p-6 text-center text-indigo-600 font-bold">عرض السجل التفصيلي</td>
+                    <td class="p-6 font-mono text-slate-400">${e.nationalId}</td>
+                    <td class="p-6 text-center text-indigo-600 font-black">فتح الشركة View</td>
                 </tr>
             `).join('');
         }
@@ -117,22 +100,26 @@
             const res = await fetch(`/api/employees/${id}/details`);
             const data = await res.json();
             document.getElementById('p-name').innerText = data.emp.name;
-            document.getElementById('p-nid').innerText = data.emp.nationalId;
+            
+            // تسلسل الشهور التلقائي
+            let lastMonth = data.history.length > 0 ? data.history[data.history.length - 1].month : data.emp.hiringDate.substring(0, 7);
+            if (data.history.length > 0) {
+                let [y, m] = lastMonth.split('-').map(Number);
+                m++; if(m > 12) { m = 1; y++; }
+                lastMonth = `${y}-${m.toString().padStart(2, '0')}`;
+            }
+            document.getElementById('c-month').value = lastMonth;
+
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
 
             document.getElementById('histBody').innerHTML = data.history.map(r => {
                 const d = r.payload;
-                return `<tr>
-                    <td class="p-3 border bg-slate-50">${r.month}</td><td class="p-3 border">${d.fullBasic}</td><td class="p-3 border">${d.fullTrans}</td>
-                    <td class="p-3 border">${d.days}</td><td class="p-3 border">${d.proratedBasic}</td><td class="p-3 border">${d.proratedTrans}</td>
-                    <td class="p-3 border text-blue-600">${d.totalAdditions}</td><td class="p-3 border bg-indigo-50 font-black">${d.gross}</td>
-                    <td class="p-3 border">${d.insBase}</td><td class="p-3 border text-orange-600">${d.insuranceEmployee}</td>
-                    <td class="p-3 border">${d.prevDays}</td><td class="p-3 border">${d.currentTaxable}</td><td class="p-3 border">${d.taxPoolYTD}</td>
-                    <td class="p-3 border italic">${d.annualProjected}</td><td class="p-3 border">${d.totalAnnualTax}</td><td class="p-3 border">${d.prevTaxes}</td>
-                    <td class="p-3 border bg-rose-50 text-rose-600 font-black">${d.monthlyTax}</td><td class="p-3 border">${d.martyrs}</td><td class="p-3 border text-rose-400">${d.totalAllDeductions}</td>
-                    <td class="p-3 border bg-emerald-100 text-emerald-700 font-black text-xs">${d.net}</td>
+                return `<tr class="border-b">
+                    <td class="p-3 bg-slate-50">${r.month}</td><td>${d.fullBasic}</td><td>${d.fullTrans}</td><td>${d.proratedBasic}</td><td>${d.proratedTrans}</td><td>${d.totalAdditions}</td><td class="bg-indigo-50">${d.gross}</td>
+                    <td>${d.insBase}</td><td class="text-orange-600">${d.insuranceEmployee}</td><td>${d.currentTaxable}</td><td>${d.taxPoolYTD}</td><td class="italic">${d.annualProjected}</td>
+                    <td class="bg-rose-50 text-rose-600">${d.monthlyTax}</td><td>${d.martyrs}</td><td>${d.totalAllDeductions}</td><td class="bg-emerald-50 text-emerald-700 text-[11px]">${d.net}</td>
                 </tr>`;
             }).join('');
         }
@@ -144,7 +131,7 @@
         }
 
         async function runCalc() {
-            const getItems = (areaId) => Array.from(document.getElementById(areaId).children).map(row => ({ name: row.children[0].value, amount: Number(row.children[1].value) }));
+            const getItems = (id) => Array.from(document.getElementById(id).children).map(r => ({ name: r.children[0].value, amount: Number(r.children[1].value) }));
             const body = {
                 empId: document.getElementById('currId').value, month: document.getElementById('c-month').value,
                 days: Number(document.getElementById('c-days').value), fullBasic: Number(document.getElementById('c-fbasic').value),
@@ -154,7 +141,6 @@
             await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
             openProfile(body.empId);
         }
-
         window.onload = load;
     </script>
 </body>
