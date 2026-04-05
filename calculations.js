@@ -21,7 +21,7 @@ function calculateEgyptianTax(annualTaxable) {
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
-    // 1. Prorated Salaries (Basic + Transportation)
+    // 1. Prorated Salaries
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
     
@@ -32,7 +32,7 @@ function runPayrollLogic(input, prev, emp) {
     // 3. Gross Calculation
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // 4. Insurance (The Fix: Max 16700, Min 5384.6 for Full Time)
+    // 4. Insurance (The Law Fix)
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
@@ -40,14 +40,14 @@ function runPayrollLogic(input, prev, emp) {
     
     // 5. Taxes (Cumulative & Floor Logic)
     const martyrs = R(gross * 0.0005);
-    const personalExemption = R((20000 / 360) * days); // Prorated Exemption
+    const personalExemption = R((20000 / 360) * days); 
     
     const currentTaxable = R(Math.max(0, (gross - insuranceEmployee) - personalExemption));
     
     const totalDaysYTD = days + (prev.pDays || 0);
     const totalTaxableYTD = currentTaxable + (prev.pTaxable || 0);
     
-    // THE SECRET: Floor to nearest 10 for Annual Projected
+    // السر: التقريب لأقرب 10 جنيه (Annual Projected)
     const annualProjected = Math.floor(((totalTaxableYTD / totalDaysYTD) * 360) / 10) * 10;
     
     const totalAnnualTax = calculateEgyptianTax(annualProjected);
