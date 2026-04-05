@@ -1,101 +1,95 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// دالة لحساب الضريبة المصرية بناءً على الشرائح
-function calculateEgyptianTax(annualProjected) {
-    let tax = 0;
-    const ai = annualProjected; 
-    let start0 = ai > 600000 ? 0 : 40000;
-    let remainder = ai - start0;
-    if (remainder <= 0) return 0;
-
-    const brackets = [
-        { limit: 15000, rate: 0.10 },
-        { limit: 15000, rate: 0.15 },
-        { limit: 130000, rate: 0.20 },
-        { limit: 200000, rate: 0.225 },
-        { limit: 800000, rate: 0.25 },
-        { limit: Infinity, rate: 0.275 }
-    ];
-
-    for (let b of brackets) {
-        if (remainder <= 0) break;
-        let chunk = Math.min(remainder, b.limit);
-        tax += chunk * b.rate;
-        remainder -= chunk;
-    }
-    return tax;
-}
-
-// الدالة الأساسية لحساب الرواتب والضرائب
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
-    // حساب النسبة المئوية للراتب حسب الأيام
+    // 1. الحسابات الأساسية (Prorated)
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
-    
-    // جمع الإضافات والخصومات
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    
-    // حساب الإجمالي الإجمالي
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // حساب التأمينات
+    // 2. التأمينات (AV9)
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
     const insuranceEmployee = R(insBase * 0.11);
     
-    // حسابات أخرى
-    const martyrs = R(gross * 0.0005);
+    // 3. الإعفاء الشخصي (يُحسب بالأيام حسب معادلتك)
     const personalExemption = R((20000 / 360) * days); 
 
-    // حساب الدخل الخاضع للضريبة الحالي
+    // 4. الوعاء الضريبي الشهري (AH9) - ده اللي كان بيفرق معاك في الكسور
     const currentTaxable = R(Math.max(0, (gross - insuranceEmployee) - personalExemption));
     
-    // حساب الإجمالي السنوي حتى الآن
-    const totalDaysYTD = days + (prev.pDays || 0);
-    const totalTaxableYTD = R(currentTaxable + (prev.pTaxable || 0));
+    // 5. التراكمي (YTD)
+    const totalDaysYTD = days + (Number(prev.pDays) || 0); // AF7
+    const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0)); // AH7
     
-    // حساب الدخل الخاضع للضريبة السنوي
-    const rawAnnual = R((totalTaxableYTD / totalDaysYTD) * 360);
-    const floorAnnual = Math.floor(rawAnnual / 10) * 10;
+    // 6. الـ Tax Pool السنوي (AI7) - تطبيق معادلة FLOOR(AH7/AF7*360, 10)/360*AF7
+    let rawAnnual = totalDaysYTD > 0 ? (totalTaxableYTD / totalDaysYTD) * 360 : 0;
+    let floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
+    let taxPoolYTD = totalDaysYTD > 0 ? R((floorAnnual / 360) * totalDaysYTD) : 0;
+    
+    // 7. حساب الضرائب بالشرايح المتغيرة (Brackets) - ترجمة حرفية لمعادلاتك
+    let ai = taxPoolYTD; // AI7
+    let af = totalDaysYTD; // AF7
+    let L = (val) => af > 0 ? (val / 360) * af : 0; // دالة تحويل القيمة السنوية لقيمة متناسبة مع الأيام
 
-    // حساب الـtax pool الحقيقي بناءً على الـtax pool السابق
-    const taxPool = prev.taxPool !== undefined ? prev.taxPool : 0; // قيمة الـtax pool السابقة
-    const taxPoolYTD = R(taxPool + (floorAnnual / 360) * totalDaysYTD);
+    let AJ = 0, AK = 0, AL = 0, AM = 0, AN = 0, AO = 0, AP = 0;
+    
+    if (ai > 0 && af > 0) {
+        // شريحة الـ 0%
+        AJ = ai > L(600000) ? 0 : L(40000);
 
-    // حساب الضرائب السنوية بناءً على الشرائح
-    const totalAnnualTax = calculateEgyptianTax(floorAnnual);
-    const taxUntilNow = R((totalAnnualTax / 360) * totalDaysYTD);
+        // شريحة الـ 10%
+        if (ai > L(600000) && ai <= L(700000)) AK = L(55000) * 0.1;
+        else if (ai > L(700000)) AK = 0;
+        else AK = Math.min(L(15000), Math.max(0, ai - AJ)) * 0.1;
 
-    // الضرائب الشهرية بناءً على الـtax pool الحقيقي
-    const monthlyTax = R(Math.max(0, taxUntilNow - (prev.pTaxes || 0)));
+        // شريحة الـ 15%
+        if (ai > L(700000) && ai <= L(800000)) AL = L(70000) * 0.15;
+        else if (ai > L(800000)) AL = 0;
+        else AL = Math.min(L(15000), Math.max(0, ai - AJ - (AK / 0.1))) * 0.15;
 
-    // إجمالي الخصومات
+        // شريحة الـ 20%
+        if (ai > L(800000) && ai <= L(900000)) AM = L(200000) * 0.2;
+        else if (ai > L(900000)) AM = 0;
+        else AM = Math.min(L(130000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15))) * 0.2;
+
+        // شريحة الـ 22.5%
+        if (ai > L(900000) && ai <= L(1200000)) AN = L(400000) * 0.225;
+        else if (ai > L(1200000)) AN = 0;
+        else AN = Math.min(L(200000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2))) * 0.225;
+
+        // شريحة الـ 25%
+        if (ai > L(1200000)) AO = L(1200000) * 0.25;
+        else AO = Math.min(L(800000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2) - (AN/0.225))) * 0.25;
+
+        // شريحة الـ 27.5%
+        AP = ai > L(1200000) ? (ai - L(1200000)) * 0.275 : 0;
+    }
+
+    // إجمالي الضريبة المستحقة (AQ7)
+    const totalAnnualTax = R(AK + AL + AM + AN + AO + AP);
+    
+    // ضريبة الشهر الحالي (AQ7 - AR7)
+    const monthlyTax = R(Math.max(0, totalAnnualTax - (Number(prev.pTaxes) || 0)));
+
+    const martyrs = R(gross * 0.0005);
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
-    
-    // صافي الراتب
     const net = R(gross - totalAllDeductions);
 
-    // إرجاع جميع القيم
     return {
-        fullBasic,
-        fullTrans,
-        days,
-        proratedBasic,
-        proratedTrans,
-        totalAdditions,
-        gross,
-        insBase,
-        insuranceEmployee,
+        fullBasic, fullTrans, days, 
+        proratedBasic, proratedTrans, 
+        totalAdditions, gross,
+        insBase, insuranceEmployee,
         prevDays: prev.pDays || 0,
         totalDaysYTD,
         prevTaxable: prev.pTaxable || 0,
         currentTaxable,
-        taxPool: taxPool, // تمرير قيمة الـtax pool الحالية للخروج
-        taxPoolYTD,
+        taxPoolYTD: taxPoolYTD, // ده الـ AI7
         annualProjected: floorAnnual,
         totalAnnualTax,
         prevTaxes: prev.pTaxes || 0,
