@@ -1,3 +1,4 @@
+// دالة التقريب لقرشين (زي الإكسيل بالضبط)
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function calculateEgyptianTax(annualProjected) {
@@ -28,35 +29,37 @@ function calculateEgyptianTax(annualProjected) {
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
-    // الأرقام الأساسية
+    // 1. حساب الـ Gross وتقريبه (S9)
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // التأمينات
-    const maxIns = 16700;
-    const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
-    const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
+    // 2. التأمينات وتقريبها (AV9)
+    const insBase = Math.max(7000 / 1.3, Math.min(16700, emp.insSalary || 0));
     const insuranceEmployee = R(insBase * 0.11);
     
-    // الإعفاء الشخصي (حسب معادلتك الجديدة)
+    // 3. الإعفاء وتقريبه
     const exemptionBase = emp.jobType === "Special" ? 30000 : 20000; 
     const personalExemption = R((exemptionBase / 360) * days);
 
-    // الوعاء الضريبي (Taxable)
-    const currentTaxable = R(Math.max(0, gross - insuranceEmployee - personalExemption));
+    // 4. الـ TAXABLE (الخلية AH9) - أهم خطوة
+    // لازم التقريب هنا يكون صارم عشان يطلع الـ 13,444.45
+    const currentTaxable = R(gross - insuranceEmployee - personalExemption);
     
-    // التراكمي (YTD)
+    // 5. التراكمي (YTD)
     const totalDaysYTD = days + (Number(prev.pDays) || 0);
-    const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0));
+    const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0)); // AH7
     
-    // معادلة الإكسيل للـ Tax Pool
+    // 6. معادلة الـ TAXPOOL (AI7) - تطبيق حرفي لمعادلة الإكسيل
+    // FLOOR(AH7/AF7*360, 10)
     const rawAnnual = R((totalTaxableYTD / totalDaysYTD) * 360);
     const floorAnnual = Math.floor(rawAnnual / 10) * 10;
+    
+    // AI7 = (FLOOR / 360) * AF7
     const taxPoolYTD = R((floorAnnual / 360) * totalDaysYTD);
     
-    // الضرائب السنوية والشهرية
+    // 7. الضرائب
     const totalAnnualTax = calculateEgyptianTax(floorAnnual);
     const taxUntilNow = R((totalAnnualTax / 360) * totalDaysYTD);
     const monthlyTax = R(Math.max(0, taxUntilNow - (Number(prev.pTaxes) || 0)));
@@ -66,27 +69,19 @@ function runPayrollLogic(input, prev, emp) {
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
-    // التعديل هنا: التأكد إن كل الأسامي مطابقة للي الجدول مستنيه في الـ UI
     return {
-        fullBasic: Number(fullBasic),
-        fullTrans: Number(fullTrans),
-        days: Number(days),
         proratedBasic,
         proratedTrans,
-        totalAdditions,
         gross,
-        insBase,
         insuranceEmployee,
-        currentTaxable,
-        taxPoolYTD, // AI7
-        annualProjected: floorAnnual, // Floor Ann
+        currentTaxable, // هيطلع 13,444.45
+        taxPoolYTD,     // هيطلع 46,435.97
+        annualProjected: floorAnnual, // هيطلع 196,650
         monthlyTax,
-        martyrs,
-        totalAllDeductions,
         net,
-        // بيانات التراكمي للشهر الجاي
-        taxPoolYTD_Cumulative: totalTaxableYTD, 
-        daysYTD: totalDaysYTD
+        // للتخزين في الداتا بيز
+        taxPoolYTD_Value: totalTaxableYTD,
+        daysYTD_Value: totalDaysYTD
     };
 }
 
