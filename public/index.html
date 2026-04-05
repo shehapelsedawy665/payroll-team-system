@@ -119,8 +119,7 @@
             <div class="flex justify-between items-start mb-8">
                 <button onclick="showHR()" class="text-indigo-600 font-bold hover:translate-x-2 transition inline-block">← العودة للقائمة</button>
                 <div class="flex gap-2">
-                    <button onclick="handleResign()" class="bg-orange-100 text-orange-600 px-4 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-orange-200">تأكيد الاستقالة</button>
-                    <button onclick="delEmp()" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-red-200">حذف نهائي</button>
+                    <button onclick="delEmp()" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-red-200">حذف نهائي للموظف</button>
                 </div>
             </div>
 
@@ -158,7 +157,7 @@
                 <table class="w-full text-[9px] text-center whitespace-nowrap" dir="ltr">
                     <thead class="bg-slate-800 text-white">
                         <tr class="divide-x divide-slate-700 italic uppercase">
-                            <th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">F.Basic</th><th class="p-4">F.Trans</th><th class="p-4">P.Basic</th><th class="p-4">P.Trans</th><th class="p-4 text-emerald-400">Adds</th><th class="p-4 bg-indigo-700">GROSS</th>
+                            <th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">F.Basic</th><th class="p-4">F.Trans</th><th class="p-4">P.Basic</th><th class="p-4">P.Trans</th><th class="p-4 text-emerald-400">Adds & Details</th><th class="p-4 bg-indigo-700">GROSS</th>
                             <th class="p-4">Ins 11%</th><th class="p-4">Taxable</th><th class="p-4">Pool YTD</th><th class="p-4 italic text-slate-400">Floor</th>
                             <th class="p-4 bg-rose-700">M.Tax</th><th class="p-4">Martyrs</th><th class="p-4">Total Ded</th><th class="p-4 bg-emerald-600 text-[12px] font-black italic">NET SALARY</th>
                         </tr>
@@ -210,14 +209,19 @@
         async function load() {
             const res = await fetch('/api/employees');
             const data = await res.json();
-            document.getElementById('empTable').innerHTML = data.map(e => `
+            document.getElementById('empTable').innerHTML = data.map(e => {
+                const isResigned = e.resignationDate && e.resignationDate !== "";
+                const statusLabel = isResigned ? "Resigned" : "Active";
+                const statusClass = isResigned ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600";
+                
+                return `
                 <tr class="hover:bg-slate-50 cursor-pointer group transition" onclick="openProfile('${e._id}')">
                     <td class="p-6"><div class="flex items-center"><div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black ml-4 transition group-hover:rotate-12">${e.name[0]}</div><div class="font-black text-slate-700">${e.name}</div></div></td>
                     <td class="p-6 text-center font-mono text-slate-400 font-bold italic">${e.nationalId}</td>
-                    <td class="p-6 text-center"><span class="bg-emerald-100 text-emerald-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">Active</span></td>
+                    <td class="p-6 text-center"><span class="${statusClass} px-4 py-1 rounded-full text-[10px] font-black uppercase">${statusLabel}</span></td>
                     <td class="p-6 text-center"><i class="fas fa-chevron-left text-slate-300 group-hover:text-indigo-600 transition translate-x-0 group-hover:-translate-x-2"></i></td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
 
         async function openProfile(id) {
@@ -230,6 +234,7 @@
             
             document.getElementById('p-name').innerText = data.emp.name;
             document.getElementById('p-hdate').value = data.emp.hiringDate;
+            document.getElementById('c-resign').value = data.emp.resignationDate || "";
 
             let nextMonth;
             if (data.history && data.history.length > 0) {
@@ -248,6 +253,11 @@
 
             document.getElementById('histBody').innerHTML = data.history.map(r => {
                 const d = r.payload;
+                // تجميع أسماء الإضافات للعرض
+                const addDetails = d.additions && d.additions.length > 0 
+                    ? d.additions.map(a => `${a.name}: ${a.amount}`).join(' | ') 
+                    : d.totalAdditions.toLocaleString();
+
                 return `<tr class="divide-x divide-slate-50 transition hover:bg-slate-50/50">
                     <td class="p-4 bg-slate-50/50 text-slate-950 font-black">${r.month}</td>
                     <td class="text-indigo-500 font-black">${d.days || 30}</td>
@@ -255,7 +265,7 @@
                     <td>${d.fullTrans.toLocaleString()}</td>
                     <td>${d.proratedBasic.toLocaleString()}</td>
                     <td>${d.proratedTrans.toLocaleString()}</td>
-                    <td class="text-indigo-600">${d.totalAdditions.toLocaleString()}</td>
+                    <td class="text-indigo-600 max-w-[150px] truncate" title="${addDetails}">${addDetails}</td>
                     <td class="bg-indigo-50 font-black">${d.gross.toLocaleString()}</td>
                     <td class="text-orange-500">${d.insuranceEmployee.toLocaleString()}</td>
                     <td>${d.currentTaxable.toLocaleString()}</td>
@@ -280,28 +290,15 @@
             const net = Number(document.getElementById('target-net').value);
             const btn = document.getElementById('calc-btn');
             if(!net) return alert("أدخل الصافي المطلوب!");
-
-            btn.innerText = "CALCULATING... ⏳";
-            btn.disabled = true;
-
+            btn.innerText = "CALCULATING... ⏳"; btn.disabled = true;
             try {
-                const res = await fetch('/api/payroll/net-to-gross', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ targetNet: net })
-                });
+                const res = await fetch('/api/payroll/net-to-gross', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ targetNet: net }) });
                 const data = await res.json();
-                
                 document.getElementById('calc-result').classList.remove('hidden');
                 document.getElementById('result-gross').innerText = data.gross.toLocaleString();
                 document.getElementById('res-ins-ee').innerText = data.insEmployee.toLocaleString();
                 document.getElementById('res-tax').innerText = data.taxes.toLocaleString();
-            } catch (e) {
-                alert("Error calling server!");
-            } finally {
-                btn.innerText = "Run Prediction ⚡";
-                btn.disabled = false;
-            }
+            } catch (e) { alert("Error calling server!"); } finally { btn.innerText = "Run Prediction ⚡"; btn.disabled = false; }
         }
 
         async function runCalc() {
@@ -330,8 +327,7 @@
             } else alert("Error calculating payroll!");
         }
 
-        async function delEmp() { if(confirm("حذف الموظف؟")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); location.reload(); } }
-        function handleResign() { if(confirm("تأكيد الاستقالة؟")) runCalc(); }
+        async function delEmp() { if(confirm("حذف الموظف نهائياً؟")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); location.reload(); } }
 
         window.onload = showDash;
     </script>
