@@ -5,7 +5,7 @@ const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const connectDB = require("./db");
-const { runPayrollLogic } = require("./calculations");
+const { runPayrollLogic, calculateNetToGross } = require("./calculations"); // استيراد الوظائف الجديدة
 const auth = require("./middleware/auth"); 
 const Company = require("./models/company"); 
 
@@ -55,7 +55,13 @@ app.post("/api/auth/register", async (req, res) => {
             name: companyName, 
             adminEmail: adminEmail.toLowerCase(),
             email: adminEmail.toLowerCase(), 
-            password: hashedPassword         
+            password: hashedPassword,
+            settings: { // إعدادات افتراضية قانونية
+                personalExemption: 20000,
+                maxInsSalary: 16700,
+                minInsSalary: 2325,
+                insEmployeePercent: 0.11
+            }
         });
         const savedCompany = await newCompany.save();
 
@@ -127,10 +133,11 @@ app.get("/api/employees/:id/details", auth, async (req, res) => {
             companyId: req.user.companyId 
         }).sort({ month: 1 });
         
+        // حساب التراكمي الفعلي من قاعدة البيانات
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => { 
             pDays += (Number(r.payload.days) || 0); 
-            pTaxable += (Number(r.payload.currentTaxable) || 0); 
+            pTaxable += (Number(r.payload.annualTaxable / 12) || 0); // نستخدم القيمة الشهرية الخاضعة
             pTaxes += (Number(r.payload.monthlyTax) || 0); 
         });
         
@@ -150,19 +157,21 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
 
         if (!emp || !company) return res.status(404).json({ error: "بيانات ناقصة" });
 
-        // تحديث تاريخ الاستقالة لو موجود
+        // تحديث تاريخ الاستقالة في البروفايل تلقائياً
         if (resignationDate) {
             await Employee.findByIdAndUpdate(empId, { resignationDate });
         }
+
+        const settings = company.settings || { personalExemption: 20000, maxInsSalary: 16700, insEmployeePercent: 0.11 };
 
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
             prevData, 
             emp.toObject(),
-            company.settings || {}
+            settings
         );
 
-        // مسح أي حسابات قديمة لنفس الشهر لتجنب التكرار
+        // مسح القديم لنفس الشهر (إعادة حساب)
         await Payroll.deleteOne({ employeeId: empId, month, companyId: req.user.companyId });
 
         const record = await new Payroll({ 
@@ -182,37 +191,25 @@ app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
     try {
         const { targetNet } = req.body;
         const company = await Company.findById(req.user.companyId);
-        
-        const settings = company?.settings || { 
-            insEmployeePercent: 0.11, 
-            maxInsSalary: 16700, 
-            personalExemption: 20000 
-        };
+        const settings = company?.settings || { insEmployeePercent: 0.11, maxInsSalary: 16700, personalExemption: 20000 };
 
-        let estimateGross = Number(targetNet);
-        let finalResult = {};
-        
-        // Loop تقاربي للوصول للصافي المطلوب بدقة 100%
-        for (let i = 0; i < 50; i++) {
-            finalResult = runPayrollLogic({
-                fullBasic: estimateGross, 
-                days: 30, 
-                additions: [], 
-                deductions: [],
-                month: new Date().toISOString().substring(0, 7)
-            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross }, settings);
+        // استخدام وظيفة الحساب العكسي المتطورة
+        const grossSalary = calculateNetToGross(targetNet, { month: new Date().toISOString().substring(0, 7) }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: 0 }, settings);
 
-            let diff = Number(targetNet) - finalResult.net;
-            if (Math.abs(diff) < 0.05) break; 
-            estimateGross += diff; 
-        }
+        // تشغيل اللوجيك مرة واحدة للحصول على التفاصيل (الضريبة والتأمينات)
+        const finalDetails = runPayrollLogic(
+            { fullBasic: grossSalary, fullTrans: 0, days: 30, month: new Date().toISOString().substring(0, 7) },
+            { pDays: 0, pTaxable: 0, pTaxes: 0 },
+            { insSalary: grossSalary },
+            settings
+        );
 
         res.json({
-            grossSalary: Math.round(estimateGross), 
-            insBase: finalResult.insBase,
-            insuranceEmployee: finalResult.insuranceEmployee,
-            monthlyTax: finalResult.monthlyTax,
-            net: finalResult.net
+            grossSalary: grossSalary, 
+            insBase: finalDetails.gross, // الإجمالي الذي تم احتساب التأمين بناءً عليه
+            insuranceEmployee: finalDetails.insuranceEmployee,
+            monthlyTax: finalDetails.monthlyTax,
+            net: finalDetails.net
         });
     } catch (err) {
         res.status(500).json({ error: "فشل التحويل العكسي" });
@@ -229,6 +226,7 @@ app.delete("/api/employees/:id", auth, async (req, res) => {
     }
 });
 
+// Static & Routing
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 app.get("*", (req, res) => { res.sendFile(path.join(publicPath, "index.html")); });
