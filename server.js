@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const path = require("path");
 const connectDB = require("./db");
 const { runPayrollLogic } = require("./calculations");
+const auth = require("./middleware/auth"); // استدعاء حرس الحدود
+const Company = require("./models/Company"); // استدعاء موديل الشركات
 
 const app = express();
 app.use(cors());
@@ -12,8 +14,9 @@ app.use(express.json());
 // 1. الاتصال بقاعدة البيانات
 connectDB();
 
-// 2. التعريفات (Schemas)
+// 2. التعريفات (Schemas) - تم إضافة companyId لربط البيانات
 const employeeSchema = new mongoose.Schema({
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     name: String, 
     nationalId: String, 
     hiringDate: String, 
@@ -24,34 +27,43 @@ const employeeSchema = new mongoose.Schema({
 const Employee = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);
 
 const payrollSchema = new mongoose.Schema({
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     employeeId: mongoose.Schema.Types.ObjectId, 
     month: String, 
-    payload: Object // هنا بيتحفظ الـ additions والـ deductions بأساميهم وأنواعهم (exempted/non)
+    payload: Object 
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
 // --- [APIs] ---
 
-app.get("/api/employees", async (req, res) => {
+// الحصول على موظفين الشركة الخاصة بالمستخدم المسجل فقط
+app.get("/api/employees", auth, async (req, res) => {
     try {
-        const employees = await Employee.find().sort({_id: -1});
+        const employees = await Employee.find({ companyId: req.user.companyId }).sort({_id: -1});
         res.json(employees);
     } catch (err) {
         res.status(500).json({ error: "Error fetching employees" });
     }
 });
 
-app.post("/api/employees", async (req, res) => {
-    const newEmp = new Employee(req.body);
-    res.json(await newEmp.save());
+app.post("/api/employees", auth, async (req, res) => {
+    try {
+        const data = { ...req.body, companyId: req.user.companyId };
+        const newEmp = new Employee(data);
+        res.json(await newEmp.save());
+    } catch (err) {
+        res.status(500).json({ error: "Save failed" });
+    }
 });
 
-app.get("/api/employees/:id/details", async (req, res) => {
+app.get("/api/employees/:id/details", auth, async (req, res) => {
     try {
-        const emp = await Employee.findById(req.params.id);
-        const history = await Payroll.find({ employeeId: req.params.id }).sort({ month: 1 });
+        // التأكد أن الموظف يتبع نفس شركة المستخدم
+        const emp = await Employee.findOne({ _id: req.params.id, companyId: req.user.companyId });
+        if (!emp) return res.status(404).json({ error: "Employee not found in your company" });
+
+        const history = await Payroll.find({ employeeId: req.params.id, companyId: req.user.companyId }).sort({ month: 1 });
         
-        // حساب البيانات التراكمية (YTD) بدقة من الـ payload المحفوظ
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => { 
             pDays += (Number(r.payload.days) || 0); 
@@ -61,36 +73,38 @@ app.get("/api/employees/:id/details", async (req, res) => {
         
         res.json({ emp, history, prevData: { pDays, pTaxable, pTaxes } });
     } catch (err) {
-        res.status(404).json({ error: "Employee not found" });
+        res.status(404).json({ error: "Process failed" });
     }
 });
 
-app.post("/api/payroll/calculate", async (req, res) => {
+app.post("/api/payroll/calculate", auth, async (req, res) => {
     try {
         const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
-        const emp = await Employee.findById(empId);
-
-        // 1. تطبيق حدود التأمينات القانونية
-        const MAX_INS = 16700;
-        const MIN_INS = 5384.62;
-        let effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
         
-        const empForCalc = { ...emp.toObject(), insSalary: effectiveInsSalary };
+        // 1. جلب بيانات الموظف وإعدادات الشركة في وقت واحد
+        const [emp, company] = await Promise.all([
+            Employee.findOne({ _id: empId, companyId: req.user.companyId }),
+            Company.findById(req.user.companyId)
+        ]);
+
+        if (!emp || !company) return res.status(404).json({ error: "Data missing" });
 
         // 2. تحديث تاريخ الاستقالة إذا وجد
         if (resignationDate) {
             await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
         }
 
-        // 3. تنفيذ الحسبة - الـ additions و الـ deductions دلوقتى واصلين بالـ Type بتاعهم
+        // 3. تنفيذ الحسبة باستخدام إعدادات الشركة الديناميكية
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
             prevData, 
-            empForCalc
+            emp.toObject(),
+            company.settings // تمرير الإعدادات الديناميكية هنا
         );
 
-        // 4. حفظ السجل في قاعدة البيانات
+        // 4. حفظ السجل
         const record = await new Payroll({ 
+            companyId: req.user.companyId,
             employeeId: empId, 
             month, 
             payload: result 
@@ -103,19 +117,17 @@ app.post("/api/payroll/calculate", async (req, res) => {
     }
 });
 
-// [FIXED] Net to Gross - حساب الشامل من الصافي بمعادلات تكرارية
-app.post("/api/payroll/net-to-gross", async (req, res) => {
+// Net to Gross - تم تحديثه ليكون ديناميكياً حسب إعدادات الشركة
+app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
     try {
         const { targetNet } = req.body;
+        const company = await Company.findById(req.user.companyId);
+        const settings = company.settings;
+
         let estimateGross = Number(targetNet);
         let finalResult = {};
         
-        const MAX_INS = 16700; 
-        const MIN_INS = 5384.62;
-
         for (let i = 0; i < 100; i++) {
-            let cappedIns = Math.min(MAX_INS, Math.max(MIN_INS, estimateGross));
-
             finalResult = runPayrollLogic({
                 fullBasic: estimateGross,
                 fullTrans: 0,
@@ -125,7 +137,7 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
                 month: new Date().toISOString().substring(0, 7),
                 hiringDate: null,
                 resignationDate: null
-            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: cappedIns });
+            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross }, settings);
 
             let diff = Number(targetNet) - finalResult.net;
             if (Math.abs(diff) < 0.01) break; 
@@ -134,27 +146,29 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
 
         res.json({
             gross: Math.round(estimateGross * 100) / 100,
-            insSalary: Math.min(MAX_INS, Math.max(MIN_INS, estimateGross)),
+            insSalary: finalResult.insBase,
             insEmployee: finalResult.insuranceEmployee,
             taxes: finalResult.monthlyTax,
             net: finalResult.net
         });
     } catch (err) {
-        console.error("NetToGross Error:", err);
         res.status(500).json({ error: "Net to Gross conversion failed" });
     }
 });
 
-app.delete("/api/employees/:id", async (req, res) => {
+app.delete("/api/employees/:id", auth, async (req, res) => {
     try {
-        await Employee.findByIdAndDelete(req.params.id);
-        await Payroll.deleteMany({ employeeId: req.params.id });
+        const deleted = await Employee.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
+        if (deleted) {
+            await Payroll.deleteMany({ employeeId: req.params.id, companyId: req.user.companyId });
+        }
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Delete failed" });
     }
 });
 
+// --- [Static Files & Start] ---
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 app.get("*", (req, res) => { 
