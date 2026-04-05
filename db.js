@@ -5,47 +5,59 @@ const mongoose = require("mongoose");
  * تم تحسينها لضمان استقرار الاتصال مع MongoDB Atlas وتقليل الـ Latency
  */
 const connectDB = async () => {
-    // التحقق إذا كان هناك اتصال قائم بالفعل لتجنب التكرار في بيئة الـ Development
+    // 1. منع التكرار: لو متصل بالفعل، اخرج فوراً
     if (mongoose.connection.readyState >= 1) {
-        console.log("ℹ️ Using existing MongoDB connection");
         return;
     }
 
     try {
-        // الرابط الخاص بك من الـ Environment Variables (الأولوية لـ Vercel)
-        // أو الرابط الاحتياطي مع التأكد من الـ Encoding
-        const dbURI = process.env.MONGODB_URI || "mongodb://Sedawy:Shehapelsedawy%2366@ac-uso95cd-shard-00-00.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-01.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-02.a6bquen.mongodb.net:27017/payrollDB?ssl=true&replicaSet=atlas-129j51-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Egyptian-Payroll";
+        // 2. استخدام الرابط من البيئة المحيطة (Vercel)
+        const dbURI = process.env.MONGODB_URI;
 
-        await mongoose.connect(dbURI, {
-            // الإعدادات دي بتضمن استقرار الـ Shards في Atlas
-            maxPoolSize: 10, 
-            serverSelectionTimeoutMS: 5000, 
+        if (!dbURI) {
+            console.error("❌ MONGODB_URI is missing in Environment Variables!");
+            return;
+        }
+
+        // 3. خيارات الاتصال المحسنة لبيئة السحاب
+        const options = {
+            maxPoolSize: 10,
+            serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,
-            family: 4, // بيساعد في سرعة الـ DNS Resolve في بعض السيرفرات
-            dbName: "payrollDB" // التأكيد على اسم قاعدة البيانات
-        });
+            family: 4,
+            dbName: "payrollDB"
+        };
+
+        await mongoose.connect(dbURI, options);
 
         console.log("✅ MongoDB Connected | Ready for Multi-tenant Payroll Operations");
     } catch (err) {
         console.error("❌ MongoDB Connection Error:", err.message);
-        // محاولة إعادة الاتصال التلقائي كل 5 ثواني في حالة الفشل (فقط في بيئة الـ Local)
+        
+        // في Vercel لا نستخدم setTimeout لإعادة الاتصال لأنها Serverless
+        // يفضل ترك المنصة هي من تعيد تشغيل الـ Function
         if (process.env.NODE_ENV !== 'production') {
             setTimeout(connectDB, 5000);
         }
     }
 };
 
-// متابعة حالة الاتصال (Monitoring) لضمان عدم توقف النظام
+// متابعة حالة الاتصال (Monitoring) لضمان استقرار النظام
 mongoose.connection.on("connected", () => {
     console.log("🟢 Database Connection: Established");
 });
 
 mongoose.connection.on("disconnected", () => {
-    console.log("⚠️ Database Connection: Disconnected. Attempting Reconnect...");
+    console.log("⚠️ Database Connection: Disconnected");
 });
 
 mongoose.connection.on("error", (err) => {
-    console.error("🔥 Database Critical Error:", err);
+    // تقليل الضجيج في الـ Logs عند حدوث خطأ عابر
+    if (err.message.includes("buffering timed out")) {
+        console.error("🔥 Database Timeout: Check your MongoDB Atlas IP Access!");
+    } else {
+        console.error("🔥 Database Critical Error:", err.message);
+    }
 });
 
 // إغلاق الاتصال بأمان عند توقف السيرفر (Graceful Shutdown)
