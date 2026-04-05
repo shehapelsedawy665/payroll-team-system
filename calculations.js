@@ -1,6 +1,6 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// Function to calculate Egyptian tax based on brackets
+// دالة لحساب الضريبة المصرية بناءً على الشرائح
 function calculateEgyptianTax(annualProjected) {
     let tax = 0;
     const ai = annualProjected; 
@@ -26,57 +26,60 @@ function calculateEgyptianTax(annualProjected) {
     return tax;
 }
 
-// Main payroll calculation function
+// الدالة الأساسية لحساب الرواتب والضرائب
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
-    // Prorate basic and transportation based on days worked
+    // حساب النسبة المئوية للراتب حسب الأيام
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
     
-    // Sum additions and deductions
+    // جمع الإضافات والخصومات
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     
-    // Calculate gross salary
+    // حساب الإجمالي الإجمالي
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // Insurance calculations
+    // حساب التأمينات
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
     const insuranceEmployee = R(insBase * 0.11);
     
-    // Other deductions
+    // حسابات أخرى
     const martyrs = R(gross * 0.0005);
     const personalExemption = R((20000 / 360) * days); 
 
-    // Calculate current taxable income
+    // حساب الدخل الخاضع للضريبة الحالي
     const currentTaxable = R(Math.max(0, (gross - insuranceEmployee) - personalExemption));
     
-    // Year-to-date totals
+    // حساب الإجمالي السنوي حتى الآن
     const totalDaysYTD = days + (prev.pDays || 0);
     const totalTaxableYTD = R(currentTaxable + (prev.pTaxable || 0));
     
-    // Calculate annualized taxable income and floor it
+    // حساب الدخل الخاضع للضريبة السنوي
     const rawAnnual = R((totalTaxableYTD / totalDaysYTD) * 360);
     const floorAnnual = Math.floor(rawAnnual / 10) * 10;
-    
-    // Tax pool for the year
-    const taxPoolYTD = R((floorAnnual / 360) * totalDaysYTD);
-    
-    // Calculate total annual tax based on brackets
+
+    // حساب الـtax pool الحقيقي بناءً على الـtax pool السابق
+    const taxPool = prev.taxPool !== undefined ? prev.taxPool : 0; // قيمة الـtax pool السابقة
+    const taxPoolYTD = R(taxPool + (floorAnnual / 360) * totalDaysYTD);
+
+    // حساب الضرائب السنوية بناءً على الشرائح
     const totalAnnualTax = calculateEgyptianTax(floorAnnual);
     const taxUntilNow = R((totalAnnualTax / 360) * totalDaysYTD);
+
+    // الضرائب الشهرية بناءً على الـtax pool الحقيقي
     const monthlyTax = R(Math.max(0, taxUntilNow - (prev.pTaxes || 0)));
 
-    // Total deductions
+    // إجمالي الخصومات
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
-
-    // Net salary
+    
+    // صافي الراتب
     const net = R(gross - totalAllDeductions);
 
-    // Return all relevant data
+    // إرجاع جميع القيم
     return {
         fullBasic,
         fullTrans,
@@ -91,6 +94,7 @@ function runPayrollLogic(input, prev, emp) {
         totalDaysYTD,
         prevTaxable: prev.pTaxable || 0,
         currentTaxable,
+        taxPool: taxPool, // تمرير قيمة الـtax pool الحالية للخروج
         taxPoolYTD,
         annualProjected: floorAnnual,
         totalAnnualTax,
