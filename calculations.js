@@ -1,7 +1,6 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function runPayrollLogic(input, prev, emp) {
-    // 1. استخراج كل البيانات بدون نقص
     const { 
         fullBasic, 
         fullTrans, 
@@ -30,7 +29,6 @@ function runPayrollLogic(input, prev, emp) {
     
     autoDays = Math.max(0, endDay - startDay + 1);
     if (autoDays > 30) autoDays = 30;
-
     let finalDays = (manualDays !== undefined && Number(manualDays) !== 30) ? Number(manualDays) : autoDays;
 
     // --- [منطق التأمينات] ---
@@ -45,32 +43,44 @@ function runPayrollLogic(input, prev, emp) {
         insuranceEmployee = R(insSalary * 0.11);
     }
 
-    // --- [الحسابات المالية الأساسية وتعديل الـ Exemptions] ---
+    // --- [الحسابات المالية الأساسية] ---
     const proratedBasic = R((fullBasic / 30) * finalDays);
     const proratedTrans = R((fullTrans / 30) * finalDays);
+    const gross = R(proratedBasic + proratedTrans + additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
 
-    // حساب إجمالي الإضافات (للقبض) وإجمالي الخاضع منها (للضريبة)
-    const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    // --- [منطق الإعفاءات الطبية والـ Drop-down] ---
+    
+    // 1. الإضافات اللي بتزود الوعاء الضريبي (لو الموظف اختار Exempted هنا معناها إنها "معفاة من الضريبة" فمش هنزودها في الوعاء)
+    // ملحوظة: حسب طلبك لو اختار exempted يقلل الضريبة يعني "لا تضاف للوعاء"
     const taxableAdditions = additions.reduce((sum, item) => {
-        // لو البند غير معفى (non-exempted) يدخل في الضريبة
-        return sum + (item.type !== 'exempted' ? (Number(item.amount) || 0) : 0);
+        return sum + (item.type === 'non-exempted' ? (Number(item.amount) || 0) : 0);
     }, 0);
 
-    // حساب إجمالي الخصومات (للقبض) وإجمالي الخاضع منها (اللي بيقلل الوعاء الضريبي)
-    const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    // 2. الخصومات اللي بتقلل الوعاء الضريبي (لو اختار Exempted يقلل الوعاء)
+    let medicalExemption = 0;
     const taxableDeductions = deductions.reduce((sum, item) => {
-        // لو الخصم غير معفى (يعني جزاء قانوني مثلاً) يقلل الوعاء الضريبي
-        return sum + (item.type !== 'exempted' ? (Number(item.amount) || 0) : 0);
+        const amt = Number(item.amount) || 0;
+        const name = item.name.toLowerCase();
+
+        // لو البند طبي (Medical) بنطبق معادلة الـ 15% أو الـ 833.33 جنيه
+        if (name.includes("medical")) {
+            const limit1 = R(gross * 0.15); // 15% من الإجمالي
+            const limit2 = R((10000 / 360) * finalDays); // سقف الـ 10000 سنوياً متوزع ع الأيام
+            medicalExemption += Math.min(amt, limit1, limit2);
+            return sum + (item.type === 'exempted' ? (amt - medicalExemption) : 0); 
+        }
+
+        // لو بند عادي واختار Exempted يقلل الوعاء الضريبي
+        return sum + (item.type === 'exempted' ? amt : 0);
     }, 0);
 
-    // الـ Gross هو كل اللي الموظف هياخده (بما في ذلك البدلات المعفاة)
-    const gross = R(proratedBasic + proratedTrans + totalAdditions);
+    const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
     // --- [حساب الضرائب - الوعاء الضريبي المعدل] ---
     const personalExemption = R((20000 / 360) * finalDays); 
     
-    // الوعاء الضريبي = (الأساسي + البدلات الخاضعة) - التأمينات - الإعفاء الشخصي - الخصومات الخاضعة
-    const currentTaxable = R(Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee - personalExemption - taxableDeductions));
+    // الوعاء = (الأساسي + البدلات الخاضعة) - التأمينات - الإعفاء الشخصي - الخصومات المعفاة - إعفاء الطبي
+    const currentTaxable = R(Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee - personalExemption - taxableDeductions - medicalExemption));
     
     const totalDaysYTD = Number(finalDays) + (Number(prev.pDays) || 0);
     const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0));
@@ -112,37 +122,19 @@ function runPayrollLogic(input, prev, emp) {
     const prevTaxes = Number(prev.pTaxes) || 0;
     const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - prevTaxes));
 
-    // --- [الشهداء والصافي] ---
     const martyrs = R(gross * 0.0005);
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
     return {
-        fullBasic,
-        fullTrans,
-        days: finalDays,
-        proratedBasic,
-        proratedTrans,
-        totalAdditions,
-        additions, 
-        deductions, 
-        gross,
-        insBase: insSalary,
-        insuranceEmployee,
-        prevDays: Number(prev.pDays) || 0,
-        totalDaysYTD,
-        prevTaxable: Number(prev.pTaxable) || 0,
-        currentTaxable,
-        taxPoolYTD: ai,
-        annualProjected: floorAnnual,
-        totalAnnualTax: totalTaxDueUntilNow,
-        prevTaxes: prevTaxes,
-        monthlyTax,
-        martyrs,
-        totalOtherDeductions,
-        totalAllDeductions,
-        net,
-        resignationDate: resignationDate || ""
+        fullBasic, fullTrans, days: finalDays, proratedBasic, proratedTrans,
+        totalAdditions: additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+        additions, deductions, gross, insBase: insSalary, insuranceEmployee,
+        prevDays: Number(prev.pDays) || 0, totalDaysYTD,
+        prevTaxable: Number(prev.pTaxable) || 0, currentTaxable, taxPoolYTD: ai,
+        annualProjected: floorAnnual, totalAnnualTax: totalTaxDueUntilNow,
+        prevTaxes: prevTaxes, monthlyTax, martyrs, totalOtherDeductions, totalAllDeductions,
+        net, resignationDate: resignationDate || ""
     };
 }
 
