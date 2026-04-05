@@ -7,7 +7,7 @@ const jwt = require("jsonwebtoken");
 const connectDB = require("./db");
 const { runPayrollLogic } = require("./calculations");
 const auth = require("./middleware/auth"); 
-const Company = require("./models/Company"); 
+const Company = require("./models/company"); 
 
 const app = express();
 app.use(cors());
