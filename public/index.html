@@ -170,7 +170,6 @@
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
         function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
 
-        // التعديل هنا: إضافة الـ Dropdown للـ Additions و Deductions
         function addRow(areaId) {
             const div = document.createElement('div');
             div.className = "flex gap-2 animate-fade-in items-center bg-white/5 p-2 rounded-xl border border-white/5";
@@ -178,8 +177,8 @@
                 <input type="text" placeholder="Name" class="flex-1 bg-transparent p-1 rounded text-[10px] outline-none border-b border-white/10 text-white">
                 <input type="number" placeholder="0" class="w-16 bg-transparent p-1 rounded text-[10px] outline-none border-b border-white/10 font-black text-emerald-400 text-center">
                 <select class="bg-slate-800 text-[8px] text-white p-1 rounded outline-none border-none cursor-pointer">
-                    <option value="non-exempted">Khade3 (Taxed)</option>
-                    <option value="exempted">Mo3fa (Exempt)</option>
+                    <option value="exempted">Exempted (Mo3fa)</option>
+                    <option value="non-exempted">Non-Exempted (Taxed)</option>
                 </select>
             `;
             document.getElementById(areaId).appendChild(div);
@@ -236,9 +235,17 @@
             document.getElementById('histBody').innerHTML = data.history.map(r => {
                 const d = r.payload;
                 let rowHTML = `<tr class="divide-x divide-slate-50 hover:bg-slate-50/50"><td class="p-3 bg-slate-50/50 text-slate-950 font-black">${r.month}</td><td class="text-indigo-500">${d.days || 30}</td><td>${d.fullBasic.toLocaleString()}</td><td>${d.fullTrans.toLocaleString()}</td><td>${d.proratedBasic.toLocaleString()}</td><td>${d.proratedTrans.toLocaleString()}</td>`;
-                dynamicAdds.forEach(key => { const found = d.additions ? d.additions.find(a => a.name === key) : null; rowHTML += `<td class="text-emerald-600 font-black" title="${found ? found.type : ''}">${found ? found.amount.toLocaleString() : 0}</td>`; });
+                dynamicAdds.forEach(key => { 
+                    const found = d.additions ? d.additions.find(a => a.name === key) : null; 
+                    const style = found && found.type === 'exempted' ? 'text-blue-400' : 'text-emerald-600';
+                    rowHTML += `<td class="${style} font-black" title="${found ? found.type : ''}">${found ? found.amount.toLocaleString() : 0}</td>`; 
+                });
                 rowHTML += `<td class="bg-indigo-50 font-black">${d.gross.toLocaleString()}</td><td class="text-orange-500">${d.insuranceEmployee.toLocaleString()}</td><td>${d.currentTaxable.toLocaleString()}</td><td>${d.taxPoolYTD.toLocaleString()}</td><td class="text-[7px] text-slate-300">${d.annualProjected.toLocaleString()}</td><td class="bg-rose-50 text-rose-600 font-black">${d.monthlyTax.toLocaleString()}</td><td>${d.martyrs.toLocaleString()}</td>`;
-                dynamicDeds.forEach(key => { const found = d.deductions ? d.deductions.find(de => de.name === key) : null; rowHTML += `<td class="text-rose-600 font-black" title="${found ? found.type : ''}">${found ? found.amount.toLocaleString() : 0}</td>`; });
+                dynamicDeds.forEach(key => { 
+                    const found = d.deductions ? d.deductions.find(de => de.name === key) : null; 
+                    const style = found && found.type === 'exempted' ? 'text-orange-400' : 'text-rose-600';
+                    rowHTML += `<td class="${style} font-black" title="${found ? found.type : ''}">${found ? found.amount.toLocaleString() : 0}</td>`; 
+                });
                 rowHTML += `<td>${d.totalAllDeductions.toLocaleString()}</td><td class="bg-emerald-50 text-emerald-700 text-[11px] font-black border-l-4 border-emerald-500">${d.net.toLocaleString()}</td></tr>`;
                 return rowHTML;
             }).join('');
@@ -266,12 +273,11 @@
             } catch (e) { alert("Error!"); } finally { btn.innerText = "Run Prediction ⚡"; btn.disabled = false; }
         }
 
-        // التعديل هنا: لم البيانات من الـ Dropdown
         async function runCalc() {
             const getItems = (id) => Array.from(document.getElementById(id).children).map(r => ({ 
                 name: r.children[0].value, 
                 amount: Number(r.children[1].value),
-                type: r.children[2].value // إضافة نوع البند (معفى أو لا)
+                type: r.children[2].value
             }));
             
             const body = {
