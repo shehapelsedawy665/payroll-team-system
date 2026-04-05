@@ -27,19 +27,15 @@
             .card-padding { padding: 1.5rem !important; }
         }
 
-        /* Prevent Text Clipping */
         .truncate-custom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .nav-text { opacity: 0; transition: opacity 0.3s; display: none; }
         
-        /* Smooth Transitions */
         .animate-fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Responsive Tables */
         .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 1.5rem; }
         table { width: 100%; min-width: 800px; } 
 
-        /* Custom Scrollbar */
         .table-container::-webkit-scrollbar { height: 6px; }
         .table-container::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
     </style>
@@ -81,7 +77,6 @@
     </aside>
 
     <main id="main-content" class="flex-1 lg:mr-[60px] p-4 md:p-8 transition-all hidden">
-        
         <div id="dashboard-view" class="animate-fade-in">
             <header class="mb-10 text-center lg:text-right">
                 <h1 class="text-3xl md:text-5xl font-black text-slate-800 italic">أهلاً <span class="text-indigo-600">يا بطل!</span></h1>
@@ -177,7 +172,7 @@
                 </div>
                 <div>
                     <label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Target Month</label>
-                    <input type="month" id="c-month" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none border border-indigo-100">
+                    <input type="month" id="c-month" onchange="validateResignationDate()" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none border border-indigo-100">
                 </div>
                 <div>
                     <label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Hiring Date</label>
@@ -266,7 +261,6 @@
     <script>
         let TOKEN = localStorage.getItem('token');
 
-        // Central API Handler
         function apiFetch(url, options = {}) {
             options.headers = {
                 ...options.headers,
@@ -277,6 +271,19 @@
                 if(res.status === 401) { handleLogout(); throw new Error("Unauthorized"); }
                 return res.json();
             });
+        }
+
+        // --- Logic: منع تاريخ الاستقالة قبل الشهر المختار ---
+        function validateResignationDate() {
+            const monthInput = document.getElementById('c-month').value;
+            const resignInput = document.getElementById('c-resign');
+            if (monthInput) {
+                resignInput.min = monthInput + "-01";
+                if (resignInput.value && resignInput.value < resignInput.min) {
+                    resignInput.value = "";
+                    alert("تنبيه: لا يمكن أن يكون تاريخ الاستقالة قبل شهر الحساب المختار.");
+                }
+            }
         }
 
         async function handleLogin() {
@@ -314,13 +321,13 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ 
-                        companyName: "SEDAY ERP New Client", 
+                        companyName: "SEDAY ERP Client", 
                         adminEmail: email.toLowerCase(), 
                         password 
                     })
                 });
                 const data = await res.json();
-                if(res.ok) { alert("مبروك! تم إنشاء حساب الشركة بنجاح. سجل دخول دلوقتي."); }
+                if(res.ok) { alert("تم إنشاء الحساب بنجاح."); }
                 else { alert(data.error || "خطأ في التسجيل"); }
             } catch (e) { alert("خطأ في الاتصال"); }
             finally { btn.innerText = "إنشاء حساب شركة جديد 🏢"; btn.disabled = false; }
@@ -380,27 +387,28 @@
             document.getElementById('currId').value = id;
             const data = await apiFetch(`/api/employees/${id}/details`);
             
-            // Populate Basic Data
             document.getElementById('p-name').innerText = data.emp.name;
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
-            document.getElementById('pD').value = data.prevData.pDays;
-            document.getElementById('pTxbl').value = data.prevData.pTaxable;
-            document.getElementById('pTx').value = data.prevData.pTaxes;
+            document.getElementById('pD').value = data.prevData.pDays || 0;
+            document.getElementById('pTxbl').value = data.prevData.pTaxable || 0;
+            document.getElementById('pTx').value = data.prevData.pTaxes || 0;
             document.getElementById('c-fbasic').value = data.emp.insSalary || 0;
 
-            // Table Headers
-            let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">GROSS</th><th class="p-4">Ins 11%</th><th class="p-4">Taxable</th><th class="p-4 bg-rose-800">Monthly Tax</th><th class="p-4 bg-emerald-600">NET SALARY</th></tr>`;
+            // Sequential Months Logic
+            const hDate = new Date(data.emp.hiringDate);
+            const monthInput = document.getElementById('c-month');
+            monthInput.min = `${hDate.getFullYear()}-${String(hDate.getMonth() + 1).padStart(2, '0')}`;
+            
+            let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">GROSS</th><th class="p-4">Ins 11%</th><th class="p-4 bg-rose-800">Monthly Tax</th><th class="p-4 bg-emerald-600">NET SALARY</th></tr>`;
             document.getElementById('histHead').innerHTML = headHTML;
             
-            // Table Body
             document.getElementById('histBody').innerHTML = data.history.map(r => `
                 <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition">
                     <td class="p-4 font-black text-slate-900">${r.month}</td>
                     <td class="p-4">${r.payload.days}</td>
                     <td class="p-4 font-black">${r.payload.gross.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="p-4">${r.payload.insuranceEmployee.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td class="p-4">${r.payload.currentTaxable.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="p-4 text-rose-600 font-black">${r.payload.monthlyTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="p-4 text-emerald-700 font-black text-lg">${r.payload.net.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>`).join('');
@@ -432,11 +440,10 @@
                     body: JSON.stringify({ targetNet: net }) 
                 });
                 document.getElementById('calc-result').classList.remove('hidden');
-                // Mapping data from server to HTML IDs
-                document.getElementById('result-gross').innerText = data.grossSalary.toLocaleString();
-                document.getElementById('result-tax').innerText = data.monthlyTax.toLocaleString();
-                document.getElementById('result-ins').innerText = data.insuranceEmployee.toLocaleString();
-                document.getElementById('result-base').innerText = data.insBase.toLocaleString();
+                document.getElementById('result-gross').innerText = data.grossSalary.toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('result-tax').innerText = data.monthlyTax.toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('result-ins').innerText = data.insuranceEmployee.toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('result-base').innerText = data.insBase.toLocaleString(undefined, {minimumFractionDigits: 2});
             } finally {
                 btn.innerText = "حساب الراتب الشامل"; btn.disabled = false;
             }
@@ -468,6 +475,8 @@
                     pTaxes: Number(document.getElementById('pTx').value) 
                 }
             };
+
+            if(!body.month) { alert("برجاء اختيار الشهر أولاً"); btn.innerText = "RUN PAYROLL ENGINE ⚡"; btn.disabled = false; return; }
 
             try {
                 await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) });
