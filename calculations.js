@@ -1,164 +1,122 @@
+// دالة التقريب الصارم زي ROUND(x, 2) في الإكسيل
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/**
+ * حساب الضريبة السنوية بناءً على الشريحة (مع مراعاة الإعفاء 40,000)
+ */
+function calculateEgyptianTax(annualProjected) {
+    const exemption = 40000;
+    if (annualProjected <= exemption) return 0;
+
+    let tax = 0;
+    let remaining = annualProjected - exemption;
+
+    const brackets = [
+        { limit: 15000, rate: 0.10 },
+        { limit: 15000, rate: 0.15 },
+        { limit: 130000, rate: 0.20 },
+        { limit: 200000, rate: 0.225 },
+        { limit: 800000, rate: 0.25 },
+        { limit: Infinity, rate: 0.275 }
+    ];
+
+    for (let b of brackets) {
+        if (remaining <= 0) break;
+        let chunk = Math.min(remaining, b.limit);
+        tax += chunk * b.rate;
+        remaining -= chunk;
+    }
+    return tax;
+}
+
+/**
+ * الدالة الرئيسية لتسوية المرتبات
+ * @param {Object} input - بيانات الشهر الحالي
+ * @param {Object} prev - بيانات الأشهر السابقة (YTD)
+ * @param {Object} emp - بيانات الموظف الثابتة
+ */
 function runPayrollLogic(input, prev, emp) {
-    const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
+    const { 
+        gross,               // S9 (المرتب الأساسي + المتغيرات + البدلات)
+        deductions,          // Z9 + AA9 + O9 (خصومات أخرى مطلوبة في المعادلة)
+        insuranceEmployee,   // AV9 (تأمينات الموظف)
+        days,                // AE9 (أيام العمل في الشهر)
+        isFinalSettlement,   // Boolean عشان شرط الـ 10% لما الموظف يسيب
+        limitedDeduction     // AX9 (خصم الـ 15% مثلاً تأمين حياة / استثمار)
+    } = input;
 
-    // Prorated salaries
-    const proratedBasic = R((fullBasic / 30) * days);
-    const proratedTrans = R((fullTrans / 30) * days);
-    const totalAdditions = additions.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-    const totalOtherDeductions = deductions.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-    const gross = R(proratedBasic + proratedTrans + totalAdditions);
+    // 1. حساب الإعفاء الشخصي (20,000 أو 30,000 حسب نوع الموظف AC9)
+    // الإكسيل بيقسم على 360 وبيضرب في أيام الشهر
+    const exemptionLimit = emp.exemptionType === 4 ? 30000 : 20000;
+    const personalExemption = R((exemptionLimit / 360) * days);
 
-    // Insurance (11% on capped base)
-    const maxIns = 16700;
-    const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
-    const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
-    const insuranceEmployee = R(insBase * 0.11);
+    // 2. حساب الأساس الخاضع للضريبة قبل تطبيق قاعدة الـ 15%
+    const baseBeforeLimit = R(gross - (deductions || 0) - insuranceEmployee - personalExemption);
 
-    // Martyrs tax (0.05% of gross)
-    const martyrs = R(gross * 0.0005);
+    // 3. تطبيق قاعدة الخصم المحدد بـ 15% (اللي في معادلة الـ IF(ROUND(S9,2)>0... في الإكسيل)
+    let appliedDeduction = 0;
+    if (baseBeforeLimit > 0) {
+        const max15Percent = baseBeforeLimit * 0.15;
+        const annualCap = R(10000 / 12); // السقف السنوي 10,000 مقسوم على 12 شهر
+        const actualDeductionValue = limitedDeduction || 0;
+        
+        appliedDeduction = Math.min(max15Percent, actualDeductionValue, annualCap);
+    }
 
-    // Personal exemption (20,000 per year, prorated)
-    const personalExemption = R((20000 / 360) * days);
+    // 4. الـ Taxable النهائي للشهر الحالي (مطابق لمعادلة الـ Dih equation taxable)
+    const currentTaxable = R(baseBeforeLimit - appliedDeduction);
 
-    // Current month taxable
-    const currentTaxable = R(Math.max(0, gross - insuranceEmployee - personalExemption));
+    // 5. تجميع YTD (الأشهر السابقة + الشهر الحالي)
+    const totalDaysYTD = days + (prev.pDays || 0);
+    const totalTaxableYTD = R(currentTaxable + (prev.pTaxable || 0));
 
-    // Cumulative values from previous month
-    const prevDays = Number(prev.pDays) || 0;
-    const prevTaxable = Number(prev.pTaxable) || 0;
-    const totalDaysYTD = days + prevDays;
-    let totalTaxableYTD = R(currentTaxable + prevTaxable);
-    const taxableForPool = Math.max(0, totalTaxableYTD);
-
-    // ----- Tax Pool (AI7) exactly as Excel: FLOOR(AH7/AF7*360,10) then /360*AF7 -----
+    // 6. حساب الـ Tax Pool (مطابق لمعادلة dih equation taxpool)
+    // FLOOR في الإكسيل بيقرب لأسفل لأقرب 10
     let taxPoolYTD = 0;
     if (totalDaysYTD > 0) {
-        let rawAnnual = (taxableForPool / totalDaysYTD) * 360;
-        let floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
+        const rawAnnual = (totalTaxableYTD / totalDaysYTD) * 360;
+        const floorAnnual = Math.floor(rawAnnual / 10) * 10; // تقريب لحد أقرب 10 لأسفل
         taxPoolYTD = R((floorAnnual / 360) * totalDaysYTD);
     }
 
-    // Helper to prorate annual amounts to YTD days
-    const P = (annual) => (totalDaysYTD > 0 ? R((annual / 360) * totalDaysYTD) : 0);
-    const AI = taxPoolYTD;
-    const AF = totalDaysYTD;
+    // 7. حساب الضريبة السنوية الكلية بناءً على الـ Tax Pool المقرّب
+    const totalAnnualTax = calculateEgyptianTax(taxPoolYTD);
+    
+    // 8. حساب ضريبة الأشهر المتراكمة (توزيع السنوي على الأيام الفعلية)
+    const totalTaxYTD = R((totalAnnualTax / 360) * totalDaysYTD);
 
-    // ---------- Brackets (exactly as your Excel formulas) ----------
-    // AJ7 (0% bracket, negative exemption)
-    let AJ = 0;
-    if (AF > 0) {
-        if (AI > P(600000)) AJ = 0;
-        else AJ = -P(40000);
+    // 9. حساب ضريبة الشهر الحالي (Taxes of the month)
+    let monthlyTax = 0;
+    if (isFinalSettlement) {
+        // لو الموظف لافي أو مستني، ضريبة 10% مباشرة بدون تسوية
+        monthlyTax = R(currentTaxable * 0.10);
+    } else {
+        // الوضع الطبيعي (إجمالي الضريبة لحد دلوقتي - اللي اتحصل فعلاً كدان)
+        monthlyTax = R(Math.max(0, totalTaxYTD - (prev.pTaxes || 0)));
     }
 
-    // AK7 (10% bracket)
-    let AK = 0;
-    if (AF > 0) {
-        if (AI > P(600000) && AI <= P(700000)) {
-            AK = R(P(55000) * 0.1);
-        } else if (AI > P(700000)) {
-            AK = 0;
-        } else {
-            let base = AI + AJ;
-            if (base <= P(15000)) AK = R(base * 0.1);
-            else AK = R(P(15000) * 0.1);
-        }
-    }
-
-    // AL7 (15% bracket)
-    let AL = 0;
-    if (AF > 0) {
-        if (AI > P(700000) && AI <= P(800000)) {
-            AL = R(P(70000) * 0.15);
-        } else if (AI > P(800000)) {
-            AL = 0;
-        } else {
-            let base = AI + AJ - (AK / 0.1);
-            if (base <= P(15000)) AL = R(base * 0.15);
-            else AL = R(P(15000) * 0.15);
-        }
-    }
-
-    // AM7 (20% bracket)
-    let AM = 0;
-    if (AF > 0) {
-        if (AI > P(800000) && AI <= P(900000)) {
-            AM = R(P(200000) * 0.2);
-        } else if (AI > P(900000)) {
-            AM = 0;
-        } else {
-            let base = AI + AJ - (AK / 0.1) - (AL / 0.15);
-            if (base <= P(130000)) AM = R(base * 0.2);
-            else AM = R(P(130000) * 0.2);
-        }
-    }
-
-    // AN7 (22.5% bracket)
-    let AN = 0;
-    if (AF > 0) {
-        if (AI > P(900000) && AI <= P(1200000)) {
-            AN = R(P(400000) * 0.225);
-        } else if (AI > P(1200000)) {
-            AN = 0;
-        } else {
-            let base = AI + AJ - (AK / 0.1) - (AL / 0.15) - (AM / 0.2);
-            if (base <= P(200000)) AN = R(base * 0.225);
-            else AN = R(P(200000) * 0.225);
-        }
-    }
-
-    // AO7 (25% bracket)
-    let AO = 0;
-    if (AF > 0) {
-        if (AI > P(1200000)) {
-            AO = R(P(1200000) * 0.25);
-        } else {
-            let base = AI + AJ - (AK / 0.1) - (AL / 0.15) - (AM / 0.2) - (AN / 0.225);
-            if (base <= P(800000)) AO = R(base * 0.25);
-            else AO = R(P(800000) * 0.25);
-        }
-    }
-
-    // AP7 (27.5% bracket)
-    let AP = 0;
-    if (AF > 0 && AI > P(1200000)) {
-        AP = R((AI - P(1200000)) * 0.275);
-    }
-
-    // Total taxes YTD and monthly tax
-    const totalTaxYTD = R(AK + AL + AM + AN + AO + AP);
-    const prevTaxes = Number(prev.pTaxes) || 0;
-    const monthlyTax = R(Math.max(0, totalTaxYTD - prevTaxes));
-
-    // Final deductions and net
-    const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
+    const martyrs = R(gross * 0.0005);
+    const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + (deductions || 0));
     const net = R(gross - totalAllDeductions);
 
-    // Floor Ann (annualized taxable, floored to 10)
-    let floorAnnual = 0;
-    if (totalDaysYTD > 0) {
-        let rawAnnual = (taxableForPool / totalDaysYTD) * 360;
-        floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
-    }
-
+    // الـ return مرتب وزي ما الـ HTML يتوقع
     return {
-        // Core results matching your Excel columns
-        floorAnnual,           // Floor Ann
-        taxPoolYTD,            // Pool YTD
-        currentTaxable,        // Taxable (this month)
-        insuranceEmployee,     // Ins 11%
+        gross,
+        days,
+        insuranceEmployee,
+        personalExemption,
+        currentTaxable,
+        prevDays: prev.pDays || 0,
         totalDaysYTD,
-        totalTaxableYTD,
+        prevTaxable: prev.pTaxable || 0,
+        taxPoolYTD,
+        annualProjected: taxPoolYTD, // اللي بنطبق عليه الـ Brackets
+        totalAnnualTax,
+        prevTaxes: prev.pTaxes || 0,
         monthlyTax,
         martyrs,
-        totalOtherDeductions,
         totalAllDeductions,
-        net,
-        // Additional fields if needed
-        gross,
-        insBase
+        net
     };
 }
 
