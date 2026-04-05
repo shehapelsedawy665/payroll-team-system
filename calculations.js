@@ -1,54 +1,51 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function runPayrollLogic(input, prev, emp) {
-    // ----- 1. Basic prorations (same as Excel ROUND(S9,2) etc.) -----
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
+
+    // Prorated salaries
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
     const totalAdditions = additions.reduce((s, i) => s + (Number(i.amount) || 0), 0);
     const totalOtherDeductions = deductions.reduce((s, i) => s + (Number(i.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // ----- 2. Insurance (11% on base, capped) -----
+    // Insurance (11% on capped base)
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
-    const insuranceEmployee = R(insBase * 0.11);          // Ins 11% column
+    const insuranceEmployee = R(insBase * 0.11);
 
-    // ----- 3. Martyrs tax (0.05% of gross) -----
+    // Martyrs tax (0.05% of gross)
     const martyrs = R(gross * 0.0005);
 
-    // ----- 4. Personal exemption (20,000 per year, prorated) -----
+    // Personal exemption (20,000 per year, prorated)
     const personalExemption = R((20000 / 360) * days);
 
-    // ----- 5. Current month taxable (the "Taxable" column in your screenshot) -----
+    // Current month taxable
     const currentTaxable = R(Math.max(0, gross - insuranceEmployee - personalExemption));
 
-    // ----- 6. Cumulative days and taxable (YTD) -----
+    // Cumulative values from previous month
     const prevDays = Number(prev.pDays) || 0;
     const prevTaxable = Number(prev.pTaxable) || 0;
-    const totalDaysYTD = days + prevDays;                 // AF7
-    let totalTaxableYTD = R(currentTaxable + prevTaxable); // AH7
-    // Excel would show #NUM! if negative; we clamp to 0 for safety
+    const totalDaysYTD = days + prevDays;
+    let totalTaxableYTD = R(currentTaxable + prevTaxable);
     const taxableForPool = Math.max(0, totalTaxableYTD);
 
-    // ----- 7. Tax Pool (AI7) exactly as your formula: -----
-    // = (IFERROR(FLOOR(AH7/AF7*360,10), FLOOR(AH7*12,10))) / 360 * AF7
+    // ----- Tax Pool (AI7) exactly as Excel: FLOOR(AH7/AF7*360,10) then /360*AF7 -----
     let taxPoolYTD = 0;
     if (totalDaysYTD > 0) {
         let rawAnnual = (taxableForPool / totalDaysYTD) * 360;
         let floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
         taxPoolYTD = R((floorAnnual / 360) * totalDaysYTD);
-    } else {
-        // If days = 0, fallback to FLOOR(AH7*12,10) but then *0/360 = 0
-        taxPoolYTD = 0;
     }
 
-    // ----- 8. Brackets (AJ7 to AP7) exactly as your Excel formulas -----
-    const AI = taxPoolYTD;      // AI7
-    const AF = totalDaysYTD;    // AF7
-    const P = (annual) => AF > 0 ? R((annual / 360) * AF) : 0; // prorated helper
+    // Helper to prorate annual amounts to YTD days
+    const P = (annual) => (totalDaysYTD > 0 ? R((annual / 360) * totalDaysYTD) : 0);
+    const AI = taxPoolYTD;
+    const AF = totalDaysYTD;
 
+    // ---------- Brackets (exactly as your Excel formulas) ----------
     // AJ7 (0% bracket, negative exemption)
     let AJ = 0;
     if (AF > 0) {
@@ -64,7 +61,7 @@ function runPayrollLogic(input, prev, emp) {
         } else if (AI > P(700000)) {
             AK = 0;
         } else {
-            let base = AI + AJ;   // AJ is negative
+            let base = AI + AJ;
             if (base <= P(15000)) AK = R(base * 0.1);
             else AK = R(P(15000) * 0.1);
         }
@@ -130,37 +127,38 @@ function runPayrollLogic(input, prev, emp) {
         AP = R((AI - P(1200000)) * 0.275);
     }
 
-    // ----- 9. Total taxes YTD (AQ7) and monthly tax (AS7) -----
+    // Total taxes YTD and monthly tax
     const totalTaxYTD = R(AK + AL + AM + AN + AO + AP);
     const prevTaxes = Number(prev.pTaxes) || 0;
     const monthlyTax = R(Math.max(0, totalTaxYTD - prevTaxes));
 
-    // ----- 10. Final net salary -----
+    // Final deductions and net
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
-    // ----- Return all values needed for reports -----
+    // Floor Ann (annualized taxable, floored to 10)
+    let floorAnnual = 0;
+    if (totalDaysYTD > 0) {
+        let rawAnnual = (taxableForPool / totalDaysYTD) * 360;
+        floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
+    }
+
     return {
-        // Inputs
-        fullBasic, fullTrans, days,
-        proratedBasic, proratedTrans,
-        totalAdditions, gross,
-        insBase, insuranceEmployee,
-        // Cumulative
-        prevDays,
+        // Core results matching your Excel columns
+        floorAnnual,           // Floor Ann
+        taxPoolYTD,            // Pool YTD
+        currentTaxable,        // Taxable (this month)
+        insuranceEmployee,     // Ins 11%
         totalDaysYTD,
-        prevTaxable,
-        currentTaxable,
-        // Excel matching columns
-        taxPoolYTD,                // Pool YTD (AI7)
-        floorAnnual: totalDaysYTD > 0 ? Math.floor(R((taxableForPool / totalDaysYTD) * 360) / 10) * 10 : 0,  // Floor Ann
-        totalAnnualTax: totalTaxYTD,
-        prevTaxes,
+        totalTaxableYTD,
         monthlyTax,
         martyrs,
         totalOtherDeductions,
         totalAllDeductions,
-        net
+        net,
+        // Additional fields if needed
+        gross,
+        insBase
     };
 }
 
