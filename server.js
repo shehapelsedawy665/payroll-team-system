@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
 const connectDB = require("./db");
 const { runPayrollLogic } = require("./calculations");
 
@@ -8,10 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. الاتصال بالقاعدة
+// الاتصال بالقاعدة
 connectDB();
 
-// 2. تعريف الـ Schemas
+// تعريف الـ Schemas
 const employeeSchema = new mongoose.Schema({
     name: String, 
     nationalId: String, 
@@ -46,13 +47,12 @@ app.post("/api/employees", async (req, res) => {
     res.json(await newEmp.save());
 });
 
-// جلب تفاصيل الموظف وسجلاته المالية (YTD Calculation)
+// جلب تفاصيل الموظف وسجلاته المالية
 app.get("/api/employees/:id/details", async (req, res) => {
     try {
         const emp = await Employee.findById(req.params.id);
         const history = await Payroll.find({ employeeId: req.params.id }).sort({ month: 1 });
         
-        // حساب البيانات التراكمية (Pre-calculated for the next month)
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => { 
             pDays += (Number(r.payload.days) || 0); 
@@ -66,7 +66,7 @@ app.get("/api/employees/:id/details", async (req, res) => {
     }
 });
 
-// الحسبة الأساسية وحفظ السجل المالي
+// الحسبة الأساسية وحفظ السجل
 app.post("/api/payroll/calculate", async (req, res) => {
     try {
         const { 
@@ -96,24 +96,16 @@ app.post("/api/payroll/calculate", async (req, res) => {
 
         res.json(record);
     } catch (err) {
-        console.error("Calculation Error:", err);
         res.status(500).json({ error: "حدث خطأ أثناء معالجة الحسابات" });
     }
 });
 
-/**
- * [NEW] Net to Gross API (Iterative Calculation)
- * بيستخدم نفس الـ Logic بتاع الضرائب والتأمينات عشان يوصل للـ Gross الصح
- */
+// Net to Gross API (Iterative)
 app.post("/api/payroll/net-to-gross", async (req, res) => {
     try {
         const { targetNet, insSalary, days } = req.body;
-        
         let estimateGross = Number(targetNet);
         let currentNet = 0;
-        const tolerance = 0.01; // دقة تصل لـ 1 قرش
-        
-        // Loop بحد أقصى 100 مرة للوصول لأدق نتيجة (Binary search logic style)
         for (let i = 0; i < 100; i++) {
             const tempResult = runPayrollLogic({
                 fullBasic: estimateGross,
@@ -121,21 +113,19 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
                 days: days || 30,
                 additions: [],
                 deductions: [],
-                month: new Date().toISOString().substring(0, 7), // الشهر الحالي كافتراضي
+                month: new Date().toISOString().substring(0, 7),
                 hiringDate: null,
                 resignationDate: null
             }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: insSalary || 0 });
 
             currentNet = tempResult.net;
             let diff = Number(targetNet) - currentNet;
-
-            if (Math.abs(diff) < tolerance) break;
+            if (Math.abs(diff) < 0.01) break;
             estimateGross += diff; 
         }
-
         res.json({ gross: Math.round(estimateGross) });
     } catch (err) {
-        res.status(500).json({ error: "فشل حساب الـ Net to Gross" });
+        res.status(500).json({ error: "فشل الحساب" });
     }
 });
 
@@ -146,14 +136,21 @@ app.delete("/api/employees/:id", async (req, res) => {
     res.json({ success: true });
 });
 
-// تصفية السجل المالي
+// تصفية السجل
 app.post("/api/employees/:id/resign", async (req, res) => {
     await Payroll.deleteMany({ employeeId: req.params.id });
     res.json({ success: true });
 });
 
-// Static files
-app.use(express.static("public"));
+// --- [هنا الحل لمشكلة الـ Cannot GET] ---
+// تعريف مسار الفولدر الاستاتيكي بشكل مطلق
+const publicPath = path.join(__dirname, "public");
+app.use(express.static(publicPath));
+
+// أي طلب مش API يروح لملف index.html
+app.get("*", (req, res) => {
+    res.sendFile(path.join(publicPath, "index.html"));
+});
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Payroll Server is LIVE on port ${PORT} 🚀`));
+app.listen(PORT, () => console.log(`Server LIVE on port ${PORT}`));
