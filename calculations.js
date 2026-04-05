@@ -18,38 +18,65 @@ function calculateEgyptianTax(annualTaxable) {
     return tax;
 }
 
-function runPayrollLogic(data, prev, emp) {
-    const { basicGross, days } = data;
+function runPayrollLogic(input, prev, emp) {
+    const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
-    // تأمينات (حسبة كاملة للمبلغ)
+    // 1. Prorated Salaries
+    const proratedBasic = R((fullBasic / 30) * days);
+    const proratedTrans = R((fullTrans / 30) * days);
+    
+    // 2. Sum Variables (Additions & Deductions)
+    const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    
+    // 3. Gross Calculation
+    const gross = R(proratedBasic + proratedTrans + totalAdditions);
+
+    // 4. Insurance (Amount is fixed based on InsSalary, but limited by Law)
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000/1.3) : 2720;
     const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
-    const insAmt = R(insBase * 0.11);
+    const insuranceEmployee = R(insBase * 0.11);
     
-    const actualGross = R((basicGross / 30) * days);
-    const martyrs = R(actualGross * 0.0005);
+    // 5. Taxes & Exemption
+    const martyrs = R(gross * 0.0005);
     const personalExemption = R((20000 / 360) * days);
     
-    // الحسبة التراكمية (YTD)
-    const currentTaxable = Math.max(0, (actualGross - insAmt) - personalExemption);
-    const totalDays = days + (prev.pDays || 0);
-    const totalTaxable = currentTaxable + (prev.pTaxable || 0);
+    const currentTaxable = Math.max(0, (gross - insuranceEmployee) - personalExemption);
     
-    // الإسقاط السنوي (Projected Annual)
-    const annualProjected = Math.floor(((totalTaxable / totalDays) * 360) / 10) * 10;
-    const annualTax = calculateEgyptianTax(annualProjected);
+    // Cumulative (YTD) Logic
+    const totalDaysYTD = days + (prev.pDays || 0);
+    const totalTaxableYTD = currentTaxable + (prev.pTaxable || 0);
+    const annualProjected = Math.floor(((totalTaxableYTD / totalDaysYTD) * 360) / 10) * 10;
     
-    const monthlyTax = R(Math.max(0, ((annualTax / 360) * totalDays) - (prev.pTaxes || 0)));
-    const net = R(actualGross - insAmt - monthlyTax - martyrs);
+    const totalAnnualTax = calculateEgyptianTax(annualProjected);
+    const taxUntilNow = R((totalAnnualTax / 360) * totalDaysYTD);
+    const monthlyTax = R(Math.max(0, taxUntilNow - (prev.pTaxes || 0)));
 
-    return { 
-        gross: actualGross, 
-        insurance: insAmt, 
-        monthlyTax, 
-        martyrs, 
-        net, 
-        taxableIncome: currentTaxable 
+    // 6. Final Net
+    const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
+    const net = R(gross - totalAllDeductions);
+
+    return {
+        fullBasic, fullTrans, days, 
+        proratedBasic, proratedTrans, 
+        additions, totalAdditions,
+        gross,
+        insBase, insuranceEmployee,
+        prevDays: prev.pDays || 0,
+        totalDaysYTD,
+        prevTaxable: prev.pTaxable || 0,
+        currentTaxable,
+        taxPoolYTD: totalTaxableYTD,
+        annualProjected,
+        totalAnnualTax,
+        prevTaxes: prev.pTaxes || 0,
+        monthlyTax,
+        martyrs,
+        deductions,
+        totalOtherDeductions,
+        totalAllDeductions,
+        net
     };
 }
 
