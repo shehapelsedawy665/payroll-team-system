@@ -205,7 +205,7 @@
             finally { btn.innerText = "دخول آمن 🔒"; btn.disabled = false; }
         }
 
-        // وظيفة تسجيل شركة جديدة
+        // وظيفة تسجيل شركة جديدة (مُعدلة لإرسال adminEmail و companyName)
         async function handleRegister() {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
@@ -218,7 +218,12 @@
                 const res = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email, password, companyName: "Seday New Co" })
+                    body: JSON.stringify({ 
+                        email: email, 
+                        password: password, 
+                        adminEmail: email, // الحقل المطلوب في الـ Validation
+                        companyName: "Seday New Co" 
+                    })
                 });
                 const data = await res.json();
                 if(res.ok) {
