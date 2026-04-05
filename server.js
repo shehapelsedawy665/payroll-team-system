@@ -17,7 +17,7 @@ const employeeSchema = new mongoose.Schema({
     name: String, 
     nationalId: String, 
     hiringDate: String, 
-    resignationDate: String, // إضافة حقل تاريخ الاستقالة في ملف الموظف
+    resignationDate: String, // حقل تاريخ الاستقالة
     insSalary: Number, 
     jobType: String
 });
@@ -26,7 +26,7 @@ const Employee = mongoose.models.Employee || mongoose.model("Employee", employee
 const payrollSchema = new mongoose.Schema({
     employeeId: mongoose.Schema.Types.ObjectId, 
     month: String, 
-    payload: Object 
+    payload: Object // هنا بيتحفظ الـ additions والـ deductions كاملين بأساميهم
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
@@ -72,22 +72,22 @@ app.post("/api/payroll/calculate", async (req, res) => {
         const MIN_INS = 5384.62;
         let effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
         
-        // تحديث كائن الموظف مؤقتاً للحسبة بحدود التأمين الصحيحة
+        // كائن موظف مؤقت للحسبة
         const empForCalc = { ...emp.toObject(), insSalary: effectiveInsSalary };
 
-        // 2. تحديث تاريخ الاستقالة في قاعدة البيانات لو موجود
+        // 2. تحديث تاريخ الاستقالة في قاعدة البيانات
         if (resignationDate) {
             await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
         }
 
-        // 3. الحساب
+        // 3. تنفيذ الحسبة (بما فيها الـ additions والـ deductions بأساميهم)
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
             prevData, 
             empForCalc
         );
 
-        // حفظ السجل (الـ payload هيحتفظ بالـ additions كـ array لزوم العرض بالتفصيل)
+        // حفظ السجل كاملاً
         const record = await new Payroll({ employeeId: empId, month, payload: result }).save();
         res.json(record);
     } catch (err) {
@@ -107,7 +107,6 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
         const MIN_INS = 5384.62;
 
         for (let i = 0; i < 100; i++) {
-            // تطبيق حدود التأمينات على الحسبة التكرارية
             let cappedIns = Math.min(MAX_INS, Math.max(MIN_INS, estimateGross));
 
             finalResult = runPayrollLogic({
