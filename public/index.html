@@ -253,10 +253,16 @@
 
             document.getElementById('histBody').innerHTML = data.history.map(r => {
                 const d = r.payload;
-                // تجميع أسماء الإضافات للعرض
-                const addDetails = d.additions && d.additions.length > 0 
-                    ? d.additions.map(a => `${a.name}: ${a.amount}`).join(' | ') 
-                    : d.totalAdditions.toLocaleString();
+                
+                // --- منطق عرض التفاصيل لكل بند ---
+                const addDetailsArr = [];
+                if (d.additions && Array.isArray(d.additions)) {
+                    d.additions.forEach(a => { if(a.amount > 0) addDetailsArr.push(`${a.name || 'Extra'}: ${a.amount}`); });
+                }
+                if (d.deductions && Array.isArray(d.deductions)) {
+                    d.deductions.forEach(de => { if(de.amount > 0) addDetailsArr.push(`-${de.name || 'Ded'}: ${de.amount}`); });
+                }
+                const addDetailsStr = addDetailsArr.length > 0 ? addDetailsArr.join(' | ') : 'None';
 
                 return `<tr class="divide-x divide-slate-50 transition hover:bg-slate-50/50">
                     <td class="p-4 bg-slate-50/50 text-slate-950 font-black">${r.month}</td>
@@ -265,7 +271,7 @@
                     <td>${d.fullTrans.toLocaleString()}</td>
                     <td>${d.proratedBasic.toLocaleString()}</td>
                     <td>${d.proratedTrans.toLocaleString()}</td>
-                    <td class="text-indigo-600 max-w-[150px] truncate" title="${addDetails}">${addDetails}</td>
+                    <td class="text-indigo-600 max-w-[150px] truncate px-2 font-bold" title="${addDetailsStr}">${addDetailsStr}</td>
                     <td class="bg-indigo-50 font-black">${d.gross.toLocaleString()}</td>
                     <td class="text-orange-500">${d.insuranceEmployee.toLocaleString()}</td>
                     <td>${d.currentTaxable.toLocaleString()}</td>
