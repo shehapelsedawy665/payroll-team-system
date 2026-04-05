@@ -17,6 +17,7 @@ const employeeSchema = new mongoose.Schema({
     name: String, 
     nationalId: String, 
     hiringDate: String, 
+    resignationDate: String, // إضافة حقل تاريخ الاستقالة في ملف الموظف
     insSalary: Number, 
     jobType: String
 });
@@ -65,10 +66,32 @@ app.post("/api/payroll/calculate", async (req, res) => {
     try {
         const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
         const emp = await Employee.findById(empId);
-        const result = runPayrollLogic({ fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, prevData, emp);
+
+        // 1. تطبيق حدود التأمينات القانونية (Min/Max)
+        const MAX_INS = 16700;
+        const MIN_INS = 5384.62;
+        let effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
+        
+        // تحديث كائن الموظف مؤقتاً للحسبة بحدود التأمين الصحيحة
+        const empForCalc = { ...emp.toObject(), insSalary: effectiveInsSalary };
+
+        // 2. تحديث تاريخ الاستقالة في قاعدة البيانات لو موجود
+        if (resignationDate) {
+            await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
+        }
+
+        // 3. الحساب
+        const result = runPayrollLogic(
+            { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
+            prevData, 
+            empForCalc
+        );
+
+        // حفظ السجل (الـ payload هيحتفظ بالـ additions كـ array لزوم العرض بالتفصيل)
         const record = await new Payroll({ employeeId: empId, month, payload: result }).save();
         res.json(record);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Calculation error" });
     }
 });
@@ -81,7 +104,7 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
         let finalResult = {};
         
         const MAX_INS = 16700; 
-        const MIN_INS = 5384.62; // (7000 / 1.3)
+        const MIN_INS = 5384.62;
 
         for (let i = 0; i < 100; i++) {
             // تطبيق حدود التأمينات على الحسبة التكرارية
@@ -104,7 +127,7 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
         }
 
         res.json({
-            gross: Math.round(estimateGross),
+            gross: Math.round(estimateGross * 100) / 100,
             insSalary: Math.min(MAX_INS, Math.max(MIN_INS, estimateGross)),
             insEmployee: finalResult.insuranceEmployee,
             taxes: finalResult.monthlyTax,
