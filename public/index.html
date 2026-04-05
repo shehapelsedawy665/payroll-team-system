@@ -33,7 +33,10 @@
             <div class="space-y-4">
                 <input type="email" id="auth-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
                 <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
-                <button onclick="handleLogin()" id="login-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">دخول آمن 🔒</button>
+                
+                <button onclick="handleLogin()" id="login-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition mb-2">دخول آمن 🔒</button>
+                
+                <button onclick="handleRegister()" id="reg-btn" class="w-full bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold text-sm border-2 border-dashed border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 transition">إنشاء حساب شركة جديد 🏢</button>
             </div>
             <p class="mt-6 text-[10px] text-slate-300 uppercase tracking-widest italic">Egyptian Payroll Engine v3.0</p>
         </div>
@@ -202,6 +205,34 @@
             finally { btn.innerText = "دخول آمن 🔒"; btn.disabled = false; }
         }
 
+        // وظيفة تسجيل شركة جديدة
+        async function handleRegister() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-pass').value;
+            const btn = document.getElementById('reg-btn');
+
+            if(!email || !password) return alert("اكتب بريد وباسورد للتسجيل");
+            btn.innerText = "جاري الإنشاء..."; btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email, password, companyName: "Seday New Co" })
+                });
+                const data = await res.json();
+                if(res.ok) {
+                    alert("تم إنشاء الحساب بنجاح! تقدر تدخل دلوقتي");
+                } else {
+                    alert("خطأ: " + (data.error || "تعذر التسجيل"));
+                }
+            } catch (e) {
+                alert("السيرفر لا يستجيب، تأكد من إعدادات Vercel");
+            } finally {
+                btn.innerText = "إنشاء حساب شركة جديد 🏢"; btn.disabled = false;
+            }
+        }
+
         function handleLogout() {
             localStorage.removeItem('token');
             location.reload();
@@ -220,7 +251,7 @@
             }
         }
 
-        // --- وظائف النظام (تم تحديثها لتعمل مع apiFetch) ---
+        // --- باقي وظائف النظام ---
         function hideAll() { ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => document.getElementById(id).classList.add('hidden')); }
         function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
@@ -247,14 +278,6 @@
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
-
-            // منطق عرض الجدول (نفس الكود الأصلي بتاعك)
-            const allAddKeys = new Set(); const allDedKeys = new Set();
-            data.history.forEach(r => {
-                if(r.payload.additions) r.payload.additions.forEach(a => allAddKeys.add(a.name));
-                if(r.payload.deductions) r.payload.deductions.forEach(d => allDedKeys.add(d.name));
-            });
-            const dynamicAdds = Array.from(allAddKeys); const dynamicDeds = Array.from(allDedKeys);
 
             let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-3">Month</th><th class="p-3">Days</th><th class="p-3">GROSS</th><th class="p-3">Ins 11%</th><th class="p-3">Taxable</th><th class="p-3 bg-rose-700">M.Tax</th><th class="p-3 bg-emerald-600">NET</th></tr>`;
             document.getElementById('histHead').innerHTML = headHTML;
