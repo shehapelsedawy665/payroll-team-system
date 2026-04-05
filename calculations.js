@@ -28,74 +28,65 @@ function calculateEgyptianTax(annualProjected) {
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
-    // S9: Gross (Prorated)
+    // الأرقام الأساسية
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // AV9: Insurance Employee (11%)
+    // التأمينات
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
     const insuranceEmployee = R(insBase * 0.11);
     
-    // AE9: Days of current month
-    const currentDays = days;
-
-    // حساب الإعفاء الشخصي بناءً على نوع العقد (AC9)
-    // IF(AC9=4, 30000, 20000)
+    // الإعفاء الشخصي (حسب معادلتك الجديدة)
     const exemptionBase = emp.jobType === "Special" ? 30000 : 20000; 
-    const personalExemption = R((exemptionBase / 360) * currentDays);
+    const personalExemption = R((exemptionBase / 360) * days);
 
-    // --- تطبيق معادلة Taxable المعقدة ---
-    // الجزء الأساسي: ROUND(S9,2) - ROUND(AV9,2) - personalExemption
-    let baseTaxable = R(gross - insuranceEmployee - personalExemption);
-
-    // حساب الـ Insurance Deduction (الـ 15% أو الـ 10,000/12)
-    // AX9 هي قيمة التأمين الطبي/الحياة المدفوعة
-    const medicalLifeInsurance = deductions.find(d => d.name.includes("Insurance"))?.amount || 0;
-    let insDeduction = 0;
+    // الوعاء الضريبي (Taxable)
+    const currentTaxable = R(Math.max(0, gross - insuranceEmployee - personalExemption));
     
-    if (gross > 0) {
-        let fifteenPercent = R(baseTaxable * 0.15);
-        let cap = R(10000 / 12);
-        insDeduction = Math.min(medicalLifeInsurance, fifteenPercent, cap);
-    }
+    // التراكمي (YTD)
+    const totalDaysYTD = days + (Number(prev.pDays) || 0);
+    const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0));
     
-    // AH9: Taxable final
-    const currentTaxable = R(baseTaxable - insDeduction);
-    
-    // 4. التراكمي (YTD)
-    const totalDaysYTD = currentDays + (prev.pDays || 0);
-    const totalTaxableYTD = R(currentTaxable + (prev.pTaxable || 0));
-    
-    // 5. تطبيق معادلة Tax Pool (AI7)
+    // معادلة الإكسيل للـ Tax Pool
     const rawAnnual = R((totalTaxableYTD / totalDaysYTD) * 360);
     const floorAnnual = Math.floor(rawAnnual / 10) * 10;
     const taxPoolYTD = R((floorAnnual / 360) * totalDaysYTD);
     
-    // 6. الضرائب
+    // الضرائب السنوية والشهرية
     const totalAnnualTax = calculateEgyptianTax(floorAnnual);
     const taxUntilNow = R((totalAnnualTax / 360) * totalDaysYTD);
-    const monthlyTax = R(Math.max(0, taxUntilNow - (prev.pTaxes || 0)));
+    const monthlyTax = R(Math.max(0, taxUntilNow - (Number(prev.pTaxes) || 0)));
 
     const martyrs = R(gross * 0.0005);
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
+    // التعديل هنا: التأكد إن كل الأسامي مطابقة للي الجدول مستنيه في الـ UI
     return {
-        fullBasic, fullTrans, days, 
-        proratedBasic, proratedTrans, 
-        totalAdditions, gross,
-        insBase, insuranceEmployee,
-        totalDaysYTD,
+        fullBasic: Number(fullBasic),
+        fullTrans: Number(fullTrans),
+        days: Number(days),
+        proratedBasic,
+        proratedTrans,
+        totalAdditions,
+        gross,
+        insBase,
+        insuranceEmployee,
         currentTaxable,
-        taxPoolYTD: taxPoolYTD,
-        annualProjected: floorAnnual,
+        taxPoolYTD, // AI7
+        annualProjected: floorAnnual, // Floor Ann
         monthlyTax,
-        net
+        martyrs,
+        totalAllDeductions,
+        net,
+        // بيانات التراكمي للشهر الجاي
+        taxPoolYTD_Cumulative: totalTaxableYTD, 
+        daysYTD: totalDaysYTD
     };
 }
 
