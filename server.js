@@ -24,7 +24,7 @@ const employeeSchema = new mongoose.Schema({
     email: { type: String, unique: true },
     password: { type: String }, // للباسورد الخاص بالـ Login
     role: { type: String, enum: ['Admin', 'HR', 'Employee'], default: 'Employee' },
-    nationalId: String, 
+    nationalId: String, // التأكد من كتابتها هكذا لتجنب undefined في الـ Frontend
     hiringDate: String, 
     resignationDate: String, 
     insSalary: Number, 
@@ -51,26 +51,24 @@ app.post("/api/auth/register", async (req, res) => {
             return res.status(400).json({ error: "برجاء إدخال اسم الشركة، البريد، وكلمة المرور" });
         }
 
-        // تشفير الباسورد قبل الحفظ لضمان الأمان في الشركة والموظف
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 1. إنشاء الشركة (مع إضافة الحقول المطلوبة في الـ Schema الجديدة)
         const newCompany = new Company({ 
             name: companyName, 
             adminEmail: adminEmail.toLowerCase(),
-            email: adminEmail.toLowerCase(), // مضاف للتوافق مع التعديل الأخير
-            password: hashedPassword         // مضاف للتوافق مع التعديل الأخير
+            email: adminEmail.toLowerCase(), 
+            password: hashedPassword         
         });
         const savedCompany = await newCompany.save();
 
-        // 2. إنشاء حساب الأدمن في جدول الموظفين
         const adminUser = new Employee({
             companyId: savedCompany._id,
             name: "Admin",
             email: adminEmail.toLowerCase(),
             password: hashedPassword,
-            role: "Admin"
+            role: "Admin",
+            nationalId: "N/A" // قيمة افتراضية للأدمن
         });
         await adminUser.save();
 
@@ -192,28 +190,41 @@ app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
     try {
         const { targetNet } = req.body;
         const company = await Company.findById(req.user.companyId);
+        
+        // إعدادات افتراضية لو الإعدادات مش موجودة في الشركة
+        const settings = company.settings || { 
+            insEmployeePercent: 0.11, 
+            maxInsSalary: 16700, 
+            personalExemption: 15000 
+        };
+
         let estimateGross = Number(targetNet);
         let finalResult = {};
         
         for (let i = 0; i < 100; i++) {
             finalResult = runPayrollLogic({
-                fullBasic: estimateGross, days: 30, additions: [], deductions: [],
+                fullBasic: estimateGross, 
+                days: 30, 
+                additions: [], 
+                deductions: [],
                 month: new Date().toISOString().substring(0, 7)
-            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross }, company.settings);
+            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross }, settings);
 
             let diff = Number(targetNet) - finalResult.net;
             if (Math.abs(diff) < 0.01) break; 
             estimateGross += diff; 
         }
 
+        // إرجاع البيانات بالمسميات التي يتوقعها الـ UI في الصور المرفقة
         res.json({
-            gross: Math.round(estimateGross * 100) / 100,
-            insSalary: finalResult.insBase,
-            insEmployee: finalResult.insuranceEmployee,
-            taxes: finalResult.monthlyTax,
+            grossSalary: Math.round(estimateGross * 100) / 100, // ليظهر في خانة Gross Salary
+            insBase: finalResult.insBase, // ليظهر في خانة Insurance Salary
+            insuranceEmployee: finalResult.insuranceEmployee, // ليظهر في خانة التأمينات
+            monthlyTax: finalResult.monthlyTax, // ليظهر في خانة الضرائب
             net: finalResult.net
         });
     } catch (err) {
+        console.error("Net to Gross Error:", err);
         res.status(500).json({ error: "Net to Gross conversion failed" });
     }
 });
@@ -228,7 +239,6 @@ app.delete("/api/employees/:id", auth, async (req, res) => {
     }
 });
 
-// ملفات الـ Static والـ Frontend
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 app.get("*", (req, res) => { res.sendFile(path.join(publicPath, "index.html")); });
