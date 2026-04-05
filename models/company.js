@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
-// تعريف الثوابت العالمية (ممكن تحطها في ملف منفصل مستقبلاً)
+// تعريف الثوابت العالمية طبقاً لآخر تحديثات قانون العمل والضرائب 2024/2025
 const GLOBAL_DEFAULTS = {
     INS_EE_PERCENT: 0.11,
     INS_CO_PERCENT: 0.1875,
-    MAX_INS_SALARY: 16700, // الرقم ده لو اتغير في القانون، بتغيره هنا بس
+    MAX_INS_SALARY: 16700, 
     MIN_INS_SALARY: 2325,
-    PERSONAL_EXEMPTION: 15000
+    PERSONAL_EXEMPTION: 20000 // تم التعديل من 15000 لـ 20000 لتطابق الإكسيل والقانون الجديد
 };
 
 const companySchema = new mongoose.Schema({
