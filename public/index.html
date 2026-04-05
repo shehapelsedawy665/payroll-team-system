@@ -70,9 +70,6 @@
                     <button onclick="showDash()" class="text-indigo-600 font-bold mb-2 block">← العودة للرئيسية</button>
                     <h1 class="text-3xl font-black text-slate-800">قائمة الموارد البشرية</h1>
                 </div>
-                <div class="bg-white p-2 rounded-xl shadow-sm border flex gap-4 text-xs font-bold">
-                    <span class="text-indigo-600">Company View: Enabled</span>
-                </div>
             </div>
             <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-slate-200">
                 <table class="w-full text-right">
@@ -89,25 +86,39 @@
             <div class="max-w-2xl mx-auto bg-slate-900 text-white p-10 rounded-[3rem] shadow-2xl">
                 <h2 class="text-3xl font-black mb-8 text-center italic underline decoration-emerald-500">Net To Gross Tool</h2>
                 <div class="space-y-6">
-                    <div>
-                        <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2 text-center">Target Net Salary (الصافي المستهدف)</label>
-                        <input type="number" id="target-net" class="w-full bg-slate-800 p-6 rounded-2xl border-none outline-none font-black text-4xl text-emerald-400 text-center" placeholder="0.00">
-                    </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Ins. Salary</label>
-                            <input type="number" id="calc-ins" value="0" class="w-full bg-slate-800 p-4 rounded-2xl border-none outline-none font-bold text-center">
+                            <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2 text-center">Net Salary (الصافي)</label>
+                            <input type="number" id="target-net" class="w-full bg-slate-800 p-4 rounded-2xl border-none outline-none font-black text-2xl text-emerald-400 text-center" placeholder="0.00">
                         </div>
                         <div>
-                            <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2">Days</label>
-                            <input type="number" id="calc-days" value="30" class="w-full bg-slate-800 p-4 rounded-2xl border-none outline-none font-bold text-center">
+                            <label class="text-[10px] text-slate-400 uppercase font-bold block mb-2 text-center">Ins. Salary (التأمينات)</label>
+                            <input type="number" id="calc-ins" value="0" class="w-full bg-slate-800 p-4 rounded-2xl border-none outline-none font-black text-2xl text-indigo-400 text-center">
                         </div>
                     </div>
-                    <button onclick="runNetToGross()" id="calc-btn" class="w-full bg-emerald-500 hover:bg-emerald-400 py-6 rounded-2xl font-black text-slate-900 text-xl transition active:scale-95">REVERSE CALCULATE ⚡</button>
                     
-                    <div id="calc-result" class="hidden mt-8 p-8 bg-white/5 border border-white/10 rounded-3xl text-center">
-                        <p class="text-slate-400 font-bold text-xs uppercase mb-2">Required Gross Salary</p>
-                        <h4 id="result-gross" class="text-5xl font-black text-emerald-400">0.00</h4>
+                    <button onclick="runNetToGross()" id="calc-btn" class="w-full bg-emerald-500 hover:bg-emerald-400 py-6 rounded-2xl font-black text-slate-900 text-xl transition active:scale-95 uppercase">Calculate Full Breakdown ⚡</button>
+                    
+                    <div id="calc-result" class="hidden mt-8 space-y-4 animate-fade-in">
+                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-center">
+                            <p class="text-slate-400 font-bold text-xs uppercase mb-1">Required Gross Salary</p>
+                            <h4 id="result-gross" class="text-5xl font-black text-emerald-400">0.00</h4>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-white/5 p-4 rounded-2xl border border-white/5 text-center">
+                                <p class="text-[9px] text-slate-500 uppercase font-bold">Ins. Salary</p>
+                                <p id="res-ins-base" class="text-sm font-black text-slate-300">0</p>
+                            </div>
+                            <div class="bg-white/5 p-4 rounded-2xl border border-white/5 text-center">
+                                <p class="text-[9px] text-slate-500 uppercase font-bold">EE Share (11%)</p>
+                                <p id="res-ins-ee" class="text-sm font-black text-orange-400">0</p>
+                            </div>
+                            <div class="bg-white/5 p-4 rounded-2xl border border-white/5 text-center">
+                                <p class="text-[9px] text-slate-500 uppercase font-bold">Monthly Tax</p>
+                                <p id="res-tax" class="text-sm font-black text-rose-400">0</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -189,7 +200,8 @@
         // Navigation Functions
         function hideAll() {
             ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
+                const el = document.getElementById(id);
+                if(el) el.classList.add('hidden');
             });
         }
 
@@ -273,10 +285,10 @@
             location.reload();
         }
 
+        // [UPDATED] Net to Gross UI Function
         async function runNetToGross() {
             const net = Number(document.getElementById('target-net').value);
             const ins = Number(document.getElementById('calc-ins').value);
-            const days = Number(document.getElementById('calc-days').value);
             const btn = document.getElementById('calc-btn');
 
             if(!net) return alert("دخل الصافي الأول!");
@@ -287,14 +299,18 @@
             const res = await fetch('/api/payroll/net-to-gross', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ targetNet: net, insSalary: ins, days: days })
+                body: JSON.stringify({ targetNet: net, insSalary: ins })
             });
             const data = await res.json();
             
-            btn.innerText = "REVERSE CALCULATE ⚡";
+            btn.innerText = "Calculate Full Breakdown ⚡";
             btn.disabled = false;
+            
             document.getElementById('calc-result').classList.remove('hidden');
             document.getElementById('result-gross').innerText = data.gross.toLocaleString();
+            document.getElementById('res-ins-base').innerText = data.insSalary.toLocaleString();
+            document.getElementById('res-ins-ee').innerText = data.insEmployee.toLocaleString();
+            document.getElementById('res-tax').innerText = data.taxes.toLocaleString();
         }
 
         function handleResign() {
