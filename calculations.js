@@ -4,13 +4,8 @@ function calculateEgyptianTax(annualProjected) {
     let tax = 0;
     const ai = annualProjected; 
     
-    // تحديد الشريحة الصفرية (المعفاة) بناءً على إجمالي الدخل السنوي
     let start0 = 40000;
-    if (ai > 1200000) start0 = 0;
-    else if (ai > 900000) start0 = 0;
-    else if (ai > 800000) start0 = 0;
-    else if (ai > 700000) start0 = 0;
-    else if (ai > 600000) start0 = 0;
+    if (ai > 600000) start0 = 0; // حسب معادلات الإكسيل اللي بعتها للشرائح
 
     let remainder = ai - start0;
     if (remainder <= 0) return 0;
@@ -36,42 +31,50 @@ function calculateEgyptianTax(annualProjected) {
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
+    // 1. Prorated Salaries
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
+    // 2. Insurance
     const maxIns = 16700;
     const minIns = emp.jobType === "Full Time" ? R(7000 / 1.3) : 2720;
     const insBase = Math.max(minIns, Math.min(maxIns, emp.insSalary || 0));
     const insuranceEmployee = R(insBase * 0.11);
     
+    // 3. Taxable Income
     const martyrs = R(gross * 0.0005);
     const personalExemption = R((20000 / 360) * days); 
     const currentTaxable = R(Math.max(0, (gross - insuranceEmployee) - personalExemption));
     
+    // 4. Cumulative Data
     const totalDaysYTD = days + (prev.pDays || 0);
     const totalTaxableYTD = currentTaxable + (prev.pTaxable || 0);
     
-    // --- تطبيق معادلة الإكسيل بالحرف ---
-    // AH7/AF7*360 => (totalTaxableYTD / totalDaysYTD) * 360
+    // --- التصحيح القاتل لمطابقة الإكسيل ---
+    
+    // الخطوة 1: حساب الـ Annual Projected (الرقم السنوي قبل الـ Floor)
     const rawAnnual = (totalTaxableYTD / totalDaysYTD) * 360;
     
-    // FLOOR(..., 10) => التقريب السنوي للأقل
-    const floorAnnual = Math.floor(rawAnnual / 10) * 10;
+    // الخطوة 2: عمل الـ Floor لأقرب 10 جنيه (زي الإكسيل بالظبط)
+    // FLOOR(AH7/AF7*360, 10)
+    const floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
     
-    // AI7 = (FLOOR...) / 360 * AF7
-    // دي الخطوة اللي كانت ناقصة: تحويل الرقم السنوي لرقم متناسب مع أيام الفترة
+    // الخطوة 3: حساب الـ Taxpool YTD (الـ AI7 في الإكسيل)
+    // AI7 = FLOOR(...) / 360 * AF7
+    // ملحوظة: لازم نستخدم R() هنا عشان الكسور تطلع زي الإكسيل (46,435.97)
     const taxPoolYTD = R((floorAnnual / 360) * totalDaysYTD);
     
-    // الضريبة السنوية بتتحسب دايماً على الـ Floor السنوي (كأن الموظف هيكمل السنة كدة)
+    // 5. Tax Calculation
     const totalAnnualTax = calculateEgyptianTax(floorAnnual);
     
-    // AQ7 = الضريبة المستحقة للفترة الحالية
+    // AQ7: الضريبة المستحقة للفترة
+    // AQ7 = totalAnnualTax / 360 * totalDaysYTD
     const taxUntilNow = R((totalAnnualTax / 360) * totalDaysYTD);
     
-    // ضريبة الشهر = AQ7 - AR7 (الشهور السابقة)
+    // ضريبة الشهر = AQ7 - AR7
     const monthlyTax = R(Math.max(0, taxUntilNow - (prev.pTaxes || 0)));
 
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
@@ -86,8 +89,8 @@ function runPayrollLogic(input, prev, emp) {
         totalDaysYTD,
         prevTaxable: prev.pTaxable || 0,
         currentTaxable,
-        taxPoolYTD: taxPoolYTD, // ده الـ AI7 النهائي
-        annualProjected: floorAnnual, // ده الـ Floor اللي جوة المعادلة
+        taxPoolYTD: taxPoolYTD, // هيطلع 46,435.97
+        annualProjected: floorAnnual,
         totalAnnualTax,
         prevTaxes: prev.pTaxes || 0,
         monthlyTax,
