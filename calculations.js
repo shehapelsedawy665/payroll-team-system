@@ -18,19 +18,22 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
         month            
     } = input;
 
-    // --- [تحميل الإعدادات الديناميكية أو استخدام الافتراضي] ---
+    // --- [إعدادات ديناميكية] ---
     const insEEPercent = settings.insEmployeePercent || 0.11;
     const maxInsLimit = settings.maxInsSalary || 16700;
     const minInsLimit = settings.minInsSalary || 2325;
-    const annualPersonalExemption = settings.personalExemption || 15000; // الإعفاء الشخصي السنوي
-    const medicalLimitAnnual = 10000; // ممكن تخليها settings.medicalLimit لو حبيت
+    const annualPersonalExemption = settings.personalExemption || 20000; // تم التحديث لـ 20 ألف حسب أحدث قانون
 
-    // --- [حساب الأيام بناءً على التواريخ] ---
+    // --- [منطق التواريخ والأيام] ---
     const currentMonthDate = new Date(month + "-01");
-    const hDate = hiringDate ? new Date(hiringDate) : null;
-    const rDate = resignationDate ? new Date(resignationDate) : null;
+    let rDate = resignationDate ? new Date(resignationDate) : null;
+    
+    // حماية: منع تاريخ الاستقالة قبل بداية الشهر الحالي
+    if (rDate && rDate < currentMonthDate) {
+        rDate = null; 
+    }
 
-    let autoDays = 30; 
+    const hDate = hiringDate ? new Date(hiringDate) : null;
     let startDay = 1;
     if (hDate && hDate.getMonth() === currentMonthDate.getMonth() && hDate.getFullYear() === currentMonthDate.getFullYear()) {
         startDay = hDate.getDate();
@@ -40,112 +43,102 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
         endDay = rDate.getDate();
     }
     
-    autoDays = Math.max(0, endDay - startDay + 1);
+    let autoDays = Math.max(0, endDay - startDay + 1);
     if (autoDays > 30) autoDays = 30;
     let finalDays = (manualDays !== undefined && Number(manualDays) !== 30) ? Number(manualDays) : autoDays;
 
-    // --- [منطق التأمينات الديناميكي] ---
-    const isHiredAfterFirst = hDate && hDate.getDate() > 1 && hDate.getMonth() === currentMonthDate.getMonth();
-    const isResignedSameMonth = rDate && rDate.getMonth() === currentMonthDate.getMonth();
-    
-    let insuranceEmployee = 0;
+    // --- [التأمينات: حساب كامل بدون Prorata] ---
     let insSalary = Number(emp.insSalary) || 0;
-    
-    // تطبيق الحدود الدنيا والقصوى ديناميكياً
     if (insSalary > maxInsLimit) insSalary = maxInsLimit;
     if (insSalary < minInsLimit && insSalary > 0) insSalary = minInsLimit;
+    
+    // التأمينات تُخصم كاملة طالما الموظف "على القوة" خلال الشهر
+    const insuranceEmployee = R(insSalary * insEEPercent);
 
-    if (isHiredAfterFirst && !isResignedSameMonth) {
-        insuranceEmployee = 0;
-    } else {
-        insuranceEmployee = R(insSalary * insEEPercent);
-    }
-
-    // --- [الحسابات المالية الأساسية] ---
+    // --- [الحسابات المالية] ---
     const proratedBasic = R((fullBasic / 30) * finalDays);
     const proratedTrans = R((fullTrans / 30) * finalDays);
-    const gross = R(proratedBasic + proratedTrans + additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
+    const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // --- [منطق الإعفاءات والـ Drop-down] ---
+    // --- [الوعاء الضريبي] ---
     const taxableAdditions = additions.reduce((sum, item) => {
-        return sum + (item.type === 'non-exempted' ? (Number(item.amount) || 0) : 0);
+        return sum + (item.type !== 'exempted' ? (Number(item.amount) || 0) : 0);
     }, 0);
 
-    let medicalExemption = 0;
-    const taxableDeductions = deductions.reduce((sum, item) => {
-        const amt = Number(item.amount) || 0;
-        const name = (item.name || "").toLowerCase();
+    const personalExemptionMonthly = R(annualPersonalExemption / 12); 
+    const currentTaxable = Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee - personalExemptionMonthly);
+    
+    // حساب السنوي المتوقع للضريبة
+    const annualTaxable = Math.floor((currentTaxable * 12) / 10) * 10;
 
-        if (name.includes("medical")) {
-            const limit1 = R(gross * 0.15); 
-            const limit2 = R((medicalLimitAnnual / 360) * finalDays); 
-            medicalExemption += Math.min(amt, limit1, limit2);
-            return sum + (item.type === 'exempted' ? (amt - medicalExemption) : 0); 
+    // --- [حساب الضرائب - نظام الشرائح المصري] ---
+    function calculateAnnualTax(taxable) {
+        let tax = 0;
+        const slabs = [
+            { limit: 40000, rate: 0 },
+            { limit: 15000, rate: 0.10 },
+            { limit: 15000, rate: 0.15 },
+            { limit: 130000, rate: 0.20 },
+            { limit: 200000, rate: 0.225 },
+            { limit: 800000, rate: 0.25 }
+        ];
+
+        let remaining = taxable;
+
+        // معالجة إلغاء الشرائح الأولى للدخول العالية
+        if (taxable > 1200000) return (taxable - 1200000) * 0.275 + (800000 * 0.25) + (400000 * 0.225); 
+        
+        for (let slab of slabs) {
+            if (remaining <= 0) break;
+            let chunk = Math.min(remaining, slab.limit);
+            tax += chunk * slab.rate;
+            remaining -= chunk;
         }
-        return sum + (item.type === 'exempted' ? amt : 0);
-    }, 0);
-
-    const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-
-    // --- [حساب الضرائب - الوعاء الضريبي المعدل ديناميكياً] ---
-    const personalExemption = R((annualPersonalExemption / 360) * finalDays); 
-    
-    const currentTaxable = R(Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee - personalExemption - taxableDeductions - medicalExemption));
-    
-    const totalDaysYTD = Number(finalDays) + (Number(prev.pDays) || 0);
-    const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0));
-    
-    const rawAnnual = totalDaysYTD > 0 ? (totalTaxableYTD / totalDaysYTD) * 360 : 0;
-    const floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
-    
-    const ai = totalDaysYTD > 0 ? R((floorAnnual / 360) * totalDaysYTD) : 0;
-    const af = totalDaysYTD;
-    const L = (val) => af > 0 ? (val / 360) * af : 0;
-
-    let AJ = 0, AK = 0, AL = 0, AM = 0, AN = 0, AO = 0, AP = 0;
-
-    if (ai > 0 && af > 0) {
-        AJ = ai > L(600000) ? 0 : L(40000);
-        if (ai > L(600000) && ai <= L(700000)) AK = L(55000) * 0.1;
-        else if (ai > L(700000)) AK = 0;
-        else AK = Math.min(L(15000), Math.max(0, ai - AJ)) * 0.1;
-
-        if (ai > L(700000) && ai <= L(800000)) AL = L(70000) * 0.15;
-        else if (ai > L(800000)) AL = 0;
-        else AL = Math.min(L(15000), Math.max(0, ai - AJ - (AK / 0.1))) * 0.15;
-
-        if (ai > L(800000) && ai <= L(900000)) AM = L(200000) * 0.2;
-        else if (ai > L(900000)) AM = 0;
-        else AM = Math.min(L(130000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15))) * 0.2;
-
-        if (ai > L(900000) && ai <= L(1200000)) AN = L(400000) * 0.225;
-        else if (ai > L(1200000)) AN = 0;
-        else AN = Math.min(L(200000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2))) * 0.225;
-
-        if (ai > L(1200000)) AO = L(1200000) * 0.25;
-        else AO = Math.min(L(800000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2) - (AN/0.225))) * 0.25;
-
-        AP = ai > L(1200000) ? (ai - L(1200000)) * 0.275 : 0;
+        if (remaining > 0) tax += remaining * 0.275;
+        return tax;
     }
 
-    const totalTaxDueUntilNow = R(AK + AL + AM + AN + AO + AP);
-    const prevTaxes = Number(prev.pTaxes) || 0;
-    const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - prevTaxes));
+    const totalAnnualTax = calculateAnnualTax(annualTaxable);
+    const monthlyTax = R(totalAnnualTax / 12);
 
     const martyrs = R(gross * 0.0005);
+    const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
     return {
         fullBasic, fullTrans, days: finalDays, proratedBasic, proratedTrans,
-        totalAdditions: additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
-        additions, deductions, gross, insBase: insSalary, insuranceEmployee,
-        prevDays: Number(prev.pDays) || 0, totalDaysYTD,
-        prevTaxable: Number(prev.pTaxable) || 0, currentTaxable, taxPoolYTD: ai,
-        annualProjected: floorAnnual, totalAnnualTax: totalTaxDueUntilNow,
-        prevTaxes: prevTaxes, monthlyTax, martyrs, totalOtherDeductions, totalAllDeductions,
-        net, resignationDate: resignationDate || ""
+        totalAdditions, gross, insuranceEmployee, monthlyTax, martyrs, 
+        totalOtherDeductions, totalAllDeductions, net, 
+        annualTaxable, resignationDate: rDate ? rDate.toISOString().split('T')[0] : ""
     };
 }
 
-module.exports = { runPayrollLogic };
+/**
+ * وظيفة الحساب العكسي من الصافي للإجمالي
+ */
+function calculateNetToGross(targetNet, input, prev, emp, settings) {
+    let low = targetNet;
+    let high = targetNet * 2; // افتراض أولي
+    let estimatedGross = targetNet;
+    let attempts = 0;
+
+    while (attempts < 50) {
+        let testInput = { ...input, fullBasic: estimatedGross, fullTrans: 0, additions: [], deductions: [] };
+        let result = runPayrollLogic(testInput, prev, emp, settings);
+        
+        if (Math.abs(result.net - targetNet) < 0.1) break;
+
+        if (result.net < targetNet) {
+            low = estimatedGross;
+        } else {
+            high = estimatedGross;
+        }
+        estimatedGross = (low + high) / 2;
+        attempts++;
+    }
+    return R(estimatedGross);
+}
+
+module.exports = { runPayrollLogic, calculateNetToGross };
