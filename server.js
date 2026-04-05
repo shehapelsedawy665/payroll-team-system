@@ -2,10 +2,12 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const connectDB = require("./db");
 const { runPayrollLogic } = require("./calculations");
-const auth = require("./middleware/auth"); // استدعاء حرس الحدود
-const Company = require("./models/Company"); // استدعاء موديل الشركات
+const auth = require("./middleware/auth"); 
+const Company = require("./models/Company"); 
 
 const app = express();
 app.use(cors());
@@ -14,10 +16,13 @@ app.use(express.json());
 // 1. الاتصال بقاعدة البيانات
 connectDB();
 
-// 2. التعريفات (Schemas) - تم إضافة companyId لربط البيانات
+// 2. التعريفات (Schemas)
 const employeeSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
-    name: String, 
+    name: { type: String, required: true },
+    email: { type: String, unique: true },
+    password: { type: String }, // للباسورد الخاص بالـ Login
+    role: { type: String, enum: ['Admin', 'HR', 'Employee'], default: 'Employee' },
     nationalId: String, 
     hiringDate: String, 
     resignationDate: String, 
@@ -34,9 +39,61 @@ const payrollSchema = new mongoose.Schema({
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
-// --- [APIs] ---
+// --- [Auth APIs] ---
 
-// الحصول على موظفين الشركة الخاصة بالمستخدم المسجل فقط
+// تسجيل شركة جديدة وأدمن للشركة
+app.post("/api/auth/register", async (req, res) => {
+    try {
+        const { companyName, adminEmail, password } = req.body;
+        
+        // إنشاء الشركة
+        const newCompany = new Company({ name: companyName, adminEmail: adminEmail });
+        const savedCompany = await newCompany.save();
+
+        // تشفير الباسورد
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // إنشاء حساب الأدمن
+        const adminUser = new Employee({
+            companyId: savedCompany._id,
+            name: "Admin",
+            email: adminEmail,
+            password: hashedPassword,
+            role: "Admin"
+        });
+        await adminUser.save();
+
+        res.json({ success: true, message: "Company and Admin created!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// تسجيل الدخول
+app.post("/api/auth/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await Employee.findOne({ email });
+        if (!user) return res.status(400).json({ error: "User not found" });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+
+        const secret = process.env.JWT_SECRET || 'SEDAY_ERP_SECRET_2026';
+        const payload = { user: { id: user.id, companyId: user.companyId, role: user.role } };
+
+        jwt.sign(payload, secret, { expiresIn: "10h" }, (err, token) => {
+            if (err) throw err;
+            res.json({ token, role: user.role });
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Login failed" });
+    }
+});
+
+// --- [Main APIs] ---
+
 app.get("/api/employees", auth, async (req, res) => {
     try {
         const employees = await Employee.find({ companyId: req.user.companyId }).sort({_id: -1});
@@ -58,9 +115,8 @@ app.post("/api/employees", auth, async (req, res) => {
 
 app.get("/api/employees/:id/details", auth, async (req, res) => {
     try {
-        // التأكد أن الموظف يتبع نفس شركة المستخدم
         const emp = await Employee.findOne({ _id: req.params.id, companyId: req.user.companyId });
-        if (!emp) return res.status(404).json({ error: "Employee not found in your company" });
+        if (!emp) return res.status(404).json({ error: "Not found" });
 
         const history = await Payroll.find({ employeeId: req.params.id, companyId: req.user.companyId }).sort({ month: 1 });
         
@@ -80,8 +136,6 @@ app.get("/api/employees/:id/details", auth, async (req, res) => {
 app.post("/api/payroll/calculate", auth, async (req, res) => {
     try {
         const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
-        
-        // 1. جلب بيانات الموظف وإعدادات الشركة في وقت واحد
         const [emp, company] = await Promise.all([
             Employee.findOne({ _id: empId, companyId: req.user.companyId }),
             Company.findById(req.user.companyId)
@@ -89,20 +143,17 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
 
         if (!emp || !company) return res.status(404).json({ error: "Data missing" });
 
-        // 2. تحديث تاريخ الاستقالة إذا وجد
         if (resignationDate) {
             await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
         }
 
-        // 3. تنفيذ الحسبة باستخدام إعدادات الشركة الديناميكية
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
             prevData, 
             emp.toObject(),
-            company.settings // تمرير الإعدادات الديناميكية هنا
+            company.settings 
         );
 
-        // 4. حفظ السجل
         const record = await new Payroll({ 
             companyId: req.user.companyId,
             employeeId: empId, 
@@ -112,32 +163,22 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
         
         res.json(record);
     } catch (err) {
-        console.error("Calculation Error:", err);
-        res.status(500).json({ error: "Calculation error occurred" });
+        res.status(500).json({ error: "Calculation error" });
     }
 });
 
-// Net to Gross - تم تحديثه ليكون ديناميكياً حسب إعدادات الشركة
 app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
     try {
         const { targetNet } = req.body;
         const company = await Company.findById(req.user.companyId);
-        const settings = company.settings;
-
         let estimateGross = Number(targetNet);
         let finalResult = {};
         
         for (let i = 0; i < 100; i++) {
             finalResult = runPayrollLogic({
-                fullBasic: estimateGross,
-                fullTrans: 0,
-                days: 30,
-                additions: [],
-                deductions: [],
-                month: new Date().toISOString().substring(0, 7),
-                hiringDate: null,
-                resignationDate: null
-            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross }, settings);
+                fullBasic: estimateGross, days: 30, additions: [], deductions: [],
+                month: new Date().toISOString().substring(0, 7)
+            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross }, company.settings);
 
             let diff = Number(targetNet) - finalResult.net;
             if (Math.abs(diff) < 0.01) break; 
@@ -159,21 +200,16 @@ app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
 app.delete("/api/employees/:id", auth, async (req, res) => {
     try {
         const deleted = await Employee.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
-        if (deleted) {
-            await Payroll.deleteMany({ employeeId: req.params.id, companyId: req.user.companyId });
-        }
+        if (deleted) await Payroll.deleteMany({ employeeId: req.params.id, companyId: req.user.companyId });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Delete failed" });
     }
 });
 
-// --- [Static Files & Start] ---
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
-app.get("*", (req, res) => { 
-    res.sendFile(path.join(publicPath, "index.html")); 
-});
+app.get("*", (req, res) => { res.sendFile(path.join(publicPath, "index.html")); });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server LIVE on ${PORT} 🚀`));
