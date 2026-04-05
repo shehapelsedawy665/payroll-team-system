@@ -3,33 +3,33 @@ const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 function runPayrollLogic(input, prev, emp) {
     const { fullBasic, fullTrans, days, additions = [], deductions = [] } = input;
     
-    // 1. حساب الإجمالي والأساسيات (Prorated)
+    // 1. الحسابات الأساسية حسب الأيام (Prorated)
     const proratedBasic = R((fullBasic / 30) * days);
     const proratedTrans = R((fullTrans / 30) * days);
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // 2. التأمينات (Insurance) - حسب منطق السيرفر
+    // 2. التأمينات (نفس حسبة السيرفر)
     const insSalary = Number(emp.insSalary) || 0;
     const insuranceEmployee = R(insSalary * 0.11);
     
-    // 3. الشهداء (Martyrs)
+    // 3. الشهداء والإعفاء الشخصي (مقسم على الأيام لضمان الدقة)
     const martyrs = R(gross * 0.0005);
-
-    // 4. الوعاء الضريبي (Taxable)
     const personalExemption = R((20000 / 360) * days); 
+
+    // 4. الوعاء الضريبي (Current Taxable)
     const currentTaxable = R(Math.max(0, (gross - insuranceEmployee) - personalExemption));
     
-    // 5. التراكمي (YTD)
+    // 5. التراكمي (YTD) - AF7 و AH7
     const totalDaysYTD = days + (Number(prev.pDays) || 0);
     const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0));
     
-    // 6. السنوي المتوقع (Annual Projected)
+    // 6. السنوي المتوقع (Annual Taxable) - نفس معادلة السيرفر بالحرف
     const rawAnnual = totalDaysYTD > 0 ? (totalTaxableYTD / totalDaysYTD) * 360 : 0;
     const floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
     
-    // 7. حساب الضريبة السنوية (نفس منطق السيرفر بالظبط)
+    // 7. حساب الضريبة السنوية (نقل حرفي من لوجيك السيرفر IF-ELSE)
     let annualTax = 0;
     let temp = Math.max(0, floorAnnual - 20000);
 
@@ -50,16 +50,16 @@ function runPayrollLogic(input, prev, emp) {
         if (temp > 1200000) annualTax += (temp - 1200000) * 0.275;
     }
 
-    // 8. ضريبة الشهر الحالي
-    const taxUntilNow = R((annualTax / 360) * totalDaysYTD);
+    // 8. ضريبة الشهر الحالي (Total Due Until Now - Previous Taxes)
+    const totalTaxDueUntilNow = (annualTax / 360) * totalDaysYTD;
     const prevTaxes = Number(prev.pTaxes) || 0;
-    const monthlyTax = R(Math.max(0, taxUntilNow - prevTaxes));
+    const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - prevTaxes));
 
-    // 9. الصافي والخصومات
+    // 9. الصافي النهائي
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
-    // الـ Return موحد عشان يشتغل مع الـ UI والـ Server
+    // إرجاع الأرقام للجدول (نفس الأسماء المطلوبة في الـ UI)
     return {
         fullBasic, fullTrans, days,
         proratedBasic, proratedTrans,
@@ -70,9 +70,9 @@ function runPayrollLogic(input, prev, emp) {
         totalDaysYTD,
         prevTaxable: Number(prev.pTaxable) || 0,
         currentTaxable,
-        taxPoolYTD: totalTaxableYTD, // بنستخدم ده كوعاء تراكمي
+        taxPoolYTD: totalTaxableYTD, 
         annualProjected: floorAnnual,
-        totalAnnualTax: taxUntilNow,
+        totalAnnualTax: R(totalTaxDueUntilNow),
         prevTaxes: prevTaxes,
         monthlyTax,
         martyrs,
