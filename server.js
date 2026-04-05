@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const connectDB = require("./db");
 const { runPayrollLogic } = require("./calculations");
 const auth = require("./middleware/auth"); 
+// تأكد أن اسم الملف في GitHub هو company.js بحروف صغيرة كما في الصورة
 const Company = require("./models/company"); 
 
 const app = express();
@@ -16,7 +17,7 @@ app.use(express.json());
 // 1. الاتصال بقاعدة البيانات
 connectDB();
 
-// 2. التعريفات (Schemas)
+// 2. التعريفات (Schemas) داخل الملف
 const employeeSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     name: { type: String, required: true },
@@ -46,26 +47,39 @@ app.post("/api/auth/register", async (req, res) => {
     try {
         const { companyName, adminEmail, password } = req.body;
         
-        // إنشاء الشركة
-        const newCompany = new Company({ name: companyName, adminEmail: adminEmail });
-        const savedCompany = await newCompany.save();
+        if (!companyName || !adminEmail || !password) {
+            return res.status(400).json({ error: "برجاء إدخال اسم الشركة، البريد، وكلمة المرور" });
+        }
 
-        // تشفير الباسورد
+        // تشفير الباسورد قبل الحفظ لضمان الأمان في الشركة والموظف
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // إنشاء حساب الأدمن
+        // 1. إنشاء الشركة (مع إضافة الحقول المطلوبة في الـ Schema الجديدة)
+        const newCompany = new Company({ 
+            name: companyName, 
+            adminEmail: adminEmail.toLowerCase(),
+            email: adminEmail.toLowerCase(), // مضاف للتوافق مع التعديل الأخير
+            password: hashedPassword         // مضاف للتوافق مع التعديل الأخير
+        });
+        const savedCompany = await newCompany.save();
+
+        // 2. إنشاء حساب الأدمن في جدول الموظفين
         const adminUser = new Employee({
             companyId: savedCompany._id,
             name: "Admin",
-            email: adminEmail,
+            email: adminEmail.toLowerCase(),
             password: hashedPassword,
             role: "Admin"
         });
         await adminUser.save();
 
-        res.json({ success: true, message: "Company and Admin created!" });
+        res.json({ success: true, message: "تم إنشاء الشركة وحساب المسؤول بنجاح!" });
     } catch (err) {
+        console.error("Register Error:", err.message);
+        if (err.code === 11000) {
+            return res.status(400).json({ error: "هذا البريد الإلكتروني مسجل بالفعل" });
+        }
         res.status(500).json({ error: err.message });
     }
 });
@@ -74,21 +88,27 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await Employee.findOne({ email });
-        if (!user) return res.status(400).json({ error: "User not found" });
+        const user = await Employee.findOne({ email: email.toLowerCase() });
+        if (!user) return res.status(400).json({ error: "الحساب غير موجود" });
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+        if (!isMatch) return res.status(400).json({ error: "بيانات الدخول غير صحيحة" });
 
         const secret = process.env.JWT_SECRET || 'SEDAY_ERP_SECRET_2026';
-        const payload = { user: { id: user.id, companyId: user.companyId, role: user.role } };
+        const payload = { 
+            user: { 
+                id: user.id, 
+                companyId: user.companyId, 
+                role: user.role 
+            } 
+        };
 
         jwt.sign(payload, secret, { expiresIn: "10h" }, (err, token) => {
             if (err) throw err;
             res.json({ token, role: user.role });
         });
     } catch (err) {
-        res.status(500).json({ error: "Login failed" });
+        res.status(500).json({ error: "فشل عملية تسجيل الدخول" });
     }
 });
 
@@ -141,7 +161,7 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
             Company.findById(req.user.companyId)
         ]);
 
-        if (!emp || !company) return res.status(404).json({ error: "Data missing" });
+        if (!emp || !company) return res.status(404).json({ error: "بيانات غير مكتملة" });
 
         if (resignationDate) {
             await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
@@ -163,7 +183,8 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
         
         res.json(record);
     } catch (err) {
-        res.status(500).json({ error: "Calculation error" });
+        console.error(err);
+        res.status(500).json({ error: "خطأ في حساب المرتب" });
     }
 });
 
@@ -207,6 +228,7 @@ app.delete("/api/employees/:id", auth, async (req, res) => {
     }
 });
 
+// ملفات الـ Static والـ Frontend
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 app.get("*", (req, res) => { res.sendFile(path.join(publicPath, "index.html")); });
