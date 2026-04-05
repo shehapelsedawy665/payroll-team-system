@@ -101,27 +101,27 @@ app.post("/api/payroll/calculate", async (req, res) => {
 });
 
 /**
- * [T3DEEL] Net to Gross API (Iterative + Full Breakdown)
- * الحسبة هنا بتعتمد على 30 يوم عمل افتراضي وبترجع كل تفاصيل الخصومات
+ * [MODIFIED] Net to Gross API
+ * التعديل: حساب التأمينات بناءً على الراتب الشامل المتوقع تلقائياً
  */
 app.post("/api/payroll/net-to-gross", async (req, res) => {
     try {
-        const { targetNet, insSalary } = req.body;
+        const { targetNet } = req.body;
         let estimateGross = Number(targetNet);
         let finalResult = {};
         
-        // المحرك التكراري (Iterative Engine) للوصول للـ Gross بدقة
         for (let i = 0; i < 100; i++) {
+            // بنفترض إن التأمينات = الشامل في كل لفة عشان الدقة
             finalResult = runPayrollLogic({
                 fullBasic: estimateGross,
                 fullTrans: 0,
-                days: 30, // ثابتة للحسابات التقديرية
+                days: 30,
                 additions: [],
                 deductions: [],
                 month: new Date().toISOString().substring(0, 7),
                 hiringDate: null,
                 resignationDate: null
-            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: insSalary || 0 });
+            }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: estimateGross });
 
             let diff = Number(targetNet) - finalResult.net;
             if (Math.abs(diff) < 0.01) break;
@@ -130,7 +130,7 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
 
         res.json({
             gross: Math.round(estimateGross),
-            insSalary: insSalary || 0,
+            insSalary: Math.round(estimateGross),
             insEmployee: finalResult.insuranceEmployee,
             taxes: finalResult.monthlyTax,
             net: finalResult.net
@@ -156,8 +156,6 @@ app.post("/api/employees/:id/resign", async (req, res) => {
 // --- [Static Files Logic] ---
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
-
-// التعامل مع أي مسارات غير معروفة وتوجيهها لـ index.html (لحماية الـ Routing)
 app.get("*", (req, res) => {
     res.sendFile(path.join(publicPath, "index.html"));
 });
