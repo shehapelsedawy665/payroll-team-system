@@ -1,16 +1,16 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function runPayrollLogic(input, prev, emp) {
-    // 1. استخراج البيانات من المدخلات (بما فيها التواريخ)
+    // 1. استخراج البيانات من المدخلات
     const { 
         fullBasic, 
         fullTrans, 
-        days: manualDays, // الأيام اللي بتكتبها يدوي في الـ UI
+        days: manualDays, 
         additions = [], 
         deductions = [],
-        hiringDate,      // YYYY-MM-DD
-        resignationDate, // YYYY-MM-DD
-        month            // YYYY-MM
+        hiringDate,      
+        resignationDate, 
+        month            
     } = input;
 
     // --- [منطق حساب الأيام] ---
@@ -28,12 +28,9 @@ function runPayrollLogic(input, prev, emp) {
         endDay = rDate.getDate();
     }
     
-    // حساب الأيام التلقائي (مثال: تعيين 2 واستقالة 5 = 4 أيام)
     autoDays = Math.max(0, endDay - startDay + 1);
     if (autoDays > 30) autoDays = 30;
 
-    // القرار النهائي للأيام: لو الـ manualDays مش 30 (يعني إنت عدلتها يدوي)، نستخدمها.
-    // غير كدة نستخدم الـ autoDays المحسوبة من التواريخ.
     let finalDays = (manualDays !== undefined && Number(manualDays) !== 30) ? Number(manualDays) : autoDays;
 
     // --- [منطق التأمينات] ---
@@ -43,7 +40,6 @@ function runPayrollLogic(input, prev, emp) {
     let insuranceEmployee = 0;
     const insSalary = Number(emp.insSalary) || 0;
 
-    // شرطك: لو اتعين بعد يوم 1 ومستقالش في نفس الشهر -> مفيش تأمينات
     if (isHiredAfterFirst && !isResignedSameMonth) {
         insuranceEmployee = 0;
     } else {
@@ -57,7 +53,7 @@ function runPayrollLogic(input, prev, emp) {
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // --- [حساب الضرائب - معادلات الإكسيل بالحرف] ---
+    // --- [حساب الضرائب - معادلات الإكسيل] ---
     const personalExemption = R((20000 / 360) * finalDays); 
     const currentTaxable = R(Math.max(0, gross - insuranceEmployee - personalExemption));
     
@@ -67,7 +63,7 @@ function runPayrollLogic(input, prev, emp) {
     const rawAnnual = totalDaysYTD > 0 ? (totalTaxableYTD / totalDaysYTD) * 360 : 0;
     const floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
     
-    // معادلة الـ Tax Pool (AI7) من الإكسيل
+    // معادلة الـ Tax Pool (AI7)
     const taxPoolYTD = totalDaysYTD > 0 ? R((floorAnnual / 360) * totalDaysYTD) : 0;
     
     let ai = taxPoolYTD; 
@@ -77,53 +73,34 @@ function runPayrollLogic(input, prev, emp) {
     let AJ = 0, AK = 0, AL = 0, AM = 0, AN = 0, AO = 0, AP = 0;
 
     if (ai > 0 && af > 0) {
-        // الشريحة الأولى 0%
+        // الشريحة الأولى 0% (حتى 40,000 سنويًا)
         AJ = ai > L(600000) ? 0 : L(40000);
 
-        // شريحة 10%
-        if (ai > L(600000) && ai <= L(700000)) {
-            AK = L(55000) * 0.1;
-        } else if (ai > L(700000)) {
-            AK = 0;
-        } else {
-            AK = Math.min(L(15000), Math.max(0, ai - AJ)) * 0.1;
-        }
+        // شريحة 10% (من 40,000 إلى 55,000)
+        if (ai > L(600000) && ai <= L(700000)) AK = L(55000) * 0.1;
+        else if (ai > L(700000)) AK = 0;
+        else AK = Math.min(L(15000), Math.max(0, ai - AJ)) * 0.1;
 
-        // شريحة 15%
-        if (ai > L(700000) && ai <= L(800000)) {
-            AL = L(70000) * 0.15;
-        } else if (ai > L(800000)) {
-            AL = 0;
-        } else {
-            AL = Math.min(L(15000), Math.max(0, ai - AJ - (AK / 0.1))) * 0.15;
-        }
+        // شريحة 15% (من 55,000 إلى 70,000)
+        if (ai > L(700000) && ai <= L(800000)) AL = L(70000) * 0.15;
+        else if (ai > L(800000)) AL = 0;
+        else AL = Math.min(L(15000), Math.max(0, ai - AJ - (AK / 0.1))) * 0.15;
 
-        // شريحة 20%
-        if (ai > L(800000) && ai <= L(900000)) {
-            AM = L(200000) * 0.2;
-        } else if (ai > L(900000)) {
-            AM = 0;
-        } else {
-            AM = Math.min(L(130000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15))) * 0.2;
-        }
+        // شريحة 20% (من 70,000 إلى 200,000)
+        if (ai > L(800000) && ai <= L(900000)) AM = L(200000) * 0.2;
+        else if (ai > L(900000)) AM = 0;
+        else AM = Math.min(L(130000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15))) * 0.2;
 
-        // شريحة 22.5%
-        if (ai > L(900000) && ai <= L(1200000)) {
-            AN = L(400000) * 0.225;
-        } else if (ai > L(1200000)) {
-            AN = 0;
-        } else {
-            AN = Math.min(L(200000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2))) * 0.225;
-        }
+        // شريحة 22.5% (من 200,000 إلى 400,000)
+        if (ai > L(900000) && ai <= L(1200000)) AN = L(400000) * 0.225;
+        else if (ai > L(1200000)) AN = 0;
+        else AN = Math.min(L(200000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2))) * 0.225;
 
-        // شريحة 25%
-        if (ai > L(1200000)) {
-            AO = L(1200000) * 0.25;
-        } else {
-            AO = Math.min(L(800000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2) - (AN/0.225))) * 0.25;
-        }
+        // شريحة 25% (من 400,000 إلى 1,200,000)
+        if (ai > L(1200000)) AO = L(1200000) * 0.25;
+        else AO = Math.min(L(800000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2) - (AN/0.225))) * 0.25;
 
-        // شريحة 27.5%
+        // شريحة 27.5% (ما فوق 1,200,000)
         AP = ai > L(1200000) ? (ai - L(1200000)) * 0.275 : 0;
     }
 
@@ -150,7 +127,7 @@ function runPayrollLogic(input, prev, emp) {
         totalDaysYTD,
         prevTaxable: Number(prev.pTaxable) || 0,
         currentTaxable,
-        taxPoolYTD: totalTaxableYTD,
+        taxPoolYTD: ai, // القيمة الفعلية الخاضعة للضريبة تراكمياً
         annualProjected: floorAnnual,
         totalAnnualTax: totalTaxDueUntilNow,
         prevTaxes: prevTaxes,
