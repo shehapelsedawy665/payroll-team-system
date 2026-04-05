@@ -31,7 +31,6 @@ function runPayrollLogic(input, prev, emp) {
     autoDays = Math.max(0, endDay - startDay + 1);
     if (autoDays > 30) autoDays = 30;
 
-    // لو مدخلتش أيام يدوي (30)، بنستخدم الحسبة التلقائية للتواريخ
     let finalDays = (manualDays !== undefined && Number(manualDays) !== 30) ? Number(manualDays) : autoDays;
 
     // --- [منطق التأمينات] ---
@@ -46,25 +45,39 @@ function runPayrollLogic(input, prev, emp) {
         insuranceEmployee = R(insSalary * 0.11);
     }
 
-    // --- [الحسابات المالية الأساسية] ---
+    // --- [الحسابات المالية الأساسية وتعديل الـ Exemptions] ---
     const proratedBasic = R((fullBasic / 30) * finalDays);
     const proratedTrans = R((fullTrans / 30) * finalDays);
+
+    // حساب إجمالي الإضافات (للقبض) وإجمالي الخاضع منها (للضريبة)
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const taxableAdditions = additions.reduce((sum, item) => {
+        // لو البند غير معفى (non-exempted) يدخل في الضريبة
+        return sum + (item.type !== 'exempted' ? (Number(item.amount) || 0) : 0);
+    }, 0);
+
+    // حساب إجمالي الخصومات (للقبض) وإجمالي الخاضع منها (اللي بيقلل الوعاء الضريبي)
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const taxableDeductions = deductions.reduce((sum, item) => {
+        // لو الخصم غير معفى (يعني جزاء قانوني مثلاً) يقلل الوعاء الضريبي
+        return sum + (item.type !== 'exempted' ? (Number(item.amount) || 0) : 0);
+    }, 0);
+
+    // الـ Gross هو كل اللي الموظف هياخده (بما في ذلك البدلات المعفاة)
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // --- [حساب الضرائب - معادلات الإكسيل] ---
+    // --- [حساب الضرائب - الوعاء الضريبي المعدل] ---
     const personalExemption = R((20000 / 360) * finalDays); 
-    const currentTaxable = R(Math.max(0, gross - insuranceEmployee - personalExemption));
+    
+    // الوعاء الضريبي = (الأساسي + البدلات الخاضعة) - التأمينات - الإعفاء الشخصي - الخصومات الخاضعة
+    const currentTaxable = R(Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee - personalExemption - taxableDeductions));
     
     const totalDaysYTD = Number(finalDays) + (Number(prev.pDays) || 0);
     const totalTaxableYTD = R(currentTaxable + (Number(prev.pTaxable) || 0));
     
-    // تحويل الوعاء التراكمي لقيمة سنوية (لأغراض الشرايح فقط)
     const rawAnnual = totalDaysYTD > 0 ? (totalTaxableYTD / totalDaysYTD) * 360 : 0;
     const floorAnnual = Math.floor(R(rawAnnual) / 10) * 10;
     
-    // الـ Tax Pool الفعلي (AI7)
     const ai = totalDaysYTD > 0 ? R((floorAnnual / 360) * totalDaysYTD) : 0;
     const af = totalDaysYTD;
     const L = (val) => af > 0 ? (val / 360) * af : 0;
@@ -104,7 +117,6 @@ function runPayrollLogic(input, prev, emp) {
     const totalAllDeductions = R(insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions);
     const net = R(gross - totalAllDeductions);
 
-    // رجوع الـ Object كامل بكل الـ Keys اللي الـ Frontend بيحتاجها
     return {
         fullBasic,
         fullTrans,
@@ -112,8 +124,8 @@ function runPayrollLogic(input, prev, emp) {
         proratedBasic,
         proratedTrans,
         totalAdditions,
-        additions, // مفتاح أساسي للعرض الديناميكي
-        deductions, // مفتاح أساسي للعرض الديناميكي
+        additions, 
+        deductions, 
         gross,
         insBase: insSalary,
         insuranceEmployee,
