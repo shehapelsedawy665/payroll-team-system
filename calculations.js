@@ -22,13 +22,12 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const insEEPercent = settings.insEmployeePercent || 0.11;
     const maxInsLimit = settings.maxInsSalary || 16700;
     const minInsLimit = settings.minInsSalary || 2325;
-    const annualPersonalExemption = settings.personalExemption || 20000; // تم التحديث لـ 20 ألف حسب أحدث قانون
+    const annualPersonalExemption = settings.personalExemption || 20000; 
 
     // --- [منطق التواريخ والأيام] ---
     const currentMonthDate = new Date(month + "-01");
     let rDate = resignationDate ? new Date(resignationDate) : null;
     
-    // حماية: منع تاريخ الاستقالة قبل بداية الشهر الحالي
     if (rDate && rDate < currentMonthDate) {
         rDate = null; 
     }
@@ -47,12 +46,11 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     if (autoDays > 30) autoDays = 30;
     let finalDays = (manualDays !== undefined && Number(manualDays) !== 30) ? Number(manualDays) : autoDays;
 
-    // --- [التأمينات: حساب كامل بدون Prorata] ---
+    // --- [التأمينات] ---
     let insSalary = Number(emp.insSalary) || 0;
     if (insSalary > maxInsLimit) insSalary = maxInsLimit;
     if (insSalary < minInsLimit && insSalary > 0) insSalary = minInsLimit;
     
-    // التأمينات تُخصم كاملة طالما الموظف "على القوة" خلال الشهر
     const insuranceEmployee = R(insSalary * insEEPercent);
 
     // --- [الحسابات المالية] ---
@@ -69,33 +67,42 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const personalExemptionMonthly = R(annualPersonalExemption / 12); 
     const currentTaxable = Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee - personalExemptionMonthly);
     
-    // حساب السنوي المتوقع للضريبة
+    // حساب السنوي المتوقع وتقريبه لأقرب 10 جنيهات أقل (حسب القانون)
     const annualTaxable = Math.floor((currentTaxable * 12) / 10) * 10;
 
-    // --- [حساب الضرائب - نظام الشرائح المصري] ---
+    // --- [حساب الضرائب - نظام الشرائح المصري 2024/2025] ---
     function calculateAnnualTax(taxable) {
-        let tax = 0;
-        const slabs = [
-            { limit: 40000, rate: 0 },
-            { limit: 15000, rate: 0.10 },
-            { limit: 15000, rate: 0.15 },
-            { limit: 130000, rate: 0.20 },
-            { limit: 200000, rate: 0.225 },
-            { limit: 800000, rate: 0.25 }
-        ];
+        if (taxable <= 40000) return 0; // الشريحة الصفرية (الإعفاء)
 
+        let tax = 0;
         let remaining = taxable;
 
-        // معالجة إلغاء الشرائح الأولى للدخول العالية
-        if (taxable > 1200000) return (taxable - 1200000) * 0.275 + (800000 * 0.25) + (400000 * 0.225); 
-        
-        for (let slab of slabs) {
-            if (remaining <= 0) break;
-            let chunk = Math.min(remaining, slab.limit);
-            tax += chunk * slab.rate;
-            remaining -= chunk;
+        // مصفوفة الشرائح (الحد، النسبة)
+        const slabs = [
+            { limit: 40000, rate: 0 },      // 0%
+            { limit: 15000, rate: 0.10 },   // 10%
+            { limit: 15000, rate: 0.15 },   // 15%
+            { limit: 130000, rate: 0.20 },  // 20%
+            { limit: 200000, rate: 0.225 }, // 22,5%
+            { limit: 400000, rate: 0.25 }   // 25%
+        ];
+
+        // معالجة أصحاب الدخول العالية (إلغاء الشرائح الأولى تدريجياً)
+        if (taxable > 1200000) {
+            return (taxable - 1200000) * 0.275 + (800000 * 0.25) + (400000 * 0.225); 
         }
-        if (remaining > 0) tax += remaining * 0.275;
+
+        for (let i = 0; i < slabs.length; i++) {
+            let chunk = Math.min(remaining, slabs[i].limit);
+            tax += chunk * slabs[i].rate;
+            remaining -= chunk;
+            if (remaining <= 0) break;
+        }
+
+        if (remaining > 0) {
+            tax += remaining * 0.275; // الشريحة الأخيرة 27.5%
+        }
+
         return tax;
     }
 
@@ -116,19 +123,30 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
 }
 
 /**
- * وظيفة الحساب العكسي من الصافي للإجمالي
+ * وظيفة الحساب العكسي - Binary Search Method
+ * دقيقة جداً وتصل للرقم الصحيح في أقل من 50 محاولة
  */
 function calculateNetToGross(targetNet, input, prev, emp, settings) {
+    if (!targetNet || targetNet <= 0) return 0;
+
     let low = targetNet;
-    let high = targetNet * 2; // افتراض أولي
+    let high = targetNet * 5; // رفع الحد الأقصى لضمان استيعاب الضرائب العالية
     let estimatedGross = targetNet;
     let attempts = 0;
 
     while (attempts < 50) {
-        let testInput = { ...input, fullBasic: estimatedGross, fullTrans: 0, additions: [], deductions: [] };
-        let result = runPayrollLogic(testInput, prev, emp, settings);
+        let testInput = { 
+            ...input, 
+            fullBasic: estimatedGross, 
+            fullTrans: 0, 
+            additions: [], 
+            deductions: [],
+            days: 30 
+        };
         
-        if (Math.abs(result.net - targetNet) < 0.1) break;
+        let result = runPayrollLogic(testInput, prev, { ...emp, insSalary: estimatedGross }, settings);
+        
+        if (Math.abs(result.net - targetNet) < 0.01) break;
 
         if (result.net < targetNet) {
             low = estimatedGross;
