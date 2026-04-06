@@ -12,24 +12,24 @@ const departmentSchema = new mongoose.Schema({
         type: String, 
         trim: true 
     },
-    // ربط القسم بالشركة (ضروري جداً عشان الـ Multi-tenancy)
+    // ربط القسم بالشركة (أساسي لضمان فصل بيانات كل شركة عن الأخرى)
     companyId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Company', 
-        required: true 
+        required: [true, 'يجب ربط القسم بشركة محددة'] 
     },
-    // مدير القسم (خيار من قائمة الموظفين - أساسي للـ Org Chart)
+    // مدير القسم (يربط بموديل الموظفين)
     manager: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Employee',
         default: null
     },
-    // وصف بسيط للقسم
+    // وصف بسيط لمسؤوليات القسم
     description: { 
         type: String, 
         trim: true 
     },
-    // حالة القسم (نشط أو غير نشط)
+    // حالة القسم (نشط أو مؤرشف)
     isActive: { 
         type: Boolean, 
         default: true 
@@ -40,7 +40,14 @@ const departmentSchema = new mongoose.Schema({
     }
 });
 
-// إضافة Index للبحث السريع عن أقسام شركة معينة
+/**
+ * تحسين أداء الاستعلامات (Performance Optimization)
+ * عمل Index مركب لسرعة الوصول لأقسام شركة معينة بالاسم
+ */
 departmentSchema.index({ companyId: 1, name: 1 });
 
+/**
+ * التصدير النهائي (Serverless & Vercel Friendly)
+ * التأكد من عدم إعادة تعريف الموديل في كل طلب (Request)
+ */
 module.exports = mongoose.models.Department || mongoose.model('Department', departmentSchema);
