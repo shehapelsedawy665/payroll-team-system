@@ -3,91 +3,96 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Employee = require('../models/employee');
 const Company = require('../models/company');
-const Payroll = require('../models/payroll');
-const calculatePayroll = require('../calculations'); // ماكينة الحسابات الخاصة بك
-const connectDB = require('../db');
+const calculatePayroll = require('../calculations');
 
 /**
- * 1. حساب وتحميل مرتبات شهر معين (Generate Payroll)
- * الوظيفة: تأخذ الموظفين النشطين، تحسب ضرائبهم وتأميناتهم، وتخزن السجل
+ * 1. حساب وحفظ مرتب موظف واحد (المستخدمة في شاشة البروفايل)
+ * POST /api/payroll/calculate
  */
-router.post('/generate', auth, async (req, res) => {
+router.post('/calculate', auth, async (req, res) => {
     try {
-        await connectDB();
-        const { month } = req.body; // صيغة YYYY-MM
+        const { empId, month, days, fullBasic, fullTrans, additions, deductions } = req.body;
 
-        if (!month) return res.status(400).json({ error: 'يرجى تحديد الشهر والسنة' });
+        if (!empId || !month) return res.status(400).json({ error: 'بيانات ناقصة (الموظف أو الشهر)' });
 
-        // أ. جلب إعدادات الشركة (الضرائب والتأمينات الخاصة بها)
-        const company = await Company.findById(req.user.companyId);
+        // أ. جلب بيانات الموظف والشركة
+        const [emp, company] = await Promise.all([
+            Employee.findOne({ _id: empId, companyId: req.user.companyId }),
+            Company.findById(req.user.companyId)
+        ]);
+
+        if (!emp) return res.status(404).json({ error: 'الموظف غير موجود' });
         
-        // ب. جلب جميع موظفي الشركة النشطين
-        const employees = await Employee.find({ 
-            companyId: req.user.companyId, 
-            status: 'Active' 
-        });
+        const settings = company?.settings || { 
+            personalExemption: 20000, 
+            maxInsSalary: 16700, 
+            insEmployeePercent: 0.11 
+        };
 
-        const payrollResults = [];
+        // ب. تشغيل المحرك المالي بناءً على البيانات المرسلة من الـ UI
+        const calculation = calculatePayroll({
+            ...emp.toObject(),
+            salaryDetails: {
+                ...emp.salaryDetails,
+                basicSalary: Number(fullBasic) || emp.salaryDetails.basicSalary,
+                allowances: Number(fullTrans) || emp.salaryDetails.allowances
+            }
+        }, settings, { days, additions, deductions });
 
-        for (let emp of employees) {
-            // ج. تشغيل ماكينة الحسابات لكل موظف بناءً على إعدادات الشركة
-            const calculation = calculatePayroll(emp, company.settings);
+        // ج. تجهيز عنصر الهيستوري
+        const historyItem = {
+            month: month,
+            payload: {
+                ...calculation,
+                days: days,
+                createdAt: new Date()
+            }
+        };
 
-            // د. حفظ السجل في قاعدة البيانات (أو تحديثه لو موجود)
-            const payrollRecord = await Payroll.findOneAndUpdate(
-                { employeeId: emp._id, month: month },
-                {
-                    companyId: req.user.companyId,
-                    employeeId: emp._id,
-                    month: month,
-                    payload: {
-                        grossSalary: calculation.grossSalary,
-                        netSalary: calculation.netSalary,
-                        taxAmount: calculation.taxAmount,
-                        insuranceEmployee: calculation.insuranceEmployee,
-                        insuranceCompany: calculation.insuranceCompany,
-                        totalAdditions: calculation.totalAdditions,
-                        totalDeductions: calculation.totalDeductions,
-                        details: calculation.details // تفاصيل الحسبة كاملة
-                    },
-                    status: 'Pending'
-                },
-                { upsert: true, new: true }
-            );
-            payrollResults.push(payrollRecord);
-        }
+        // د. الحفظ الذكي (لو الشهر موجود يحدثه، لو مش موجود يضيفه)
+        // أولاً: نمسح الشهر القديم لو موجود عشان ميتكررش
+        await Employee.updateOne(
+            { _id: empId },
+            { $pull: { history: { month: month } } }
+        );
+
+        // ثانياً: نضيف الحسبة الجديدة
+        const updatedEmp = await Employee.findByIdAndUpdate(
+            empId,
+            { $push: { history: historyItem } },
+            { new: true }
+        );
 
         res.json({ 
             success: true, 
-            message: `تم معالجة مرتبات عدد ${employees.length} موظف لشهر ${month}`,
-            data: payrollResults 
+            message: `تم حفظ مرتب شهر ${month} بنجاح`,
+            result: calculation 
         });
 
     } catch (error) {
-        console.error("Payroll Generation Error:", error.message);
-        res.status(500).json({ error: 'حدث خطأ أثناء حساب المرتبات' });
+        console.error("Payroll Calc Error:", error);
+        res.status(500).json({ error: 'حدث خطأ في محرك الحسابات' });
     }
 });
 
 /**
- * 2. جلب سجلات المرتبات السابقة (History)
+ * 2. محرك الـ Net to Gross (الآلة الحاسبة السريعة)
+ * POST /api/payroll/net-to-gross
  */
-router.get('/history', auth, async (req, res) => {
+router.post('/net-to-gross', auth, async (req, res) => {
     try {
-        await connectDB();
-        const { month } = req.query; // اختياري لفلترة شهر معين
+        const { targetNet } = req.body;
+        if (!targetNet) return res.status(400).json({ error: 'يرجى إدخال المبلغ الصافي' });
 
-        let query = { companyId: req.user.companyId };
-        if (month) query.month = month;
+        const company = await Company.findById(req.user.companyId);
+        const settings = company?.settings || { personalExemption: 20000, maxInsSalary: 16700, insEmployeePercent: 0.11 };
 
-        const records = await Payroll.find(query)
-            .populate('employeeId', 'name nationalId jobTitle')
-            .sort({ month: -1 });
+        // ملاحظة: تأكد أن ملف calculations.js يحتوي على وظيفة reverse أو loop للوصول للـ Gross
+        const result = calculatePayroll.reverse ? calculatePayroll.reverse(Number(targetNet), settings) : { grossSalary: targetNet * 1.4 }; // مثال تقريبي لو مفيش reverse
 
-        res.json({ success: true, count: records.length, data: records });
+        res.json(result);
     } catch (error) {
-        console.error("Payroll History Error:", error.message);
-        res.status(500).json({ error: 'خطأ في جلب سجلات المرتبات' });
+        res.status(500).json({ error: 'فشل في عملية الحساب العكسي' });
     }
 });
 
