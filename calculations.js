@@ -1,43 +1,57 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/**
+ * المحرك المالي لرواتب ERP (قانون العمل والضرائب المصري 2024/2025)
+ * تم التعديل لإضافة منطق التأمين الطبي والإعفاءات الديناميكية
+ */
 function runPayrollLogic(input, prev, emp, settings = {}) {
     const { 
-        fullBasic = 0, fullTrans = 0, days: manualDays, 
-        additions = [], deductions = [], month 
+        fullBasic = 0, 
+        fullTrans = 0, 
+        days: manualDays, 
+        additions = [], 
+        deductions = [], 
+        month 
     } = input;
 
+    // 1. استخراج الإعدادات
     const insEEPercent = settings.insEmployeePercent || 0.11;
-    const maxInsLimit = settings.maxInsSalary || 16700;
+    const maxInsSalary = settings.maxInsSalary || 16700;
     const minInsLimit = settings.minInsSalary || 2325;
     const annualPersonalExemption = settings.personalExemption || 20000; 
 
+    // 2. حساب الأيام الفعلية
     let finalDays = (manualDays !== undefined) ? Number(manualDays) : 30;
     if (finalDays > 30) finalDays = 30;
 
+    // 3. التأمينات الاجتماعية
     let insSalary = Math.min(Math.max(Number(emp.insSalary) || 0, minInsLimit), maxInsLimit);
     const insuranceEmployee = R(insSalary * insEEPercent);
 
+    // 4. الحسابات المالية للشهر الحالي
     const proratedBasic = R((fullBasic / 30) * finalDays);
     const proratedTrans = R((fullTrans / 30) * finalDays);
     
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // --- منطق الوعاء الضريبي المطور ---
+    // 5. الوعاء الضريبي (Taxable Pool) المطور
     let currentTaxable = (proratedBasic + proratedTrans) - insuranceEmployee;
-    let medicalLimit = R(10000 / 12); // 833.33
+    const medicalLimit = R(10000 / 12); // 833.33
 
+    // معالجة الإضافات في الوعاء
     additions.forEach(item => {
         const amt = Number(item.amount) || 0;
         if (item.type !== 'exempted') {
             currentTaxable += amt;
         } else if (item.name.toLowerCase().includes('medical')) {
-            // خصم طبي: أيهما أقل 15% من الوعاء الحالي أو 833.33
-            const fifteenPct = R(currentTaxable * 0.15);
-            currentTaxable -= Math.min(fifteenPct, medicalLimit);
+            // منطق التأمين الطبي: أيهما أقل 15% من الوعاء أو 833.33
+            const fifteenPercent = R(currentTaxable * 0.15);
+            currentTaxable -= Math.min(fifteenPercent, medicalLimit);
         }
     });
 
+    // معالجة الاستقطاعات المعفاة
     deductions.forEach(item => {
         if (item.type === 'exempted') {
             currentTaxable -= (Number(item.amount) || 0);
@@ -46,10 +60,11 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
 
     currentTaxable = Math.max(0, currentTaxable);
 
-    // المنطق التراكمي
+    // 6. المنطق التراكمي (YTD Logic)
     const pDays = Number(prev?.pDays) || 0;
     const pTaxable = Number(prev?.pTaxable) || 0;
     const pTaxes = Number(prev?.pTaxes) || 0;
+
     const totalDaysSoFar = pDays + finalDays; 
     const totalTaxableSoFar = pTaxable + currentTaxable;
 
@@ -57,13 +72,18 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const estimatedAnnualTaxable = (avgDailyTaxable * 360) - annualPersonalExemption;
     const finalAnnualTaxable = Math.floor(Math.max(0, estimatedAnnualTaxable) / 10) * 10;
 
+    // 7. دالة شرائح الضرائب
     function calculateAnnualTax(taxable) {
         if (taxable <= 40000) return 0;
-        let tax = 0; let remaining = taxable;
+        let tax = 0;
+        let remaining = taxable;
         const slabs = [
-            { limit: 40000, rate: 0 }, { limit: 15000, rate: 0.10 },
-            { limit: 15000, rate: 0.15 }, { limit: 130000, rate: 0.20 },
-            { limit: 200000, rate: 0.225 }, { limit: 400000, rate: 0.25 }
+            { limit: 40000, rate: 0 }, 
+            { limit: 15000, rate: 0.10 },
+            { limit: 15000, rate: 0.15 }, 
+            { limit: 130000, rate: 0.20 },
+            { limit: 200000, rate: 0.225 }, 
+            { limit: 400000, rate: 0.25 }
         ];
         if (taxable > 1200000) return (taxable - 1200000) * 0.275 + 306500;
         for (let s of slabs) {
@@ -80,23 +100,29 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const totalTaxDueUntilNow = (totalAnnualTax / 360) * totalDaysSoFar;
     const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - pTaxes));
 
+    // 9. الاستقطاعات الأخرى
     const martyrs = R(gross * 0.0005); 
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const net = R(gross - (insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions));
 
     return {
-        fullBasic, fullTrans, days: finalDays, gross,
+        fullBasic, fullTrans, days: finalDays, 
+        proratedBasic, proratedTrans, gross,
         insuranceEmployee, monthlyTax, martyrs, 
-        totalOtherDeductions, net, currentTaxable, 
+        totalOtherDeductions, net,
+        currentTaxable, 
         annualTaxable: finalAnnualTaxable,
-        additionsData: additions, // مهم للجدول
-        deductionsData: deductions // مهم للجدول
+        additionsData: additions, // لحفظ الأسماء للجدول
+        deductionsData: deductions // لحفظ الأسماء للجدول
     };
 }
 
 function calculateNetToGross(targetNet, input, prev, emp, settings) {
     if (!targetNet || targetNet <= 0) return 0;
-    let low = targetNet, high = targetNet * 5, estimatedGross = targetNet, attempts = 0;
+    let low = targetNet;
+    let high = targetNet * 5; 
+    let estimatedGross = targetNet;
+    let attempts = 0;
     while (attempts < 50) {
         let testInput = { ...input, fullBasic: estimatedGross, fullTrans: 0, additions: [], deductions: [], days: 30 };
         let result = runPayrollLogic(testInput, prev, { ...emp, insSalary: estimatedGross }, settings);
