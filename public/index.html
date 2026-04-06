@@ -12,7 +12,7 @@
         #sidebar { width: 60px; transition: 0.3s; overflow: hidden; }
         #sidebar:hover { width: 240px; }
         @media (max-width: 1023px) {
-            #sidebar { width: 100% !important; height: 70px !important; bottom: 0 !important; top: auto !important; flex-direction: row !important; }
+            #sidebar { width: 100% !important; height: 70px !important; bottom: 0 !important; top: auto !important; flex-direction: row !important; right:0; left:0; }
             main { margin-right: 0 !important; padding-bottom: 100px !important; }
         }
     </style>
@@ -20,91 +20,55 @@
 <body class="bg-slate-50 flex min-h-screen">
     <div id="login-view" class="fixed inset-0 bg-slate-900 z-[300] flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl text-center">
-            <h2 class="text-3xl font-black text-slate-800 mb-6">SEDAY ERP</h2>
+            <h2 class="text-3xl font-black text-slate-800 mb-6 uppercase">Seday ERP</h2>
             <div class="space-y-4">
-                <input type="email" id="auth-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-center">
-                <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-center">
-                <button onclick="handleLogin()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg">دخول آمن</button>
+                <input type="email" id="auth-email" placeholder="Email" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-center">
+                <input type="password" id="auth-pass" placeholder="Password" class="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-center">
+                <button onclick="handleLogin()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg">Login 🔒</button>
             </div>
         </div>
     </div>
 
     <aside id="sidebar" class="bg-slate-900 text-white fixed h-full right-0 top-0 z-[100] flex flex-col hidden">
         <nav class="flex-1">
-            <div onclick="showDash()" class="p-5 hover:bg-indigo-600 cursor-pointer text-center lg:text-right"><i class="fas fa-home lg:ml-4"></i> الرئيسية</div>
-            <div onclick="showHR()" class="p-5 hover:bg-indigo-600 cursor-pointer text-center lg:text-right"><i class="fas fa-users lg:ml-4"></i> الموظفين</div>
-            <div onclick="showCalc()" class="p-5 hover:bg-emerald-600 cursor-pointer text-center lg:text-right"><i class="fas fa-magic lg:ml-4"></i> Net to Gross</div>
-            <div onclick="handleLogout()" class="p-5 hover:bg-rose-600 cursor-pointer text-center lg:text-right mt-auto"><i class="fas fa-power-off lg:ml-4"></i> خروج</div>
+            <div onclick="showDash()" class="p-5 hover:bg-indigo-600 cursor-pointer"><i class="fas fa-home ml-4"></i> الرئيسية</div>
+            <div onclick="showHR()" class="p-5 hover:bg-indigo-600 cursor-pointer"><i class="fas fa-users ml-4"></i> الموظفين</div>
+            <div onclick="showCalc()" class="p-5 hover:bg-emerald-600 cursor-pointer"><i class="fas fa-magic ml-4"></i> Net to Gross</div>
+            <div onclick="handleLogout()" class="p-5 hover:bg-rose-600 cursor-pointer mt-auto"><i class="fas fa-power-off ml-4"></i> خروج</div>
         </nav>
     </aside>
 
     <main id="main-content" class="flex-1 lg:mr-[60px] p-4 md:p-8 hidden">
         <div id="dashboard-view">
-             <h1 class="text-3xl font-black mb-10">لوحة التحكم</h1>
-             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div onclick="showHR()" class="bg-white p-8 rounded-3xl shadow cursor-pointer">إدارة الموظفين</div>
-                <div onclick="showCalc()" class="bg-white p-8 rounded-3xl shadow cursor-pointer">حساب العكسي</div>
-             </div>
+            <h1 class="text-4xl font-black mb-10 italic">Dashboard</h1>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div onclick="showHR()" class="bg-white p-8 rounded-3xl shadow hover:shadow-xl cursor-pointer transition">الموظفين</div>
+                <div onclick="showCalc()" class="bg-white p-8 rounded-3xl shadow hover:shadow-xl cursor-pointer transition">حساب صافي</div>
+            </div>
         </div>
 
         <div id="list-view" class="hidden">
-             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold">قائمة الموظفين</h2>
-                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="bg-indigo-600 text-white px-6 py-2 rounded-xl">إضافة</button>
-             </div>
-             <div class="bg-white rounded-3xl shadow overflow-hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black">قائمة الموظفين</h2>
+                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black">+ إضافة</button>
+            </div>
+            <div class="bg-white rounded-3xl shadow overflow-hidden">
                 <table class="w-full text-right">
-                    <thead class="bg-slate-50"><tr><th class="p-4">الاسم</th><th class="p-4">الإجراء</th></tr></thead>
+                    <thead class="bg-slate-50 border-b"><tr><th class="p-5">الاسم</th><th class="p-5">الإجراء</th></tr></thead>
                     <tbody id="empTable"></tbody>
                 </table>
-             </div>
+            </div>
         </div>
 
         <div id="profile-view" class="hidden">
-            <button onclick="showHR()" class="mb-4 text-indigo-600">← عودة</button>
-            <div class="bg-white p-8 rounded-3xl shadow mb-6">
-                <h2 id="p-name" class="text-2xl font-black"></h2>
-                <div class="grid grid-cols-2 gap-4 mt-4">
-                    <input type="month" id="c-month" class="p-3 bg-slate-50 rounded-xl">
-                    <input type="number" id="c-fbasic" placeholder="الأساسي" class="p-3 bg-slate-50 rounded-xl">
-                </div>
-                <div class="flex gap-4 mt-6">
-                    <button onclick="addRow('add-area')" class="bg-indigo-100 text-indigo-600 px-4 py-2 rounded-lg">+ إضافة</button>
-                    <button onclick="addRow('ded-area')" class="bg-rose-100 text-rose-600 px-4 py-2 rounded-lg">+ استقطاع</button>
-                </div>
-                <div id="add-area" class="mt-4 space-y-2"></div>
-                <div id="ded-area" class="mt-4 space-y-2"></div>
-                <button onclick="runCalc()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl mt-6 font-black">حساب المرتب</button>
+             </div>
+
+        <div id="net-gross-view" class="hidden">
             </div>
-            <div class="bg-white rounded-3xl shadow overflow-x-auto">
-                <table class="w-full text-xs text-center border-collapse">
-                    <thead id="histHead" class="bg-slate-900 text-white"></thead>
-                    <tbody id="histBody"></tbody>
-                </table>
-            </div>
-        </div>
     </main>
-
-    <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-3xl w-full max-w-md">
-            <input type="text" id="n-name" placeholder="الاسم" class="w-full p-4 bg-slate-100 rounded-xl mb-4">
-            <input type="date" id="n-hdate" class="w-full p-4 bg-slate-100 rounded-xl mb-4">
-            <input type="number" id="n-ins" placeholder="أجر التأمين" class="w-full p-4 bg-slate-100 rounded-xl mb-4">
-            <button onclick="saveEmp()" class="w-full bg-indigo-600 text-white py-4 rounded-xl">حفظ</button>
-        </div>
-    </div>
-
-    <input type="hidden" id="currId">
 
     <script>
         let TOKEN = localStorage.getItem('token');
-
-        async function apiFetch(url, opts = {}) {
-            opts.headers = { ...opts.headers, 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
-            const r = await fetch(url, opts);
-            if(r.status === 401) handleLogout();
-            return r.json();
-        }
 
         async function handleLogin() {
             const email = document.getElementById('auth-email').value;
@@ -115,84 +79,16 @@
             });
             const d = await r.json();
             if(d.token) { localStorage.setItem('token', d.token); location.reload(); }
-            else alert("خطأ في البيانات");
+            else alert("Error: " + (d.error || "Login Failed"));
         }
 
         function handleLogout() { localStorage.removeItem('token'); location.reload(); }
 
-        function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
-        function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); loadEmps(); }
-        function hideAll() { ['dashboard-view', 'list-view', 'profile-view'].forEach(id => document.getElementById(id).classList.add('hidden')); }
-
-        async function loadEmps() {
-            const data = await apiFetch('/api/employees');
-            document.getElementById('empTable').innerHTML = data.map(e => `
-                <tr class="border-b p-4 cursor-pointer" onclick="openProfile('${e._id}')">
-                    <td class="p-4">${e.name}</td><td class="p-4 text-indigo-600">عرض</td>
-                </tr>`).join('');
-        }
-
-        async function openProfile(id) {
-            hideAll(); document.getElementById('profile-view').classList.remove('hidden');
-            document.getElementById('currId').value = id;
-            const data = await apiFetch(`/api/employees/${id}/details`);
-            document.getElementById('p-name').innerText = data.emp.name;
-            document.getElementById('c-fbasic').value = data.emp.insSalary;
-            
-            // Dynamic Headers
-            let adds = new Set(), deds = new Set();
-            data.history.forEach(h => {
-                h.payload.additionsData?.forEach(a => adds.add(a.name));
-                h.payload.deductionsData?.forEach(d => deds.add(d.name));
-            });
-            const addCols = Array.from(adds), dedCols = Array.from(deds);
-            
-            document.getElementById('histHead').innerHTML = `<tr>
-                <th class="p-2">الشهر</th>${addCols.map(c => `<th class="p-2">${c}</th>`).join('')}
-                ${dedCols.map(c => `<th class="p-2">${c}</th>`).join('')}<th>الصافي</th></tr>`;
-            
-            document.getElementById('histBody').innerHTML = data.history.map(h => `
-                <tr class="border-b">
-                    <td class="p-2">${h.month}</td>
-                    ${addCols.map(c => `<td class="p-2">${(h.payload.additionsData?.find(a=>a.name===c)?.amount || 0)}</td>`).join('')}
-                    ${dedCols.map(c => `<td class="p-2">${(h.payload.deductionsData?.find(d=>d.name===c)?.amount || 0)}</td>`).join('')}
-                    <td class="p-2 font-bold">${h.payload.net}</td>
-                </tr>`).join('');
-        }
-
-        function addRow(id) {
-            const div = document.createElement('div');
-            div.className = "flex gap-2";
-            div.innerHTML = `<input type="text" placeholder="الاسم" class="p-2 bg-slate-100 rounded-lg flex-1">
-                             <input type="number" placeholder="المبلغ" class="p-2 bg-slate-100 rounded-lg w-24">
-                             <select class="p-2 bg-slate-100 rounded-lg"><option value="non-exempted">Taxed</option><option value="exempted">Exempt</option></select>`;
-            document.getElementById(id).appendChild(div);
-        }
-
-        async function runCalc() {
-            const body = {
-                empId: document.getElementById('currId').value,
-                month: document.getElementById('c-month').value,
-                fullBasic: Number(document.getElementById('c-fbasic').value),
-                additions: Array.from(document.getElementById('add-area').children).map(c => ({name: c.children[0].value, amount: Number(c.children[1].value), type: c.children[2].value})),
-                deductions: Array.from(document.getElementById('ded-area').children).map(c => ({name: c.children[0].value, amount: Number(c.children[1].value), type: c.children[2].value}))
-            };
-            await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) });
-            openProfile(body.empId);
-        }
-
-        async function saveEmp() {
-            const body = { name: document.getElementById('n-name').value, hiringDate: document.getElementById('n-hdate').value, insSalary: Number(document.getElementById('n-ins').value) };
-            await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(body) });
-            document.getElementById('modal').classList.add('hidden');
-            loadEmps();
-        }
-
-        if(TOKEN) { 
-            document.getElementById('login-view').classList.add('hidden'); 
+        // Initial check
+        if(TOKEN) {
+            document.getElementById('login-view').classList.add('hidden');
             document.getElementById('sidebar').classList.remove('hidden');
             document.getElementById('main-content').classList.remove('hidden');
-            showDash();
         }
     </script>
 </body>
