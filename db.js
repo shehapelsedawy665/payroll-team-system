@@ -1,70 +1,56 @@
 const mongoose = require("mongoose");
 
 /**
- * وظيفة الاتصال بقاعدة البيانات - Seday ERP Core
- * تم تحسينها لضمان استقرار الاتصال مع MongoDB Atlas وتقليل الـ Latency
+ * وظيفة الاتصال بقاعدة البيانات - Seday ERP Core (Vercel Optimized)
+ * تم تحسينها لمنع تكرار الاتصال وتجنب الـ Memory Leaks في البيئة السحابية
  */
+
+// متغير لتخزين حالة الاتصال (Caching the connection)
+let isConnected = false;
+
 const connectDB = async () => {
-    // 1. منع التكرار: لو متصل بالفعل، اخرج فوراً
-    if (mongoose.connection.readyState >= 1) {
+    // 1. منع التكرار: لو متصل بالفعل (readyState == 1)، اخرج فوراً
+    if (mongoose.connection.readyState === 1) {
+        console.log("🟢 Using existing MongoDB connection");
+        return;
+    }
+
+    // تأكد إننا مش بنحاول نفتح اتصال تاني لو فيه واحد "بيلف" (Connecting)
+    if (mongoose.connection.readyState === 2) {
+        console.log("⏳ Connection is already in progress...");
         return;
     }
 
     try {
-        // 2. استخدام الرابط من البيئة المحيطة (Vercel)
         const dbURI = process.env.MONGODB_URI;
 
         if (!dbURI) {
-            console.error("❌ MONGODB_URI is missing in Environment Variables!");
-            return;
+            throw new Error("❌ MONGODB_URI is missing in Environment Variables!");
         }
 
-        // 3. خيارات الاتصال المحسنة لبيئة السحاب
+        // 2. خيارات الاتصال المحسنة (نفس الخيارات بتاعتك مع ضبط الـ Buffering)
         const options = {
-            maxPoolSize: 10,
+            maxPoolSize: 1, // في Vercel يفضل 1 لتقليل عدد الـ Connections المفتوحة في Atlas
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,
             family: 4,
-            dbName: "payrollDB"
+            dbName: "payrollDB",
+            autoIndex: true, // مهم عشان الـ Unique fields تشتغل صح
         };
 
-        await mongoose.connect(dbURI, options);
+        // منع Mongoose من عمل Listeners متكررة في كل Request
+        mongoose.set('strictQuery', true);
 
-        console.log("✅ MongoDB Connected | Ready for Multi-tenant Payroll Operations");
+        await mongoose.connect(dbURI, options);
+        isConnected = true;
+        
+        console.log("✅ MongoDB Connected | Ready for Payroll Operations");
     } catch (err) {
         console.error("❌ MongoDB Connection Error:", err.message);
-        
-        // في Vercel لا نستخدم setTimeout لإعادة الاتصال لأنها Serverless
-        // يفضل ترك المنصة هي من تعيد تشغيل الـ Function
-        if (process.env.NODE_ENV !== 'production') {
-            setTimeout(connectDB, 5000);
-        }
+        // في Vercel لا نستخدم الـ Throw هنا عشان السيرفر ما يقعش بالكامل
+        isConnected = false;
     }
 };
 
-// متابعة حالة الاتصال (Monitoring) لضمان استقرار النظام
-mongoose.connection.on("connected", () => {
-    console.log("🟢 Database Connection: Established");
-});
-
-mongoose.connection.on("disconnected", () => {
-    console.log("⚠️ Database Connection: Disconnected");
-});
-
-mongoose.connection.on("error", (err) => {
-    // تقليل الضجيج في الـ Logs عند حدوث خطأ عابر
-    if (err.message.includes("buffering timed out")) {
-        console.error("🔥 Database Timeout: Check your MongoDB Atlas IP Access!");
-    } else {
-        console.error("🔥 Database Critical Error:", err.message);
-    }
-});
-
-// إغلاق الاتصال بأمان عند توقف السيرفر (Graceful Shutdown)
-process.on("SIGINT", async () => {
-    await mongoose.connection.close();
-    console.log("🛑 MongoDB Connection closed due to app termination");
-    process.exit(0);
-});
-
+// تصدير الوظيفة لاستخدامها في server.js
 module.exports = connectDB;
