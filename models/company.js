@@ -9,19 +9,14 @@ const GLOBAL_DEFAULTS = {
     PERSONAL_EXEMPTION: 20000 
 };
 
-// سكيما الأقسام (عشان نقسم الشركة لـ IT, HR, Sales إلخ)
-const departmentSchema = new mongoose.Schema({
-    name: { type: String, required: true, trim: true },
-    code: { type: String, trim: true }, // كود القسم اختياري (مثلاً: IT-01)
-    headOfDepartment: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' } // رئيس القسم (للـ Org Chart)
-});
-
 const companySchema = new mongoose.Schema({
+    // اسم الشركة
     name: { 
         type: String, 
         required: [true, 'اسم الشركة مطلوب'], 
         trim: true 
     },
+    // إيميل الأدمن (الأساسي للتحقق)
     adminEmail: { 
         type: String, 
         required: [true, 'إيميل الأدمن مطلوب'], 
@@ -29,6 +24,7 @@ const companySchema = new mongoose.Schema({
         lowercase: true,
         trim: true 
     },
+    // الإيميل المستخدم في تسجيل الدخول (Login Email)
     email: {
         type: String,
         required: [true, 'بريد تسجيل الدخول مطلوب'],
@@ -36,14 +32,16 @@ const companySchema = new mongoose.Schema({
         lowercase: true,
         trim: true
     },
+    // كلمة المرور مشفرة
     password: {
         type: String,
         required: [true, 'كلمة المرور مطلوبة']
     },
     
-    // مصفوفة الأقسام الخاصة بكل شركة (Core HR - المرحلة التانية)
-    departments: [departmentSchema],
-
+    // تم حذف الـ departmentSchema الداخلية لأننا اعتمدنا على ملف مستقل
+    // دي الطريقة الـ Professional لربط الموديلات ببعضها (Reference)
+    
+    // الإعدادات المرنة للشركة
     settings: {
         insEmployeePercent: { 
             type: Number, 
@@ -57,8 +55,11 @@ const companySchema = new mongoose.Schema({
             type: Number, 
             default: GLOBAL_DEFAULTS.PERSONAL_EXEMPTION 
         },
-        // إضافة خانة للعملة أو اللوجو مستقبلاً
-        companyLogo: { type: String, default: "" },
+        // إضافة خانة للوجو لدعم المرحلة التانية (Company Settings)
+        companyLogo: { 
+            type: String, 
+            default: "" 
+        },
         isActive: { 
             type: Boolean, 
             default: true 
@@ -69,10 +70,11 @@ const companySchema = new mongoose.Schema({
     lastSettingsUpdate: { type: Date, default: Date.now }
 });
 
-// تحديث تاريخ التعديل تلقائياً
+// تحديث تاريخ التعديل تلقائياً قبل الحفظ
 companySchema.pre('save', function(next) {
     this.lastSettingsUpdate = Date.now();
     next();
 });
 
+// تصدير الموديل مع التأكد من اسم المجموعة في قاعدة البيانات
 module.exports = mongoose.models.Company || mongoose.model('Company', companySchema);
