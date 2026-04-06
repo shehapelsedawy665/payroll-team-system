@@ -1,7 +1,8 @@
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /**
- * المحرك المالي لرواتب ERP (قانون العمل والضرائب المصري 2024/2025)
+ * المحرك المالي لرواتب ERP - Seday Core V2
+ * تحديث 2026: دعم التأمين الطبي، الإعفاءات الضريبية، والأعمدة الديناميكية
  */
 function runPayrollLogic(input, prev, emp, settings = {}) {
     const { 
@@ -13,35 +14,55 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
         month 
     } = input;
 
-    // 1. استخراج الإعدادات (مع قيم افتراضية قانونية)
+    // 1. استخراج الإعدادات
     const insEEPercent = settings.insEmployeePercent || 0.11;
     const maxInsLimit = settings.maxInsSalary || 16700;
     const minInsLimit = settings.minInsSalary || 2325;
-    const annualPersonalExemption = settings.personalExemption || 20000; 
+    const annualPersonalExemption = settings.personalExemption || 20000;
+    // حد الإعفاء الطبي الشهري (10000 / 12)
+    const monthlyMedicalLimit = R(10000 / 12); 
 
-    // 2. حساب الأيام الفعلية (Standard 30 days)
+    // 2. حساب الأيام الفعلية
     let finalDays = (manualDays !== undefined) ? Number(manualDays) : 30;
     if (finalDays > 30) finalDays = 30;
 
-    // 3. التأمينات الاجتماعية (Social Insurance)
+    // 3. التأمينات الاجتماعية
     let insSalary = Math.min(Math.max(Number(emp.insSalary) || 0, minInsLimit), maxInsLimit);
     const insuranceEmployee = R(insSalary * insEEPercent);
 
-    // 4. الحسابات المالية للشهر الحالي
+    // 4. الحسابات المالية (Gross Salary)
     const proratedBasic = R((fullBasic / 30) * finalDays);
     const proratedTrans = R((fullTrans / 30) * finalDays);
     
+    // حساب إجمالي الإضافات (Additions)
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // 5. الوعاء الضريبي (Taxable Pool)
+    // 5. منطق الإعفاءات الضريبية (Exempted vs Non-Exempted)
+    // البنود الـ Non-Exempted هي اللي بتدخل في الوعاء الضريبي (Taxable)
     const taxableAdditions = additions.reduce((sum, item) => {
-        return sum + (item.type !== 'exempted' ? (Number(item.amount) || 0) : 0);
+        return sum + (item.type === 'Non-Exempted' ? (Number(item.amount) || 0) : 0);
     }, 0);
-    
-    const currentTaxable = Math.max(0, (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee);
 
-    // 6. المنطق التراكمي (YTD Logic)
+    // حساب وعاء الضريبة المبدئي قبل خصم الميديكال
+    let taxableBaseBeforeMedical = (proratedBasic + proratedTrans + taxableAdditions) - insuranceEmployee;
+    taxableBaseBeforeMedical = Math.max(0, taxableBaseBeforeMedical);
+
+    // 6. معادلة التأمين الطبي (Medical Insurance Rule)
+    let medicalExemption = 0;
+    const medicalDeductions = deductions.filter(d => d.isMedical && d.type === 'Exempted');
+    
+    if (medicalDeductions.length > 0) {
+        const actualMedicalAmount = medicalDeductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+        // القاعدة: الأقل من (15% من الوعاء) أو (الحد الأقصى 833.33)
+        const fifteenPercentLimit = R(taxableBaseBeforeMedical * 0.15);
+        medicalExemption = Math.min(actualMedicalAmount, fifteenPercentLimit, monthlyMedicalLimit);
+    }
+
+    // الوعاء الضريبي النهائي للشهر
+    const currentTaxable = Math.max(0, taxableBaseBeforeMedical - medicalExemption);
+
+    // 7. المنطق التراكمي (YTD Logic)
     const pDays = Number(prev?.pDays) || 0;
     const pTaxable = Number(prev?.pTaxable) || 0;
     const pTaxes = Number(prev?.pTaxes) || 0;
@@ -53,7 +74,7 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const estimatedAnnualTaxable = (avgDailyTaxable * 360) - annualPersonalExemption;
     const finalAnnualTaxable = Math.floor(Math.max(0, estimatedAnnualTaxable) / 10) * 10;
 
-    // 7. دالة شرائح الضرائب 2024
+    // 8. دالة شرائح الضرائب 2024/2025
     function calculateAnnualTax(taxable) {
         if (taxable <= 40000) return 0;
         let tax = 0;
@@ -83,11 +104,16 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const totalTaxDueUntilNow = (totalAnnualTax / 360) * totalDaysSoFar;
     const monthlyTax = R(Math.max(0, totalTaxDueUntilNow - pTaxes));
 
-    // 9. الاستقطاعات الأخرى
+    // 9. الاستقطاعات والنتيجة النهائية (Net Salary)
     const martyrs = R(gross * 0.0005); 
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     
     const net = R(gross - (insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions));
+
+    // إرجاع البيانات مع دعم الأعمدة الديناميكية (Additions/Deductions Map)
+    const dynamicColumns = {};
+    additions.forEach(a => dynamicColumns[`add_${a.name}`] = a.amount);
+    deductions.forEach(d => dynamicColumns[`ded_${d.name}`] = d.amount);
 
     return {
         fullBasic, fullTrans, days: finalDays, 
@@ -96,7 +122,8 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
         totalOtherDeductions, net,
         currentTaxable, 
         annualTaxable: finalAnnualTaxable,
-        insBase: insSalary // مضاف لسهولة العرض في الـ Net to Gross
+        insBase: insSalary,
+        ...dynamicColumns // لزيادة الأعمدة تلقائياً في الجدول
     };
 }
 
