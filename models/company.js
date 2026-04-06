@@ -1,26 +1,26 @@
 const mongoose = require('mongoose');
 
 /**
- * إعدادات الثوابت العالمية لـ Seday ERP
- * تم التحديث لتشمل التعديلات الضريبية المطلوبة 2026
+ * إعدادات الثوابت العالمية لـ Seday ERP 2026
+ * تم ضبط القيم بناءً على قوانين الضرائب والتأمينات المصرية المحدثة
  */
 const GLOBAL_DEFAULTS = {
-    INS_EE_PERCENT: 0.11,
-    INS_CO_PERCENT: 0.1875,
-    MAX_INS_SALARY: 16700, 
-    MIN_INS_SALARY: 2325,
-    PERSONAL_EXEMPTION: 20000,
-    MEDICAL_EXEMPTION_LIMIT: 10000 // الحد الأقصى السنوي للإعفاء الطبي (10000/12 شهرياً)
+    INS_EE_PERCENT: 0.11,           // حصة الموظف في التأمينات 11%
+    INS_CO_PERCENT: 0.1875,         // حصة الشركة في التأمينات 18.75%
+    MAX_INS_SALARY: 16700,          // الحد الأقصى لأجر الاشتراك التأميني 2026
+    MIN_INS_SALARY: 2325,           // الحد الأدنى لأجر الاشتراك التأميني
+    PERSONAL_EXEMPTION: 20000,      // الإعفاء الشخصي السنوي للموظف
+    MEDICAL_EXEMPTION_LIMIT: 10000  // الحد الأقصى السنوي للإعفاء الطبي (833.33 شهرياً)
 };
 
 const companySchema = new mongoose.Schema({
-    // اسم الشركة
+    // معلومات هوية الشركة
     name: { 
         type: String, 
         required: [true, 'اسم الشركة مطلوب'], 
         trim: true 
     },
-    // إيميل الأدمن (الأساسي للتحقق)
+    // إيميل الأدمن الأساسي (Owner)
     adminEmail: { 
         type: String, 
         required: [true, 'إيميل الأدمن مطلوب'], 
@@ -28,7 +28,7 @@ const companySchema = new mongoose.Schema({
         lowercase: true,
         trim: true 
     },
-    // الإيميل المستخدم في تسجيل الدخول
+    // البريد المستخدم في تسجيل دخول الشركة كـ Entity
     email: {
         type: String,
         required: [true, 'بريد تسجيل الدخول مطلوب'],
@@ -36,13 +36,13 @@ const companySchema = new mongoose.Schema({
         lowercase: true,
         trim: true
     },
-    // كلمة المرور مشفرة
+    // كلمة المرور (يجب تشفيرها باستخدام bcrypt قبل الحفظ)
     password: {
         type: String,
         required: [true, 'كلمة المرور مطلوبة']
     },
     
-    // الإعدادات المرنة للشركة
+    // إعدادات الشركة القابلة للتخصيص
     settings: {
         insEmployeePercent: { 
             type: Number, 
@@ -56,7 +56,6 @@ const companySchema = new mongoose.Schema({
             type: Number, 
             default: GLOBAL_DEFAULTS.PERSONAL_EXEMPTION 
         },
-        // إضافة حد الإعفاء الطبي في الإعدادات لدعم الـ Logic الجديد
         medicalExemptionLimit: {
             type: Number,
             default: GLOBAL_DEFAULTS.MEDICAL_EXEMPTION_LIMIT
@@ -75,14 +74,16 @@ const companySchema = new mongoose.Schema({
     lastSettingsUpdate: { type: Date, default: Date.now }
 });
 
-// تحديث تاريخ التعديل تلقائياً قبل الحفظ
+/**
+ * Middleware: تحديث تاريخ التعديل تلقائياً قبل الحفظ
+ */
 companySchema.pre('save', function(next) {
     this.lastSettingsUpdate = Date.now();
     next();
 });
 
 /**
- * التصدير النهائي (Vercel Optimized)
- * نستخدم "Company" كاسم للموديل مع التأكد من عدم تكراره
+ * التصدير النهائي (Serverless Optimized)
+ * يمنع خطأ "OverwriteModelError" المتكرر في Vercel
  */
 module.exports = mongoose.models.Company || mongoose.model('Company', companySchema);
