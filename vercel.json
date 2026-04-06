@@ -6,7 +6,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "public/**",
+      "src": "public/**/*",
       "use": "@vercel/static"
     }
   ],
@@ -16,8 +16,16 @@
       "dest": "server.js"
     },
     {
+      "src": "/(css|js|img|assets)/(.*)",
+      "dest": "/public/$1/$2"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "/public/favicon.ico"
+    },
+    {
       "src": "/(.*)",
-      "dest": "public/index.html"
+      "dest": "server.js"
     }
   ]
 }
