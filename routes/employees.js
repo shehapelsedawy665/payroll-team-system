@@ -9,37 +9,46 @@ const auth = require('../middleware/auth');
  */
 router.post('/', auth, async (req, res) => {
     try {
-        // تم إزالة connectDB لأننا استدعيناها في server.js
-        
+        // فك تشفير البيانات القادمة من الـ Request Body
         const { 
-            name, nationalId, email, phone, 
-            department, jobTitle, hireDate, 
-            employmentType, status, salaryDetails 
+            name, 
+            nationalId, 
+            email, 
+            phone, 
+            department, 
+            jobTitle, 
+            hireDate, 
+            employmentType, 
+            status, 
+            salaryDetails 
         } = req.body;
 
-        // التحقق من البيانات الأساسية
+        // التحقق من البيانات الأساسية (الاسم والرقم القومي)
         if (!name || !nationalId) {
             return res.status(400).json({ error: 'الاسم والرقم القومي بيانات إجبارية' });
         }
 
+        // إنشاء كائن الموظف الجديد مع التأكد من هيكلة البيانات صح
         const newEmployee = new Employee({
-            name,
-            nationalId,
-            email: email ? email.toLowerCase() : undefined,
-            phone,
-            companyId: req.user.companyId, 
-            department,
-            jobTitle,
+            name: name.trim(),
+            nationalId: nationalId.trim(),
+            email: email ? email.toLowerCase().trim() : undefined,
+            phone: phone ? phone.trim() : undefined,
+            companyId: req.user.companyId, // يتم جلبه تلقائياً من التوكن (Middleware)
+            department: department || 'General', // لو القسم مجاش نضع قيمة افتراضية
+            jobTitle: jobTitle || 'Employee',
             hireDate: hireDate || new Date(),
             employmentType: employmentType || 'Full-time',
             status: status || 'Active',
             salaryDetails: {
-                basicSalary: salaryDetails?.basicSalary || 0,
-                additions: [],
-                deductions: []
-            }
+                basicSalary: Number(salaryDetails?.basicSalary) || 0,
+                additions: [], // مصفوفة فارغة لحين إضافة بدلات لاحقاً
+                deductions: [] // مصفوفة فارغة لحين إضافة خصومات لاحقاً
+            },
+            history: [] // تهيئة سجل المرتبات فارغاً
         });
 
+        // حفظ في قاعدة البيانات
         await newEmployee.save();
         
         res.status(201).json({ 
@@ -50,10 +59,18 @@ router.post('/', auth, async (req, res) => {
 
     } catch (error) {
         console.error("Add Employee Error:", error);
+        
+        // معالجة خطأ تكرار الرقم القومي
         if (error.code === 11000) {
-            return res.status(400).json({ error: 'الرقم القومي مسجل لموظف آخر بالفعل' });
+            return res.status(400).json({ error: 'عفواً، الرقم القومي هذا مسجل لموظف آخر بالفعل' });
         }
-        res.status(500).json({ error: 'حدث خطأ أثناء حفظ بيانات الموظف' });
+        
+        // معالجة أخطاء الـ Validation
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: 'خطأ في البيانات: ' + Object.values(error.errors).map(e => e.message).join(', ') });
+        }
+
+        res.status(500).json({ error: 'حدث خطأ داخلي أثناء حفظ بيانات الموظف' });
     }
 });
 
@@ -63,10 +80,11 @@ router.post('/', auth, async (req, res) => {
  */
 router.get('/', auth, async (req, res) => {
     try {
+        // جلب موظفين الشركة الخاصة بالمستخدم فقط
         const employees = await Employee.find({ companyId: req.user.companyId })
             .sort({ createdAt: -1 });
 
-        // نرسل البيانات مباشرة كـ Array أو نلفها في كائن (الـ Frontend عندك مستني Array)
+        // نرسل البيانات كـ Array مباشر لأن الـ Frontend (DataTables) يحتاجها هكذا
         res.json(employees); 
     } catch (error) {
         console.error("Get Employees Error:", error);
@@ -75,7 +93,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 /**
- * 3. جلب تفاصيل موظف واحد (مهمة جداً لشاشة البروفايل)
+ * 3. جلب تفاصيل موظف واحد (لشاشة البروفايل والحسابات)
  * GET /api/employees/:id/details
  */
 router.get('/:id/details', auth, async (req, res) => {
@@ -85,13 +103,15 @@ router.get('/:id/details', auth, async (req, res) => {
             companyId: req.user.companyId 
         });
 
-        if (!emp) return res.status(404).json({ error: 'الموظف غير موجود' });
+        if (!emp) return res.status(404).json({ error: 'الموظف غير موجود أو لا تملك صلاحية الوصول إليه' });
 
+        // إرجاع بيانات الموظف مع سجل مرتباته (History)
         res.json({
             emp: emp,
             history: emp.history || []
         });
     } catch (error) {
+        console.error("Fetch Employee Details Error:", error);
         res.status(500).json({ error: 'خطأ في جلب بيانات الموظف' });
     }
 });
@@ -102,6 +122,7 @@ router.get('/:id/details', auth, async (req, res) => {
  */
 router.delete('/:id', auth, async (req, res) => {
     try {
+        // التأكد من حذف موظف يخص هذه الشركة فقط
         const deletedEmployee = await Employee.findOneAndDelete({ 
             _id: req.params.id, 
             companyId: req.user.companyId 
@@ -111,8 +132,9 @@ router.delete('/:id', auth, async (req, res) => {
             return res.status(404).json({ error: 'الموظف غير موجود' });
         }
 
-        res.json({ success: true, message: 'تم حذف الموظف بنجاح' });
+        res.json({ success: true, message: 'تم حذف الموظف بنجاح من النظام' });
     } catch (error) {
+        console.error("Delete Employee Error:", error);
         res.status(500).json({ error: 'حدث خطأ أثناء محاولة الحذف' });
     }
 });
