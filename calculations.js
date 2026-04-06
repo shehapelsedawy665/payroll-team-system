@@ -23,32 +23,24 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
-    // --- حساب الوعاء الضريبي مع الإعفاءات المتقدمة ---
+    // --- منطق الوعاء الضريبي المطور ---
     let currentTaxable = (proratedBasic + proratedTrans) - insuranceEmployee;
-    let medicalExemptionLimit = R(10000 / 12); // 833.33
+    let medicalLimit = R(10000 / 12); // 833.33
 
-    // 1. معالجة الإضافات (Additions)
     additions.forEach(item => {
         const amt = Number(item.amount) || 0;
-        const isMedical = item.name.toLowerCase().includes('medical');
-        
-        if (item.type === 'exempted') {
-            if (isMedical) {
-                // قاعدة التأمين الطبي: 15% من الوعاء أو 833.33 أيهما أقل
-                const fifteenPercent = R(currentTaxable * 0.15);
-                currentTaxable -= Math.min(fifteenPercent, medicalExemptionLimit);
-            }
-            // لو معفى وعادي مش بيدخل في الـ currentTaxable أصلاً (فمش بنضيفه)
-        } else {
-            currentTaxable += amt; // لو مش معفى بيزود الوعاء
+        if (item.type !== 'exempted') {
+            currentTaxable += amt;
+        } else if (item.name.toLowerCase().includes('medical')) {
+            // خصم طبي: أيهما أقل 15% من الوعاء الحالي أو 833.33
+            const fifteenPct = R(currentTaxable * 0.15);
+            currentTaxable -= Math.min(fifteenPct, medicalLimit);
         }
     });
 
-    // 2. معالجة الاستقطاعات (Deductions) - لو معفاة بتنزل من الوعاء
     deductions.forEach(item => {
-        const amt = Number(item.amount) || 0;
         if (item.type === 'exempted') {
-            currentTaxable -= amt;
+            currentTaxable -= (Number(item.amount) || 0);
         }
     });
 
@@ -90,7 +82,6 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
 
     const martyrs = R(gross * 0.0005); 
     const totalOtherDeductions = deductions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    
     const net = R(gross - (insuranceEmployee + monthlyTax + martyrs + totalOtherDeductions));
 
     return {
@@ -98,9 +89,8 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
         insuranceEmployee, monthlyTax, martyrs, 
         totalOtherDeductions, net, currentTaxable, 
         annualTaxable: finalAnnualTaxable,
-        // بنرجع الداتا دي عشان الـ Frontend يرسم الـ Headers
-        additionsData: additions,
-        deductionsData: deductions
+        additionsData: additions, // مهم للجدول
+        deductionsData: deductions // مهم للجدول
     };
 }
 
