@@ -6,7 +6,7 @@ const auth = require("./middleware/auth");
 
 const Company = require("./models/company"); 
 const Employee = require("./models/employee");
-const Payroll = require("./models/payroll"); // تأكد من وجود الموديل ده
+const Payroll = require("./models/payroll"); // تأكد أن الموديل موجود في فولدر models
 
 const { runPayrollLogic, calculateNetToGross } = require("./calculations"); 
 
@@ -24,7 +24,7 @@ app.get("/api/company/settings", auth, async (req, res) => {
     try {
         const company = await Company.findById(req.user.companyId).select('settings');
         res.json(company.settings);
-    } catch (err) { res.status(500).json({ error: "Settings Error" }); }
+    } catch (err) { res.status(500).json({ error: "خطأ في الإعدادات" }); }
 });
 
 app.post("/api/payroll/calculate", auth, async (req, res) => {
@@ -33,7 +33,7 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
         const [emp, company, history] = await Promise.all([
             Employee.findOne({ _id: empId, companyId: req.user.companyId }),
             Company.findById(req.user.companyId),
-            require("./models/payroll").find({ employeeId: empId, companyId: req.user.companyId, month: { $lt: month } })
+            Payroll.find({ employeeId: empId, companyId: req.user.companyId, month: { $lt: month } })
         ]);
 
         let pData = { pDays: 0, pTaxable: 0, pTaxes: 0 };
@@ -45,11 +45,8 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
 
         const result = runPayrollLogic({ fullBasic, fullTrans, days, additions, deductions, month }, pData, emp.toObject(), company.settings);
         
-        await require("./models/payroll").deleteOne({ employeeId: empId, month, companyId: req.user.companyId });
-        const record = await new (require("./models/payroll"))({ 
-            companyId: req.user.companyId, employeeId: empId, month, payload: result 
-        }).save();
-        
+        await Payroll.deleteOne({ employeeId: empId, month, companyId: req.user.companyId });
+        const record = await new Payroll({ companyId: req.user.companyId, employeeId: empId, month, payload: result }).save();
         res.json(record);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -59,14 +56,13 @@ app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
         const { targetNet } = req.body;
         const company = await Company.findById(req.user.companyId);
         const grossSalary = calculateNetToGross(targetNet, { month: new Date().toISOString().substring(0, 7) }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: 0 }, company.settings);
-        const details = runPayrollLogic({ fullBasic: grossSalary, days: 30 }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: grossSalary }, company.settings);
-        res.json({ grossSalary, ...details });
+        const final = runPayrollLogic({ fullBasic: grossSalary, days: 30 }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: grossSalary }, company.settings);
+        res.json({ grossSalary, ...final });
     } catch (err) { res.status(500).json({ error: "Calculation Error" }); }
 });
 
-const publicPath = path.join(__dirname, "public");
-app.use(express.static(publicPath));
-app.get("*", (req, res) => { res.sendFile(path.join(publicPath, "index.html")); });
+app.use(express.static(path.join(__dirname, "public")));
+app.get("*", (req, res) => { res.sendFile(path.join(__dirname, "public", "index.html")); });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server LIVE on ${PORT} 🚀`));
+app.listen(PORT, () => console.log(`Server LIVE 🚀`));
