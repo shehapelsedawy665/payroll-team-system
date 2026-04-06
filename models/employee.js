@@ -28,7 +28,7 @@ const employeeSchema = new mongoose.Schema({
     },
     department: { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Department', // الربط مع موديل الأقسام الجديد
+        ref: 'Department', 
         required: [true, 'يجب تحديد قسم للموظف'] 
     },
     jobTitle: { type: String, required: true, trim: true },
@@ -36,11 +36,11 @@ const employeeSchema = new mongoose.Schema({
     // نظام المدير المباشر (Org Chart Logic)
     reportingTo: { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Employee', // الموظف مدير لموظف آخر
+        ref: 'Employee', 
         default: null 
     },
 
-    // تواريخ التعيين والاستقالة (التزاماً بالـ Roadmap)
+    // تواريخ التعيين والاستقالة
     hireDate: { 
         type: Date, 
         required: [true, 'تاريخ التعيين مطلوب'] 
@@ -55,18 +55,36 @@ const employeeSchema = new mongoose.Schema({
         default: 'Full-time' 
     },
 
-    // هيكل الرواتب (Payroll Engine Base)
+    // هيكل الرواتب المطور (Payroll Engine)
     salaryDetails: {
-        basicSalary: { type: Number, required: true, default: 0 }, // الراتب الأساسي
-        allowances: { type: Number, default: 0 }, // البدلات
-        otherIncentives: { type: Number, default: 0 } // حوافز أخرى
+        basicSalary: { type: Number, required: true, default: 0 },
+        // تم تحديث البدلات والحوافز لتكون مرنة مع الـ Logic الجديد
+        additions: [{
+            name: { type: String }, // اسم البند (مثلاً: حافز إنتاج)
+            amount: { type: Number, default: 0 },
+            type: { 
+                type: String, 
+                enum: ['Exempted', 'Non-Exempted'], // التعديل المطلوب لـ Taxable/Non-Taxable
+                default: 'Non-Exempted' 
+            }
+        }],
+        deductions: [{
+            name: { type: String }, // اسم الخصم (مثلاً: تأمين طبي)
+            amount: { type: Number, default: 0 },
+            isMedical: { type: Boolean, default: false }, // علامة عشان الـ 15% Medical Rule
+            type: { 
+                type: String, 
+                enum: ['Exempted', 'Non-Exempted'], 
+                default: 'Non-Exempted' 
+            }
+        }]
     },
 
     // إدارة الوثائق (Document Management)
     documents: [{
-        title: { type: String }, // مثلاً: "صورة البطاقة" أو "عقد العمل"
+        title: { type: String }, 
         fileUrl: { type: String }, 
-        expiryDate: { type: Date } // تنبيهات انتهاء الأوراق
+        expiryDate: { type: Date }
     }],
 
     status: { 
@@ -81,4 +99,8 @@ const employeeSchema = new mongoose.Schema({
 employeeSchema.index({ companyId: 1, department: 1 });
 employeeSchema.index({ nationalId: 1 }, { unique: true });
 
+/**
+ * التصدير النهائي (Vercel Optimized)
+ * يمنع الـ Duplicate model name error تماماً
+ */
 module.exports = mongoose.models.Employee || mongoose.model('Employee', employeeSchema);
