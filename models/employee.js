@@ -26,15 +26,17 @@ const employeeSchema = new mongoose.Schema({
         ref: 'Company', 
         required: [true, 'يجب ربط الموظف بشركة'] 
     },
+    // التعديل: جعل القسم يقبل نص (String) ليتوافق مع الـ Frontend الحالي
     department: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Department', 
-        required: [true, 'يجب تحديد قسم للموظف'] 
+        type: String, 
+        required: [true, 'يجب تحديد قسم للموظف'],
+        default: 'General'
     },
     jobTitle: { 
         type: String, 
         required: [true, 'المسمى الوظيفي مطلوب'], 
-        trim: true 
+        trim: true,
+        default: 'Employee'
     },
     
     // الهيكل التنظيمي (Hierarchy)
@@ -47,7 +49,7 @@ const employeeSchema = new mongoose.Schema({
     // 3. دورة حياة الموظف (Lifecycle)
     hireDate: { 
         type: Date, 
-        required: [true, 'تاريخ التعيين مطلوب'] 
+        default: Date.now 
     },
     resignationDate: { 
         type: Date, 
@@ -63,24 +65,23 @@ const employeeSchema = new mongoose.Schema({
     salaryDetails: {
         basicSalary: { 
             type: Number, 
-            required: [true, 'الراتب الأساسي مطلوب'], 
             default: 0 
         },
         // البدلات والحوافز
         additions: [{
-            name: { type: String, required: true },
+            name: { type: String },
             amount: { type: Number, default: 0 },
             type: { 
                 type: String, 
-                enum: ['Exempted', 'Non-Exempted'], // Exempted = معفى من الضريبة
+                enum: ['Exempted', 'Non-Exempted'], 
                 default: 'Non-Exempted' 
             }
         }],
         // الاستقطاعات والخصومات
         deductions: [{
-            name: { type: String, required: true },
+            name: { type: String },
             amount: { type: Number, default: 0 },
-            isMedical: { type: Boolean, default: false }, // أساسي لحساب بند الـ 15% تأمين طبي
+            isMedical: { type: Boolean, default: false },
             type: { 
                 type: String, 
                 enum: ['Exempted', 'Non-Exempted'], 
@@ -89,7 +90,13 @@ const employeeSchema = new mongoose.Schema({
         }]
     },
 
-    // 5. الأرشيف والوثائق (Documents)
+    // 5. الأرشيف وسجل المرتبات (History)
+    // أضفت لك حقل الـ history هنا لأنه أساسي لعرض سجل الموظف في الـ UI
+    history: [{
+        month: String,
+        payload: Object
+    }],
+
     documents: [{
         title: { type: String }, 
         fileUrl: { type: String }, 
@@ -104,16 +111,8 @@ const employeeSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-/**
- * تحسين الأداء (Performance Optimization)
- * Indexing لسرعة استخراج كشوف المرتبات والبحث بالبطاقة
- */
-employeeSchema.index({ companyId: 1, department: 1 });
-employeeSchema.index({ companyId: 1, status: 1 }); // مهم لفلترة الموظفين النشطين فقط
+// تحسين الأداء
+employeeSchema.index({ companyId: 1, status: 1 });
 employeeSchema.index({ nationalId: 1 }, { unique: true });
 
-/**
- * التصدير النهائي (Serverless Optimized)
- * حل مشكلة الـ OverwriteModelError في Vercel
- */
 module.exports = mongoose.models.Employee || mongoose.model('Employee', employeeSchema);
