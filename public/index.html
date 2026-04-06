@@ -133,7 +133,7 @@
                 <div class="col-span-2 md:col-span-1"><label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Employee Name</label><p id="p-name" class="font-black text-slate-800 text-lg truncate-custom"></p></div>
                 <div><label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Target Month</label><input type="month" id="c-month" onchange="handleMonthChange()" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none border border-indigo-100"></div>
                 <div><label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Hiring Date</label><input type="date" id="p-hdate" class="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm outline-none" readonly></div>
-                <div><label class="text-[10px] text-orange-500 block font-black uppercase mb-1">Resign Date</label><input type="date" id="c-resign" onchange="validateResignationDate()" class="w-full bg-orange-50 p-3 rounded-xl font-bold text-sm outline-none border border-orange-100"></div>
+                <div><label class="text-[10px] text-orange-500 block font-black uppercase mb-1">Resign Date</label><input type="date" id="c-resign" class="w-full bg-orange-50 p-3 rounded-xl font-bold text-sm outline-none border border-orange-100"></div>
                 <div><label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Work Days</label><input type="number" id="c-days" value="30" max="30" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none text-center border border-indigo-100"></div>
             </div>
             <div class="bg-white p-8 rounded-[2.5rem] border mb-8 shadow-sm">
@@ -183,16 +183,28 @@
     <script>
         let TOKEN = localStorage.getItem('token');
 
-        // دالة موحدة للطلبات مع الـ Backend
+        // دالة موحدة للطلبات مع الـ Backend تضمن المسار الصحيح /api/
         async function apiFetch(url, options = {}) {
+            // إضافة /api لو مش موجودة في أول الرابط
+            const finalUrl = url.startsWith('/api') ? url : `/api${url.startsWith('/') ? '' : '/'}${url}`;
+            
             options.headers = {
                 ...options.headers, 
                 'Authorization': `Bearer ${TOKEN}`, 
                 'Content-Type': 'application/json'
             };
+
             try {
-                const res = await fetch(url, options);
+                const res = await fetch(finalUrl, options);
+                
+                // التعامل مع الـ HTML Fallback (Error 404/500 على Vercel)
+                const contentType = res.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") === -1) {
+                    throw new Error("السيرفر أرسل رد بصيغة HTML بدلاً من JSON. تأكد من أن الرابط /api/ موجود في الـ Backend.");
+                }
+
                 if(res.status === 401) { handleLogout(); throw new Error("Unauthorized"); }
+                
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || "خطأ غير معروف");
                 return data;
@@ -203,7 +215,6 @@
             }
         }
 
-        // تبديل واجهة الدخول إلى تسجيل شركة
         function toggleRegisterMode() {
             const nameField = document.getElementById('auth-name');
             const loginBtn = document.getElementById('login-btn');
@@ -217,7 +228,6 @@
             toggleBtn.innerText = !isRegistering ? "لديك حساب بالفعل؟ دخول آمن" : "إنشاء حساب شركة جديد 🏢";
         }
 
-        // عملية تسجيل الدخول
         async function handleLogin(e) {
             if(e) e.preventDefault();
             const email = document.getElementById('auth-email').value;
@@ -228,11 +238,13 @@
             btn.innerText = "جاري الدخول..."; btn.disabled = true;
 
             try {
+                // استخدام مسار صريح يبدأ بـ /api
                 const res = await fetch('/api/auth/login', { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
                     body: JSON.stringify({ email: email.toLowerCase().trim(), password }) 
                 });
+                
                 const data = await res.json();
                 
                 if(res.ok && data.token) { 
@@ -242,13 +254,12 @@
                     alert(data.error || "بيانات الدخول غير صحيحة");
                 }
             } catch (err) {
-                alert("فشل الاتصال بالسيرفر");
+                alert("فشل الاتصال بالسيرفر. تأكد من أن الـ API مفعل.");
             } finally {
                 btn.innerText = "دخول آمن 🔒"; btn.disabled = false;
             }
         }
 
-        // عملية تسجيل شركة جديدة
         async function handleRegister(e) {
             if(e) e.preventDefault();
             const name = document.getElementById('auth-name').value;
@@ -311,7 +322,7 @@
         async function showSettings() { 
             hideAll(); document.getElementById('settings-view').classList.remove('hidden'); 
             try {
-                const data = await apiFetch('/api/company/settings');
+                const data = await apiFetch('/company/settings'); // apiFetch هتضيف /api/ لوحدها
                 document.getElementById('set-exemption').value = data.personalExemption || 20000;
                 document.getElementById('set-maxins').value = data.maxInsSalary || 16700;
                 document.getElementById('set-percent').value = data.insEmployeePercent || 0.11;
@@ -327,14 +338,14 @@
                 medicalExemptionLimit: Number(document.getElementById('set-medical').value)
             };
             try {
-                await apiFetch('/api/company/settings', { method: 'POST', body: JSON.stringify(body) });
+                await apiFetch('/company/settings', { method: 'POST', body: JSON.stringify(body) });
                 alert("تم تحديث إعدادات الشركة بنجاح ✅");
             } catch(e) {}
         }
 
         async function loadEmployees() {
             try {
-                const data = await apiFetch('/api/employees');
+                const data = await apiFetch('/employees');
                 document.getElementById('empTable').innerHTML = data.map(e => `
                     <tr class="hover:bg-indigo-50/50 cursor-pointer transition border-b border-slate-50" onclick="openProfile('${e._id}')">
                         <td class="p-5 flex items-center"><div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black ml-4 shadow-sm">${e.name ? e.name[0] : '?'}</div><div class="font-black text-slate-800 text-sm">${e.name}</div></td>
@@ -349,7 +360,7 @@
             try {
                 hideAll(); document.getElementById('profile-view').classList.remove('hidden');
                 document.getElementById('currId').value = id;
-                const data = await apiFetch(`/api/employees/${id}/details`);
+                const data = await apiFetch(`/employees/${id}/details`);
                 document.getElementById('p-name').innerText = data.emp.name;
                 document.getElementById('p-hdate').value = data.emp.hireDate ? data.emp.hireDate.substring(0, 10) : "";
                 document.getElementById('c-resign').value = data.emp.resignationDate ? data.emp.resignationDate.substring(0, 10) : "";
@@ -363,11 +374,11 @@
                 document.getElementById('histBody').innerHTML = (data.history || []).map(r => `
                     <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition">
                         <td class="p-4 font-black text-slate-900">${r.month}</td>
-                        <td class="p-4">${r.payload.days}</td>
-                        <td class="p-4">${r.payload.gross.toLocaleString()}</td>
-                        <td class="p-4">${r.payload.insuranceEmployee.toLocaleString()}</td>
-                        <td class="p-4 text-rose-600">${r.payload.monthlyTax.toLocaleString()}</td>
-                        <td class="p-4 text-emerald-700 font-black">${r.payload.net.toLocaleString()}</td>
+                        <td class="p-4">${r.payload?.days || 30}</td>
+                        <td class="p-4">${(r.payload?.grossSalary || 0).toLocaleString()}</td>
+                        <td class="p-4">${(r.payload?.insuranceEmployee || 0).toLocaleString()}</td>
+                        <td class="p-4 text-rose-600">${(r.payload?.taxAmount || 0).toLocaleString()}</td>
+                        <td class="p-4 text-emerald-700 font-black">${(r.payload?.netSalary || 0).toLocaleString()}</td>
                     </tr>`).join('');
             } catch(e) {}
         }
@@ -378,7 +389,7 @@
             const btn = document.getElementById('calc-btn');
             btn.innerText = "جاري الحساب..."; btn.disabled = true;
             try {
-                const data = await apiFetch('/api/payroll/net-to-gross', { method: 'POST', body: JSON.stringify({ targetNet: net }) });
+                const data = await apiFetch('/payroll/net-to-gross', { method: 'POST', body: JSON.stringify({ targetNet: net }) });
                 document.getElementById('calc-result').classList.remove('hidden');
                 document.getElementById('result-gross').innerText = data.grossSalary.toLocaleString();
                 document.getElementById('result-tax').innerText = data.monthlyTax.toLocaleString();
@@ -414,7 +425,7 @@
             };
 
             try { 
-                await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) }); 
+                await apiFetch('/payroll/calculate', { method: 'POST', body: JSON.stringify(body) }); 
                 alert("تم حساب المرتب وحفظه بنجاح ✅");
                 await openProfile(empId); 
             } catch(e) {
@@ -432,8 +443,18 @@
                 employmentType: document.getElementById('n-type').value 
             };
             try {
-                await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(body) });
+                await apiFetch('/employees', { method: 'POST', body: JSON.stringify(body) });
                 document.getElementById('modal').classList.add('hidden'); 
+                showHR();
+            } catch(e) {}
+        }
+
+        async function delEmp() {
+            const id = document.getElementById('currId').value;
+            if(!confirm("هل أنت متأكد من حذف الموظف نهائياً؟")) return;
+            try {
+                await apiFetch(`/employees/${id}`, { method: 'DELETE' });
+                alert("تم الحذف بنجاح");
                 showHR();
             } catch(e) {}
         }
@@ -454,6 +475,10 @@
                 <button onclick="this.parentElement.remove()" class="text-rose-500 px-2"><i class="fas fa-times"></i></button>
             `;
             document.getElementById(areaId).appendChild(div);
+        }
+
+        function handleMonthChange() {
+            // يمكن إضافة لوجيك لتحديث البيانات عند تغيير الشهر
         }
 
         window.onload = checkAuth;
