@@ -8,23 +8,21 @@ const auth = require("./middleware/auth");
 const Company = require("./models/company");
 const Employee = require("./models/employee");
 
-// استيراد المحرك المالي
-// تأكد أن ملف calculations.js يصدر الدوال بهذه الأسماء
-const calculations = require("./calculations"); 
+// استيراد المحرك المالي (تأكد أن calculations.js يصدر function مباشرة)
+const calculatePayroll = require("./calculations"); 
 
 const app = express();
 
 // 1. الإعدادات الأساسية (Middleware)
-// تم ضبط CORS ليقبل الطلبات من أي مكان في بيئة الـ Development والـ Production
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 2. ربط الـ Routes المنفصلة
+// 2. ربط الـ Routes المنفصلة (تأكد من مطابقة أسماء الملفات في فولدر routes)
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/employees", require("./routes/employees"));
-// تم التأكد من وجود هذه الملفات في فولدر routes حسب صور GitHub
-app.use("/api/departments", require("./routes/department")); // تأكد من اسم الملف department.js أو departments.js
+// تم التعديل ليطابق اسم الملف في الصورة: department.js وليس departments.js
+app.use("/api/departments", require("./routes/department")); 
 app.use("/api/payroll", require("./routes/payroll"));
 
 /**
@@ -80,7 +78,7 @@ app.post("/api/company/settings", auth, async (req, res) => {
 app.post("/api/payroll/calculate", auth, async (req, res) => {
     try {
         await connectDB();
-        const { empId, month, days, fullBasic, fullTrans, additions, deductions } = req.body;
+        const { empId, month } = req.body;
         
         const [emp, company] = await Promise.all([
             Employee.findOne({ _id: empId, companyId: req.user.companyId }),
@@ -96,8 +94,8 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
             medicalExemptionLimit: 10000 
         };
         
-        // استخدام الدالة من ملف calculations
-        const result = calculations(emp.toObject(), settings);
+        // تشغيل المحرك المالي
+        const result = calculatePayroll(emp.toObject(), settings);
 
         res.json({ success: true, result });
     } catch (err) { 
@@ -107,21 +105,24 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
 });
 
 // 4. التعامل مع الملفات الثابتة (Public Folder)
-// مهم جداً لـ Vercel لخدمة واجهة المستخدم
 app.use(express.static(path.join(__dirname, "public")));
 
-// أي مسار لا يبدأ بـ /api يتم توجيهه لـ index.html
-app.get("*", (req, res) => {
-    if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(__dirname, "public", "index.html"));
-    }
+// 5. حماية الـ API من الـ HTML Fallback
+// أي طلب يبدأ بـ /api وغير موجود يرجع 404 JSON مش صفحة HTML
+app.use("/api/*", (req, res) => {
+    res.status(404).json({ error: "الرابط المطلوب غير موجود في الـ API" });
 });
 
-// 5. التشغيل
-const PORT = process.env.PORT || 3000;
+// أي مسار آخر يخدم صفحة الـ index.html
+app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// 6. التشغيل (Local Only)
 if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => console.log(`Server LIVE on port ${PORT} 🚀`));
 }
 
-// تصدير التطبيق ليكون متاحاً لـ Vercel Serverless
+// تصدير التطبيق لـ Vercel
 module.exports = app;
