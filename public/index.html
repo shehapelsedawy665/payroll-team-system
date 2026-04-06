@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Seday ERP - Payroll Pro</title>
+    <title>Seday ERP - Payroll Pro 2026</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -22,6 +22,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .table-container { width: 100%; overflow-x: auto; border-radius: 1.5rem; }
         table { width: 100%; min-width: 800px; }
+        .truncate-custom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
     </style>
 </head>
 <body class="bg-slate-50 flex min-h-screen">
@@ -32,10 +33,13 @@
             <h2 class="text-3xl font-black text-slate-800 mb-2">SEDAY ERP</h2>
             <p class="text-slate-400 text-sm mb-8 font-bold">Egyptian Payroll Engine 2026</p>
             <div class="space-y-4">
+                <input type="text" id="auth-name" placeholder="اسم الشركة (للتسجيل فقط)" class="hidden w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
                 <input type="email" id="auth-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
                 <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
+                
                 <button onclick="handleLogin()" id="login-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">دخول آمن 🔒</button>
-                <button onclick="handleRegister()" id="reg-btn" class="w-full bg-slate-50 text-slate-500 py-3 rounded-2xl font-bold text-xs border-2 border-dashed border-slate-200 hover:bg-indigo-50 transition">إنشاء حساب شركة جديد 🏢</button>
+                <button onclick="toggleRegisterMode()" id="toggle-reg-btn" class="w-full bg-slate-50 text-slate-500 py-3 rounded-2xl font-bold text-xs border-2 border-dashed border-slate-200 hover:bg-indigo-50 transition">إنشاء حساب شركة جديد 🏢</button>
+                <button onclick="handleRegister()" id="real-reg-btn" class="hidden w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">إتمام التسجيل الآن ✅</button>
             </div>
         </div>
     </div>
@@ -82,6 +86,7 @@
                     <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">الإعفاء الشخصي السنوي (EGP)</label><input type="number" id="set-exemption" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
                     <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">الحد الأقصى لأجر الاشتراك التأميني</label><input type="number" id="set-maxins" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
                     <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">نسبة تأمينات الموظف (مثال: 0.11)</label><input type="number" step="0.01" id="set-percent" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
+                    <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">حد الإعفاء الطبي السنوي (قانوني: 10000)</label><input type="number" id="set-medical" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
                     <button onclick="saveSettings()" id="save-set-btn" class="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">حفظ الإعدادات الجديدة</button>
                 </div>
             </div>
@@ -132,7 +137,7 @@
             <div class="bg-white p-8 rounded-[2.5rem] border mb-8 shadow-sm">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div><label class="text-xs font-black text-slate-500 mb-3 block">Contract Basic</label><input type="number" id="c-fbasic" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-2xl text-center outline-none focus:border-indigo-500 border-2 border-transparent transition shadow-inner"></div>
-                    <div><label class="text-xs font-black text-slate-500 mb-3 block">Allowances</label><input type="number" id="c-ftrans" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-2xl text-center outline-none focus:border-indigo-500 border-2 border-transparent transition shadow-inner"></div>
+                    <div><label class="text-xs font-black text-slate-500 mb-3 block">Allowances (Transportation)</label><input type="number" id="c-ftrans" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-2xl text-center outline-none focus:border-indigo-500 border-2 border-transparent transition shadow-inner"></div>
                 </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
@@ -165,95 +170,146 @@
                     <div><label class="text-[10px] font-black text-slate-400 mb-1 block uppercase">تاريخ التعيين</label><input type="date" id="n-hdate" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-xs outline-none"></div>
                     <div><label class="text-[10px] font-black text-slate-400 mb-1 block uppercase">أجر التأمين</label><input type="number" id="n-ins" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-center outline-none"></div>
                 </div>
-                <select id="n-type" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-indigo-600 outline-none"><option value="Full Time">Full Time</option><option value="Part Time">Part Time</option></select>
+                <select id="n-type" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-indigo-600 outline-none"><option value="Full-time">Full Time</option><option value="Part-time">Part Time</option></select>
             </div>
             <div class="flex gap-4 mt-10"><button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-lg">حفظ</button><button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-400 py-5 rounded-2xl font-bold">إلغاء</button></div>
         </div>
     </div>
 
-    <input type="hidden" id="currId"><input type="hidden" id="pD"><input type="hidden" id="pTxbl"><input type="hidden" id="pTx">
+    <input type="hidden" id="currId">
 
     <script>
         let TOKEN = localStorage.getItem('token');
-        function apiFetch(url, options = {}) {
-            options.headers = {...options.headers, 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json'};
-            return fetch(url, options).then(res => { if(res.status === 401) { handleLogout(); throw new Error("Unauthorized"); } return res.json(); });
+
+        // دالة موحدة للطلبات مع الـ Backend
+        async function apiFetch(url, options = {}) {
+            options.headers = {
+                ...options.headers, 
+                'Authorization': `Bearer ${TOKEN}`, 
+                'Content-Type': 'application/json'
+            };
+            const res = await fetch(url, options);
+            if(res.status === 401) { handleLogout(); throw new Error("Unauthorized"); }
+            return res.json();
         }
-        function validateResignationDate() {
-            const monthInput = document.getElementById('c-month').value;
-            const resignInput = document.getElementById('c-resign');
-            if (monthInput && resignInput.value) {
-                const monthDate = new Date(monthInput + "-01");
-                const resignDate = new Date(resignInput.value);
-                if (resignDate < monthDate) { alert("⚠️ تاريخ الاستقالة لا يمكن أن يكون قبل شهر الحساب."); resignInput.value = ""; }
-            }
+
+        // تبديل واجهة الدخول إلى تسجيل شركة
+        function toggleRegisterMode() {
+            const isReg = document.getElementById('auth-name').classList.toggle('hidden');
+            document.getElementById('login-btn').classList.toggle('hidden');
+            document.getElementById('real-reg-btn').classList.toggle('hidden');
+            document.getElementById('toggle-reg-btn').innerText = isReg ? "لديك حساب بالفعل؟ دخول" : "إنشاء حساب شركة جديد 🏢";
         }
-        function handleMonthChange() {
-            const selectedMonth = document.getElementById('c-month').value;
-            const minAllowed = document.getElementById('c-month').min;
-            if (selectedMonth < minAllowed) { alert("⚠️ لا يمكن اختيار شهر تم حسابه سابقاً."); document.getElementById('c-month').value = minAllowed; }
-        }
+
+        // عملية تسجيل الدخول
         async function handleLogin() {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
-            if(!email || !password) return alert("أكمل البيانات");
-            const res = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: email.toLowerCase(), password }) });
+            if(!email || !password) return alert("الرجاء إدخال البيانات");
+
+            const res = await fetch('/api/auth/login', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ email: email.toLowerCase().trim(), password }) 
+            });
             const data = await res.json();
-            if(data.token) { localStorage.setItem('token', data.token); location.reload(); } else alert(data.error);
+            if(data.token) { 
+                localStorage.setItem('token', data.token); 
+                location.reload(); 
+            } else alert(data.error || "بيانات الدخول غير صحيحة");
         }
+
+        // عملية تسجيل شركة جديدة
         async function handleRegister() {
+            const name = document.getElementById('auth-name').value;
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
-            const res = await fetch('/api/auth/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ companyName: "SEDAY ERP Client", adminEmail: email.toLowerCase(), password }) });
-            if(res.ok) alert("تم إنشاء الشركة! يمكنك الآن تسجيل الدخول."); else alert("خطأ في التسجيل");
+            
+            if(!name || !email || !password) return alert("أكمل كافة البيانات المطلوبة");
+
+            const res = await fetch('/api/auth/register', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ 
+                    name, 
+                    adminEmail: email.toLowerCase().trim(), 
+                    email: email.toLowerCase().trim(), 
+                    password 
+                }) 
+            });
+            
+            if(res.ok) {
+                alert("تم تسجيل الشركة بنجاح! يمكنك الآن تسجيل الدخول.");
+                toggleRegisterMode();
+            } else {
+                const data = await res.json();
+                alert(data.error || "خطأ في عملية التسجيل");
+            }
         }
+
         function handleLogout() { localStorage.removeItem('token'); location.reload(); }
-        function checkAuth() { if(TOKEN) { document.getElementById('login-view').classList.add('hidden'); document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('main-content').classList.remove('hidden'); showDash(); } }
+
+        function checkAuth() { 
+            if(TOKEN) { 
+                document.getElementById('login-view').classList.add('hidden'); 
+                document.getElementById('sidebar').classList.remove('hidden'); 
+                document.getElementById('main-content').classList.remove('hidden'); 
+                showDash(); 
+            } 
+        }
+
         function hideAll() { ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view', 'settings-view'].forEach(id => document.getElementById(id).classList.add('hidden')); }
         function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
-        function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
+        function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); loadEmployees(); }
         function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
+        
         async function showSettings() { 
             hideAll(); document.getElementById('settings-view').classList.remove('hidden'); 
             const data = await apiFetch('/api/company/settings');
             document.getElementById('set-exemption').value = data.personalExemption || 20000;
             document.getElementById('set-maxins').value = data.maxInsSalary || 16700;
             document.getElementById('set-percent').value = data.insEmployeePercent || 0.11;
+            document.getElementById('set-medical').value = data.medicalExemptionLimit || 10000;
         }
+
         async function saveSettings() {
-            const body = { personalExemption: Number(document.getElementById('set-exemption').value), maxInsSalary: Number(document.getElementById('set-maxins').value), insEmployeePercent: Number(document.getElementById('set-percent').value) };
+            const body = { 
+                personalExemption: Number(document.getElementById('set-exemption').value), 
+                maxInsSalary: Number(document.getElementById('set-maxins').value), 
+                insEmployeePercent: Number(document.getElementById('set-percent').value),
+                medicalExemptionLimit: Number(document.getElementById('set-medical').value)
+            };
             await apiFetch('/api/company/settings', { method: 'POST', body: JSON.stringify(body) });
-            alert("تم التحديث بنجاح ✅");
+            alert("تم تحديث إعدادات الشركة بنجاح ✅");
         }
-        async function load() {
+
+        async function loadEmployees() {
             const data = await apiFetch('/api/employees');
             document.getElementById('empTable').innerHTML = data.map(e => `
                 <tr class="hover:bg-indigo-50/50 cursor-pointer transition border-b border-slate-50" onclick="openProfile('${e._id}')">
                     <td class="p-5 flex items-center"><div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black ml-4 shadow-sm">${e.name[0]}</div><div class="font-black text-slate-800 text-sm">${e.name}</div></td>
                     <td class="p-5 text-center font-mono text-slate-400 text-xs">${e.nationalId || '---'}</td>
-                    <td class="p-5 text-center"><span class="${e.resignationDate ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"} px-4 py-2 rounded-xl text-[9px] font-black uppercase">${e.resignationDate ? "Resigned" : "Active"}</span></td>
+                    <td class="p-5 text-center"><span class="${e.status === 'Resigned' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"} px-4 py-2 rounded-xl text-[9px] font-black uppercase">${e.status}</span></td>
                     <td class="p-5 text-center text-indigo-300"><i class="fas fa-arrow-left"></i></td>
                 </tr>`).join('');
         }
+
         async function openProfile(id) {
             hideAll(); document.getElementById('profile-view').classList.remove('hidden');
             document.getElementById('currId').value = id;
             const data = await apiFetch(`/api/employees/${id}/details`);
             document.getElementById('p-name').innerText = data.emp.name;
-            document.getElementById('p-hdate').value = data.emp.hiringDate;
-            document.getElementById('c-resign').value = data.emp.resignationDate || "";
-            document.getElementById('c-fbasic').value = data.emp.insSalary || 0;
-            const hDateStr = data.emp.hiringDate.substring(0, 7);
-            let nextMonthStr = hDateStr;
-            if (data.history && data.history.length > 0) {
-                const sortedHistory = data.history.sort((a, b) => new Date(b.month) - new Date(a.month));
-                const lastMonth = new Date(sortedHistory[0].month + "-01");
-                lastMonth.setMonth(lastMonth.getMonth() + 1);
-                nextMonthStr = lastMonth.toISOString().substring(0, 7);
-            }
-            document.getElementById('c-month').min = nextMonthStr;
-            document.getElementById('c-month').value = nextMonthStr;
-            document.getElementById('histHead').innerHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">الشهر</th><th class="p-4">الأيام</th><th class="p-4">إجمالي</th><th class="p-4">تأمينات</th><th class="p-4 bg-rose-800">ضريبة</th><th class="p-4 bg-emerald-600">الصافي</th></tr>`;
+            document.getElementById('p-hdate').value = data.emp.hireDate ? data.emp.hireDate.substring(0, 10) : "";
+            document.getElementById('c-resign').value = data.emp.resignationDate ? data.emp.resignationDate.substring(0, 10) : "";
+            document.getElementById('c-fbasic').value = data.emp.salaryDetails.basicSalary || 0;
+            document.getElementById('c-ftrans').value = data.emp.salaryDetails.allowances || 0;
+            
+            // ضبط الشهر المستهدف
+            const now = new Date();
+            document.getElementById('c-month').value = now.toISOString().substring(0, 7);
+
+            // عرض تاريخ العمليات السابقة (History)
+            document.getElementById('histHead').innerHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">Gross</th><th class="p-4">Insurance</th><th class="p-4 bg-rose-800">Tax</th><th class="p-4 bg-emerald-600">Net</th></tr>`;
             document.getElementById('histBody').innerHTML = (data.history || []).map(r => `
                 <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition">
                     <td class="p-4 font-black text-slate-900">${r.month}</td>
@@ -264,6 +320,7 @@
                     <td class="p-4 text-emerald-700 font-black">${r.payload.net.toLocaleString()}</td>
                 </tr>`).join('');
         }
+
         async function runNetToGross() {
             const net = Number(document.getElementById('target-net').value);
             if(!net) return;
@@ -278,27 +335,74 @@
                 document.getElementById('result-base').innerText = data.insBase.toLocaleString();
             } finally { btn.innerText = "حساب الراتب الشامل"; btn.disabled = false; }
         }
+
         async function runCalc() {
             const btn = document.getElementById('run-btn');
             const month = document.getElementById('c-month').value;
             if(!month) return alert("اختر الشهر أولاً");
+            
             btn.innerText = "RUNNING..."; btn.disabled = true;
-            const getItems = (id) => Array.from(document.getElementById(id).children).map(r => ({ name: r.children[0].value, amount: Number(r.children[1].value), type: r.children[2].value }));
-            const body = { empId: document.getElementById('currId').value, month, days: Number(document.getElementById('c-days').value), fullBasic: Number(document.getElementById('c-fbasic').value), fullTrans: Number(document.getElementById('c-ftrans').value), additions: getItems('add-area'), deductions: getItems('ded-area') };
-            try { await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) }); await openProfile(body.empId); } 
-            finally { btn.innerText = "RUN PAYROLL ENGINE ⚡"; btn.disabled = false; }
+            
+            const getItems = (areaId) => Array.from(document.getElementById(areaId).children).map(div => ({
+                name: div.querySelector('input[type="text"]').value,
+                amount: Number(div.querySelector('input[type="number"]').value),
+                type: div.querySelector('select').value,
+                isMedical: div.querySelector('.medical-check')?.checked || false
+            }));
+
+            const body = { 
+                empId: document.getElementById('currId').value, 
+                month, 
+                days: Number(document.getElementById('c-days').value), 
+                fullBasic: Number(document.getElementById('c-fbasic').value), 
+                fullTrans: Number(document.getElementById('c-ftrans').value), 
+                additions: getItems('add-area'), 
+                deductions: getItems('ded-area') 
+            };
+
+            try { 
+                const res = await apiFetch('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(body) }); 
+                alert("تم حساب المرتب وحفظه في السجل ✅");
+                await openProfile(body.empId); 
+            } catch(e) {
+                alert("خطأ أثناء الحساب");
+            } finally { 
+                btn.innerText = "RUN PAYROLL ENGINE ⚡"; 
+                btn.disabled = false; 
+            }
         }
+
         async function saveEmp() {
-            const body = { name: document.getElementById('n-name').value, nationalId: document.getElementById('n-nid').value, hiringDate: document.getElementById('n-hdate').value, insSalary: Number(document.getElementById('n-ins').value), jobType: document.getElementById('n-type').value };
+            const body = { 
+                name: document.getElementById('n-name').value, 
+                nationalId: document.getElementById('n-nid').value, 
+                hireDate: document.getElementById('n-hdate').value, 
+                salaryDetails: { basicSalary: Number(document.getElementById('n-ins').value) },
+                employmentType: document.getElementById('n-type').value 
+            };
             await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(body) });
-            document.getElementById('modal').classList.add('hidden'); showHR();
+            document.getElementById('modal').classList.add('hidden'); 
+            showHR();
         }
-        async function delEmp() { if(confirm("حذف الموظف نهائياً؟")) { await apiFetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); showHR(); } }
+
         function addRow(areaId) {
-            const div = document.createElement('div'); div.className = "flex gap-2 items-center bg-white/10 p-3 rounded-2xl animate-fade-in";
-            div.innerHTML = `<input type="text" placeholder="الاسم" class="flex-1 bg-transparent p-1 text-xs text-white outline-none border-b border-white/20"><input type="number" placeholder="0" class="w-20 bg-transparent p-1 text-xs text-emerald-400 font-black text-center outline-none border-b border-white/20"><select class="bg-slate-800 text-[10px] text-white rounded-lg p-2"><option value="non-exempted">Taxed</option><option value="exempted">Exempt</option></select><button onclick="this.parentElement.remove()" class="text-rose-500 px-2"><i class="fas fa-times"></i></button>`;
+            const div = document.createElement('div'); 
+            div.className = "flex gap-2 items-center bg-white/10 p-3 rounded-2xl animate-fade-in";
+            const isDeduction = areaId === 'ded-area';
+            
+            div.innerHTML = `
+                <input type="text" placeholder="الاسم" class="flex-1 bg-transparent p-1 text-xs text-white outline-none border-b border-white/20">
+                <input type="number" placeholder="0" class="w-20 bg-transparent p-1 text-xs text-emerald-400 font-black text-center outline-none border-b border-white/20">
+                <select class="bg-slate-800 text-[10px] text-white rounded-lg p-2">
+                    <option value="Non-Exempted">Taxed</option>
+                    <option value="Exempted">Exempt</option>
+                </select>
+                ${isDeduction ? '<input type="checkbox" class="medical-check" title="Medical Insurance?">' : ''}
+                <button onclick="this.parentElement.remove()" class="text-rose-500 px-2"><i class="fas fa-times"></i></button>
+            `;
             document.getElementById(areaId).appendChild(div);
         }
+
         window.onload = checkAuth;
     </script>
 </body>
