@@ -1,12 +1,16 @@
 const mongoose = require('mongoose');
 
-// تعريف الثوابت العالمية طبقاً لآخر تحديثات قانون العمل والضرائب 2024/2025
+/**
+ * إعدادات الثوابت العالمية لـ Seday ERP
+ * تم التحديث لتشمل التعديلات الضريبية المطلوبة 2026
+ */
 const GLOBAL_DEFAULTS = {
     INS_EE_PERCENT: 0.11,
     INS_CO_PERCENT: 0.1875,
     MAX_INS_SALARY: 16700, 
     MIN_INS_SALARY: 2325,
-    PERSONAL_EXEMPTION: 20000 
+    PERSONAL_EXEMPTION: 20000,
+    MEDICAL_EXEMPTION_LIMIT: 10000 // الحد الأقصى السنوي للإعفاء الطبي (10000/12 شهرياً)
 };
 
 const companySchema = new mongoose.Schema({
@@ -24,7 +28,7 @@ const companySchema = new mongoose.Schema({
         lowercase: true,
         trim: true 
     },
-    // الإيميل المستخدم في تسجيل الدخول (Login Email)
+    // الإيميل المستخدم في تسجيل الدخول
     email: {
         type: String,
         required: [true, 'بريد تسجيل الدخول مطلوب'],
@@ -37,9 +41,6 @@ const companySchema = new mongoose.Schema({
         type: String,
         required: [true, 'كلمة المرور مطلوبة']
     },
-    
-    // تم حذف الـ departmentSchema الداخلية لأننا اعتمدنا على ملف مستقل
-    // دي الطريقة الـ Professional لربط الموديلات ببعضها (Reference)
     
     // الإعدادات المرنة للشركة
     settings: {
@@ -55,7 +56,11 @@ const companySchema = new mongoose.Schema({
             type: Number, 
             default: GLOBAL_DEFAULTS.PERSONAL_EXEMPTION 
         },
-        // إضافة خانة للوجو لدعم المرحلة التانية (Company Settings)
+        // إضافة حد الإعفاء الطبي في الإعدادات لدعم الـ Logic الجديد
+        medicalExemptionLimit: {
+            type: Number,
+            default: GLOBAL_DEFAULTS.MEDICAL_EXEMPTION_LIMIT
+        },
         companyLogo: { 
             type: String, 
             default: "" 
@@ -76,5 +81,8 @@ companySchema.pre('save', function(next) {
     next();
 });
 
-// تصدير الموديل مع التأكد من اسم المجموعة في قاعدة البيانات
+/**
+ * التصدير النهائي (Vercel Optimized)
+ * نستخدم "Company" كاسم للموديل مع التأكد من عدم تكراره
+ */
 module.exports = mongoose.models.Company || mongoose.model('Company', companySchema);
