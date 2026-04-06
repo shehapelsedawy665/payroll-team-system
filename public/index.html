@@ -372,7 +372,7 @@
                 insEmployeePercent: Number(document.getElementById('set-percent').value)
             };
             await apiFetch('/api/company/settings', { method: 'POST', body: JSON.stringify(body) });
-            alert("تم التحديث! الحسابات القادمة ستعتمد الإعدادات الجديدة.");
+            alert("تم التحديث!");
             btn.innerText = "حفظ الإعدادات الجديدة";
             showDash();
         }
@@ -404,35 +404,64 @@
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
             document.getElementById('c-fbasic').value = data.emp.insSalary || 0;
-            document.getElementById('pD').value = data.prevData.pDays || 0;
-            document.getElementById('pTxbl').value = data.prevData.pTaxable || 0;
-            document.getElementById('pTx').value = data.prevData.pTaxes || 0;
 
+            // --- بناء الـ Dynamic Headers ---
+            let addNames = new Set();
+            let dedNames = new Set();
+            data.history.forEach(h => {
+                if(h.payload.additionsData) h.payload.additionsData.forEach(a => addNames.add(a.name));
+                if(h.payload.deductionsData) h.payload.deductionsData.forEach(d => dedNames.add(d.name));
+            });
+
+            const addCols = Array.from(addNames);
+            const dedCols = Array.from(dedNames);
+
+            let headHTML = `<tr class="bg-slate-900 text-white italic uppercase divide-x divide-slate-700">
+                <th class="p-3">الشهر</th>
+                <th class="p-3">الأيام</th>
+                ${addCols.map(name => `<th class="p-3 bg-indigo-800 text-[10px]">${name}</th>`).join('')}
+                ${dedCols.map(name => `<th class="p-3 bg-rose-900 text-[10px]">${name}</th>`).join('')}
+                <th class="p-3">تأمينات</th>
+                <th class="p-3 bg-rose-600 text-rose-100">ضريبة</th>
+                <th class="p-3 bg-emerald-600">الصافي</th>
+            </tr>`;
+            
+            document.getElementById('histHead').innerHTML = headHTML;
+
+            document.getElementById('histBody').innerHTML = data.history.map(r => {
+                const p = r.payload;
+                const addCells = addCols.map(name => {
+                    const item = (p.additionsData || []).find(a => a.name === name);
+                    return `<td class="p-3 bg-indigo-50">${item ? item.amount.toLocaleString() : '0'}</td>`;
+                }).join('');
+                
+                const dedCells = dedCols.map(name => {
+                    const item = (p.deductionsData || []).find(d => d.name === name);
+                    return `<td class="p-3 bg-rose-50">${item ? item.amount.toLocaleString() : '0'}</td>`;
+                }).join('');
+
+                return `
+                    <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition border-b">
+                        <td class="p-3 font-black text-slate-900">${r.month}</td>
+                        <td class="p-3">${p.days}</td>
+                        ${addCells}
+                        ${dedCells}
+                        <td class="p-3">${p.insuranceEmployee.toLocaleString()}</td>
+                        <td class="p-3 text-rose-600 font-bold">${p.monthlyTax.toLocaleString()}</td>
+                        <td class="p-3 text-emerald-700 font-black">${p.net.toLocaleString()}</td>
+                    </tr>`;
+            }).join('');
+
+            // تحديث الشهور المتاحة
             const hDateStr = data.emp.hiringDate.substring(0, 7);
             let nextMonthStr = hDateStr;
-
             if (data.history.length > 0) {
-                const sortedHistory = data.history.sort((a, b) => new Date(b.month) - new Date(a.month));
-                const lastMonth = new Date(sortedHistory[0].month + "-01");
+                const lastMonth = new Date(data.history.sort((a,b) => new Date(b.month)-new Date(a.month))[0].month + "-01");
                 lastMonth.setMonth(lastMonth.getMonth() + 1);
                 nextMonthStr = lastMonth.toISOString().substring(0, 7);
             }
-
-            const monthInput = document.getElementById('c-month');
-            monthInput.min = nextMonthStr;
-            monthInput.value = nextMonthStr;
-
-            let headHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">الشهر</th><th class="p-4">الأيام</th><th class="p-4">الإجمالي</th><th class="p-4">تأمينات</th><th class="p-4 bg-rose-800">ضريبة</th><th class="p-4 bg-emerald-600">الصافي</th></tr>`;
-            document.getElementById('histHead').innerHTML = headHTML;
-            document.getElementById('histBody').innerHTML = data.history.map(r => `
-                <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition">
-                    <td class="p-4 font-black text-slate-900">${r.month}</td>
-                    <td class="p-4">${r.payload.days}</td>
-                    <td class="p-4">${r.payload.gross.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td class="p-4">${r.payload.insuranceEmployee.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td class="p-4 text-rose-600">${r.payload.monthlyTax.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td class="p-4 text-emerald-700 font-black">${r.payload.net.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                </tr>`).join('');
+            document.getElementById('c-month').min = nextMonthStr;
+            document.getElementById('c-month').value = nextMonthStr;
         }
 
         async function runNetToGross() {
@@ -454,13 +483,7 @@
             const btn = document.getElementById('run-btn');
             const month = document.getElementById('c-month').value;
             if(!month) return alert("اختر الشهر أولاً");
-            const resignDateStr = document.getElementById('c-resign').value;
-            if (resignDateStr) {
-                const rDate = new Date(resignDateStr);
-                const mDate = new Date(month + "-01");
-                if (rDate < mDate) return alert("❌ هذا الموظف مستقيل، لا يمكن حساب مرتب له في هذا التاريخ.");
-            }
-
+            
             btn.innerText = "RUNNING..."; btn.disabled = true;
             const getItems = (id) => Array.from(document.getElementById(id).children).map(r => ({ 
                 name: r.children[0].value, amount: Number(r.children[1].value), type: r.children[2].value 
@@ -471,8 +494,6 @@
                 days: Number(document.getElementById('c-days').value),
                 fullBasic: Number(document.getElementById('c-fbasic').value), 
                 fullTrans: Number(document.getElementById('c-ftrans').value),
-                hiringDate: document.getElementById('p-hdate').value, 
-                resignationDate: document.getElementById('c-resign').value,
                 additions: getItems('add-area'), deductions: getItems('ded-area')
             };
             try {
@@ -498,7 +519,7 @@
         }
 
         async function delEmp() { 
-            if(confirm("هل أنت متأكد من حذف الموظف وكل سجلاته التاريخية؟")) { 
+            if(confirm("حذف الموظف نهائياً؟")) { 
                 await apiFetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); 
                 showHR(); 
             } 
