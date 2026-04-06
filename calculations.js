@@ -19,6 +19,7 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
     const totalAdditions = additions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const gross = R(proratedBasic + proratedTrans + totalAdditions);
 
+    // الوعاء الضريبي مع معالجة الـ Medical
     let currentTaxable = (proratedBasic + proratedTrans) - insuranceEmployee;
     const medicalLimit = R(10000 / 12); 
 
@@ -80,8 +81,7 @@ function runPayrollLogic(input, prev, emp, settings = {}) {
         insuranceEmployee, monthlyTax, martyrs, 
         totalOtherDeductions, net, currentTaxable, 
         annualTaxable: finalAnnualTaxable,
-        additionsData: additions,
-        deductionsData: deductions
+        additionsData: additions, deductionsData: deductions
     };
 }
 
