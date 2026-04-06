@@ -2,26 +2,24 @@ const express = require('express');
 const router = express.Router();
 const Employee = require('../models/employee');
 const auth = require('../middleware/auth');
-const connectDB = require('../db');
 
 /**
- * 1. إضافة موظف جديد (Create)
- * تم التعديل ليتوافق مع هيكل الرواتب المطور (additions/deductions)
+ * 1. إضافة موظف جديد
+ * POST /api/employees/
  */
-router.post('/add', auth, async (req, res) => {
+router.post('/', auth, async (req, res) => {
     try {
-        await connectDB();
+        // تم إزالة connectDB لأننا استدعيناها في server.js
         
         const { 
             name, nationalId, email, phone, 
-            department, jobTitle, reportingTo, 
-            hireDate, employmentType, status,
-            basicSalary, additions, deductions 
+            department, jobTitle, hireDate, 
+            employmentType, status, salaryDetails 
         } = req.body;
 
-        // التحقق من البيانات الإلزامية
-        if (!name || !nationalId || !department || !jobTitle || !hireDate) {
-            return res.status(400).json({ error: 'برجاء إكمال البيانات الأساسية للموظف' });
+        // التحقق من البيانات الأساسية
+        if (!name || !nationalId) {
+            return res.status(400).json({ error: 'الاسم والرقم القومي بيانات إجبارية' });
         }
 
         const newEmployee = new Employee({
@@ -29,77 +27,92 @@ router.post('/add', auth, async (req, res) => {
             nationalId,
             email: email ? email.toLowerCase() : undefined,
             phone,
-            companyId: req.user.companyId, // الربط التلقائي بشركة المستخدم الحالي
+            companyId: req.user.companyId, 
             department,
             jobTitle,
-            reportingTo: reportingTo || null,
-            hireDate,
+            hireDate: hireDate || new Date(),
             employmentType: employmentType || 'Full-time',
             status: status || 'Active',
             salaryDetails: {
-                basicSalary: basicSalary || 0,
-                additions: additions || [],
-                deductions: deductions || []
+                basicSalary: salaryDetails?.basicSalary || 0,
+                additions: [],
+                deductions: []
             }
         });
 
         await newEmployee.save();
+        
         res.status(201).json({ 
             success: true, 
             message: 'تم تسجيل الموظف بنجاح', 
-            employeeId: newEmployee._id 
+            employee: newEmployee 
         });
 
     } catch (error) {
-        console.error("Add Employee Error:", error.message);
+        console.error("Add Employee Error:", error);
         if (error.code === 11000) {
-            return res.status(400).json({ error: 'رقم البطاقة (National ID) مسجل لموظف آخر بالفعل' });
+            return res.status(400).json({ error: 'الرقم القومي مسجل لموظف آخر بالفعل' });
         }
         res.status(500).json({ error: 'حدث خطأ أثناء حفظ بيانات الموظف' });
     }
 });
 
 /**
- * 2. جلب قائمة الموظفين (Read)
- * تم إضافة Populate لجلب أسماء الأقسام والمديرين بدلاً من الـ IDs
+ * 2. جلب قائمة الموظفين
+ * GET /api/employees/
  */
-router.get('/all', auth, async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
-        await connectDB();
-        
-        // جلب موظفين هذه الشركة فقط لضمان خصوصية البيانات
         const employees = await Employee.find({ companyId: req.user.companyId })
-            .populate('department', 'name code') 
-            .populate('reportingTo', 'name jobTitle')
-            .sort({ createdAt: -1 }); // الأحدث أولاً
+            .sort({ createdAt: -1 });
 
-        res.json({ success: true, count: employees.length, data: employees });
+        // نرسل البيانات مباشرة كـ Array أو نلفها في كائن (الـ Frontend عندك مستني Array)
+        res.json(employees); 
     } catch (error) {
-        console.error("Get Employees Error:", error.message);
+        console.error("Get Employees Error:", error);
         res.status(500).json({ error: 'فشل في جلب قائمة الموظفين' });
     }
 });
 
 /**
- * 3. حذف موظف (Delete)
- * التحقق من ملكية الشركة للموظف قبل الحذف
+ * 3. جلب تفاصيل موظف واحد (مهمة جداً لشاشة البروفايل)
+ * GET /api/employees/:id/details
+ */
+router.get('/:id/details', auth, async (req, res) => {
+    try {
+        const emp = await Employee.findOne({ 
+            _id: req.params.id, 
+            companyId: req.user.companyId 
+        });
+
+        if (!emp) return res.status(404).json({ error: 'الموظف غير موجود' });
+
+        res.json({
+            emp: emp,
+            history: emp.history || []
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'خطأ في جلب بيانات الموظف' });
+    }
+});
+
+/**
+ * 4. حذف موظف
+ * DELETE /api/employees/:id
  */
 router.delete('/:id', auth, async (req, res) => {
     try {
-        await connectDB();
-        
         const deletedEmployee = await Employee.findOneAndDelete({ 
             _id: req.params.id, 
-            companyId: req.user.companyId // لضمان عدم حذف موظف يتبع شركة أخرى
+            companyId: req.user.companyId 
         });
 
         if (!deletedEmployee) {
-            return res.status(404).json({ error: 'الموظف غير موجود أو ليس لديك صلاحية حذفه' });
+            return res.status(404).json({ error: 'الموظف غير موجود' });
         }
 
-        res.json({ success: true, message: 'تم حذف سجل الموظف بنجاح' });
+        res.json({ success: true, message: 'تم حذف الموظف بنجاح' });
     } catch (error) {
-        console.error("Delete Employee Error:", error.message);
         res.status(500).json({ error: 'حدث خطأ أثناء محاولة الحذف' });
     }
 });
