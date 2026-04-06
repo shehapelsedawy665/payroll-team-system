@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Seday ERP - Payroll Pro 2026</title>
+    <title>Seday ERP - Payroll Pro 2026 (Go Version)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -22,7 +22,6 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .table-container { width: 100%; overflow-x: auto; border-radius: 1.5rem; }
         table { width: 100%; min-width: 800px; }
-        .truncate-custom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
     </style>
 </head>
 <body class="bg-slate-50 flex min-h-screen">
@@ -31,17 +30,17 @@
         <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-fade-in text-center border-t-8 border-indigo-600">
             <div class="w-20 h-20 bg-indigo-600 text-white rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6 shadow-lg rotate-3"><i class="fas fa-bolt"></i></div>
             <h2 class="text-3xl font-black text-slate-800 mb-2">SEDAY ERP</h2>
-            <p class="text-slate-400 text-sm mb-8 font-bold">Egyptian Payroll Engine 2026</p>
+            <p class="text-slate-400 text-sm mb-8 font-bold italic">Go Engine 2026 ⚡</p>
             
             <div class="space-y-4">
-                <input type="text" id="auth-name" placeholder="اسم الشركة (للتسجيل فقط)" class="hidden w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
+                <input type="text" id="auth-name" placeholder="اسم الشركة" class="hidden w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
                 <input type="email" id="auth-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
                 <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
                 
                 <button type="button" onclick="handleLogin(event)" id="login-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">دخول آمن 🔒</button>
-                <button type="button" onclick="handleRegister(event)" id="real-reg-btn" class="hidden w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">إتمام التسجيل الآن ✅</button>
+                <button type="button" onclick="handleRegister(event)" id="real-reg-btn" class="hidden w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">إتمام التسجيل ✅</button>
                 
-                <button type="button" onclick="toggleRegisterMode()" id="toggle-reg-btn" class="w-full bg-slate-50 text-slate-500 py-3 rounded-2xl font-bold text-xs border-2 border-dashed border-slate-200 hover:bg-indigo-50 transition">إنشاء حساب شركة جديد 🏢</button>
+                <button type="button" onclick="toggleRegisterMode()" id="toggle-reg-btn" class="w-full bg-slate-50 text-slate-500 py-3 rounded-2xl font-bold text-xs border-2 border-dashed border-slate-200 hover:bg-indigo-50 transition">إنشاء حساب جديد 🏢</button>
             </div>
         </div>
     </div>
@@ -51,11 +50,11 @@
             <i class="fas fa-bolt"></i> <span class="nav-text italic uppercase mr-2">SEDAY</span>
         </div>
         <nav class="flex-1">
-            <div onclick="showDash()" class="p-5 hover:bg-indigo-600 flex items-center justify-center lg:justify-start cursor-pointer transition"><i class="fas fa-home lg:ml-4 text-xl"></i> <span class="nav-text">الرئيسية</span></div>
-            <div onclick="showHR()" class="p-5 hover:bg-indigo-600 flex items-center justify-center lg:justify-start cursor-pointer transition"><i class="fas fa-users lg:ml-4 text-xl"></i> <span class="nav-text">الموظفين</span></div>
-            <div onclick="showCalc()" class="p-5 hover:bg-emerald-600 flex items-center justify-center lg:justify-start cursor-pointer transition text-emerald-400"><i class="fas fa-magic lg:ml-4 text-xl"></i> <span class="nav-text">Net to Gross</span></div>
-            <div onclick="showSettings()" class="p-5 hover:bg-slate-700 flex items-center justify-center lg:justify-start cursor-pointer transition text-slate-400"><i class="fas fa-cog lg:ml-4 text-xl"></i> <span class="nav-text">الإعدادات</span></div>
-            <div onclick="handleLogout()" class="p-5 hover:bg-rose-600 flex items-center justify-center lg:justify-start cursor-pointer transition text-rose-400 mt-auto"><i class="fas fa-power-off lg:ml-4 text-xl"></i> <span class="nav-text">خروج</span></div>
+            <div onclick="showDash()" class="p-5 hover:bg-indigo-600 flex items-center cursor-pointer transition"><i class="fas fa-home lg:ml-4 text-xl"></i> <span class="nav-text">الرئيسية</span></div>
+            <div onclick="showHR()" class="p-5 hover:bg-indigo-600 flex items-center cursor-pointer transition"><i class="fas fa-users lg:ml-4 text-xl"></i> <span class="nav-text">الموظفين</span></div>
+            <div onclick="showCalc()" class="p-5 hover:bg-emerald-600 flex items-center cursor-pointer transition text-emerald-400"><i class="fas fa-magic lg:ml-4 text-xl"></i> <span class="nav-text">Net to Gross</span></div>
+            <div onclick="showSettings()" class="p-5 hover:bg-slate-700 flex items-center cursor-pointer transition text-slate-400"><i class="fas fa-cog lg:ml-4 text-xl"></i> <span class="nav-text">الإعدادات</span></div>
+            <div onclick="handleLogout()" class="p-5 hover:bg-rose-600 flex items-center cursor-pointer transition text-rose-400 mt-auto"><i class="fas fa-power-off lg:ml-4 text-xl"></i> <span class="nav-text">خروج</span></div>
         </nav>
     </aside>
 
@@ -63,118 +62,69 @@
         <div id="dashboard-view" class="animate-fade-in">
             <header class="mb-10 text-center lg:text-right">
                 <h1 class="text-3xl md:text-5xl font-black text-slate-800 italic">أهلاً <span class="text-indigo-600">يا بطل!</span></h1>
-                <p class="text-slate-400 font-bold mt-2 uppercase tracking-tighter text-xs">نظام إدارة المرتبات الذكي</p>
+                <p class="text-slate-400 font-bold mt-2 uppercase tracking-tighter text-xs">نظام السداد الذكي - نسخة Golang</p>
             </header>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div onclick="showHR()" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-b-4 border-indigo-500 hover:shadow-xl cursor-pointer transition-all active:scale-95 group">
+                <div onclick="showHR()" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-b-4 border-indigo-500 hover:shadow-xl cursor-pointer transition-all active:scale-95 group text-right">
                     <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i class="fas fa-user-tie"></i></div>
                     <h3 class="text-xl font-black text-slate-800">إدارة الموظفين</h3>
                 </div>
-                <div onclick="showCalc()" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-b-4 border-emerald-500 hover:shadow-xl cursor-pointer transition-all active:scale-95 group">
+                <div onclick="showCalc()" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-b-4 border-emerald-500 hover:shadow-xl cursor-pointer transition-all active:scale-95 group text-right">
                     <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><i class="fas fa-coins"></i></div>
                     <h3 class="text-xl font-black text-slate-800">Net to Gross</h3>
-                </div>
-                <div onclick="showSettings()" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-b-4 border-slate-700 hover:shadow-xl cursor-pointer transition-all active:scale-95 group">
-                    <div class="w-14 h-14 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:bg-slate-600 group-hover:text-white transition-colors"><i class="fas fa-cog"></i></div>
-                    <h3 class="text-xl font-black text-slate-800">إعدادات الشركة</h3>
-                </div>
-            </div>
-        </div>
-
-        <div id="settings-view" class="hidden animate-fade-in max-w-2xl mx-auto">
-            <div class="bg-white p-10 rounded-[3rem] shadow-xl border-t-8 border-slate-700">
-                <h2 class="text-3xl font-black mb-8 italic text-slate-800">إعدادات النظام ⚙️</h2>
-                <div class="space-y-6">
-                    <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">الإعفاء الشخصي السنوي (EGP)</label><input type="number" id="set-exemption" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
-                    <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">الحد الأقصى لأجر الاشتراك التأميني</label><input type="number" id="set-maxins" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
-                    <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">نسبة تأمينات الموظف (مثال: 0.11)</label><input type="number" step="0.01" id="set-percent" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
-                    <div><label class="text-xs font-black text-slate-400 uppercase mb-2 block">حد الإعفاء الطبي السنوي (قانوني: 10000)</label><input type="number" id="set-medical" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-xl outline-none focus:border-indigo-500 border-2 border-transparent transition"></div>
-                    <button onclick="saveSettings()" id="save-set-btn" class="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">حفظ الإعدادات الجديدة</button>
                 </div>
             </div>
         </div>
 
         <div id="list-view" class="hidden animate-fade-in">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div><h1 class="text-2xl font-black text-slate-800">قائمة الكوادر البشرية</h1></div>
-                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="w-full md:w-auto bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-lg active:scale-95">+ إضافة موظف</button>
+                <h1 class="text-2xl font-black text-slate-800">قائمة الكوادر البشرية</h1>
+                <button onclick="document.getElementById('modal').classList.remove('hidden')" class="w-full md:w-auto bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black shadow-lg">+ إضافة موظف</button>
             </div>
             <div class="table-container bg-white border border-slate-200 shadow-sm">
                 <table class="text-right">
-                    <thead class="bg-slate-50 border-b"><tr><th class="p-5 text-xs font-black text-slate-500 uppercase">الاسم الكامل</th><th class="p-5 text-center text-xs font-black text-slate-500 uppercase">الرقم القومي</th><th class="p-5 text-center text-xs font-black text-slate-500 uppercase">الحالة</th><th class="p-5 text-center text-xs font-black text-slate-500 uppercase">الإجراء</th></tr></thead>
+                    <thead class="bg-slate-50 border-b">
+                        <tr><th class="p-5 text-xs font-black text-slate-500">الاسم</th><th class="p-5 text-center text-xs font-black text-slate-500">الرقم القومي</th><th class="p-5 text-center text-xs font-black text-slate-500">الحالة</th><th class="p-5 text-center text-xs font-black text-slate-500">إجراء</th></tr>
+                    </thead>
                     <tbody id="empTable" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
                 </table>
             </div>
         </div>
 
-        <div id="net-gross-view" class="hidden animate-fade-in">
-            <div class="max-w-3xl mx-auto bg-slate-900 text-white p-6 md:p-12 rounded-[3rem] shadow-2xl text-center border-t-8 border-emerald-500">
-                <h2 class="text-3xl font-black mt-4 mb-2 italic">NET TO GROSS ⚡</h2>
-                <div class="space-y-8 mt-10">
-                    <div class="relative"><span class="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 font-black text-xl">EGP</span><input type="number" id="target-net" class="w-full bg-slate-800 p-8 rounded-[2rem] font-black text-5xl text-emerald-400 text-center outline-none border-4 border-transparent focus:border-emerald-500 transition shadow-inner" placeholder="0"></div>
-                    <button onclick="runNetToGross()" id="calc-btn" class="w-full bg-emerald-500 py-6 rounded-3xl font-black text-slate-900 text-2xl active:scale-95 transition shadow-xl shadow-emerald-500/30">حساب الراتب الشامل</button>
-                    <div id="calc-result" class="hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right"><p class="text-slate-500 text-[10px] uppercase font-bold">Gross Salary</p><h4 id="result-gross" class="text-3xl font-black text-emerald-400">0.00</h4></div>
-                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right"><p class="text-slate-500 text-[10px] uppercase font-bold">Monthly Tax</p><h4 id="result-tax" class="text-3xl font-black text-rose-400">0.00</h4></div>
-                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right"><p class="text-slate-500 text-[10px] uppercase font-bold">Employee Ins.</p><h4 id="result-ins" class="text-3xl font-black text-blue-400">0.00</h4></div>
-                        <div class="bg-white/5 p-6 rounded-3xl border border-white/10 text-right"><p class="text-slate-500 text-[10px] uppercase font-bold">Ins. Base</p><h4 id="result-base" class="text-3xl font-black text-indigo-400">0.00</h4></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div id="profile-view" class="hidden animate-fade-in">
-            <div class="flex flex-wrap justify-between items-center mb-8 gap-4">
-                <button onclick="showHR()" class="text-indigo-600 font-black text-sm bg-indigo-50 px-6 py-3 rounded-2xl hover:bg-indigo-100">← العودة للقائمة</button>
-                <button onclick="delEmp()" class="text-rose-600 font-black text-[11px] bg-rose-50 px-6 py-3 rounded-2xl hover:bg-rose-100">حذف الموظف نهائياً 🗑️</button>
+            <div class="flex justify-between items-center mb-8">
+                <button onclick="showHR()" class="text-indigo-600 font-black text-sm bg-indigo-50 px-6 py-3 rounded-2xl">← عودة</button>
+                <button onclick="delEmp()" class="text-rose-600 font-black text-xs bg-rose-50 px-6 py-3 rounded-2xl italic">حذف الموظف 🗑️</button>
             </div>
-            <div class="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border mb-8 grid grid-cols-2 md:grid-cols-5 gap-6 text-right relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
-                <div class="col-span-2 md:col-span-1"><label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Employee Name</label><p id="p-name" class="font-black text-slate-800 text-lg truncate-custom"></p></div>
-                <div><label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Target Month</label><input type="month" id="c-month" onchange="handleMonthChange()" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none border border-indigo-100"></div>
-                <div><label class="text-[10px] text-slate-400 block font-black uppercase mb-1">Hiring Date</label><input type="date" id="p-hdate" class="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm outline-none" readonly></div>
-                <div><label class="text-[10px] text-orange-500 block font-black uppercase mb-1">Resign Date</label><input type="date" id="c-resign" class="w-full bg-orange-50 p-3 rounded-xl font-bold text-sm outline-none border border-orange-100"></div>
-                <div><label class="text-[10px] text-indigo-600 block font-black uppercase mb-1">Work Days</label><input type="number" id="c-days" value="30" max="30" class="w-full bg-indigo-50 p-3 rounded-xl font-black text-sm outline-none text-center border border-indigo-100"></div>
-            </div>
-            <div class="bg-white p-8 rounded-[2.5rem] border mb-8 shadow-sm">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div><label class="text-xs font-black text-slate-500 mb-3 block">Contract Basic</label><input type="number" id="c-fbasic" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-2xl text-center outline-none focus:border-indigo-500 border-2 border-transparent transition shadow-inner"></div>
-                    <div><label class="text-xs font-black text-slate-500 mb-3 block">Allowances (Transportation)</label><input type="number" id="c-ftrans" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-2xl text-center outline-none focus:border-indigo-500 border-2 border-transparent transition shadow-inner"></div>
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border mb-8 text-right">
+                <h2 id="p-name" class="text-2xl font-black text-indigo-600 mb-4"></h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div><label class="text-xs font-black text-slate-400">المرتب الأساسي (تأمين)</label><input type="number" id="c-fbasic" class="w-full p-4 bg-slate-50 rounded-xl font-black text-xl outline-none"></div>
+                    <div><label class="text-xs font-black text-slate-400">الشهر</label><input type="month" id="c-month" class="w-full p-4 bg-indigo-50 rounded-xl font-black outline-none"></div>
                 </div>
+                <button onclick="runCalc()" id="run-btn" class="w-full mt-8 bg-emerald-500 py-6 rounded-2xl font-black text-slate-900 text-xl shadow-xl active:scale-95 transition">إصدار المرتب الشهري ⚡</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                <div class="bg-indigo-900 text-white p-8 rounded-[3rem] shadow-xl">
-                    <div class="flex justify-between items-center mb-6 border-b border-indigo-800 pb-4"><h4 class="font-black italic text-indigo-300 text-lg uppercase tracking-widest">Additions (+)</h4><button onclick="addRow('add-area')" class="bg-indigo-700 px-5 py-2 rounded-xl text-xs font-black hover:bg-indigo-600">+ Item</button></div>
-                    <div id="add-area" class="space-y-3"></div>
-                </div>
-                <div class="bg-slate-900 text-white p-8 rounded-[3rem] shadow-xl flex flex-col">
-                    <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4"><h4 class="font-black italic text-rose-400 text-lg uppercase tracking-widest">Deductions (-)</h4><button onclick="addRow('ded-area')" class="bg-slate-800 px-5 py-2 rounded-xl text-xs font-black hover:bg-slate-700">+ Item</button></div>
-                    <div id="ded-area" class="space-y-3 mb-6"></div>
-                    <button onclick="runCalc()" id="run-btn" class="w-full mt-auto bg-emerald-500 py-6 rounded-2xl font-black text-slate-900 text-xl shadow-xl active:scale-95 transition hover:bg-emerald-400">RUN PAYROLL ENGINE ⚡</button>
-                </div>
-            </div>
-            <div class="table-container bg-white border border-slate-200 shadow-xl mb-10">
-                <table class="text-xs text-center whitespace-nowrap" dir="ltr">
-                    <thead id="histHead" class="bg-slate-900 text-white uppercase italic"></thead>
-                    <tbody id="histBody" class="divide-y divide-slate-100 font-bold text-slate-600"></tbody>
+            <div class="table-container bg-white border shadow-sm">
+                <table class="text-xs text-center" dir="ltr">
+                    <thead class="bg-slate-900 text-white uppercase italic"><tr><th class="p-4">Month</th><th class="p-4">Gross</th><th class="p-4">Ins</th><th class="p-4">Tax</th><th class="p-4">Net</th></tr></thead>
+                    <tbody id="histBody" class="divide-y font-bold"></tbody>
                 </table>
             </div>
         </div>
     </main>
 
     <div id="modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-        <div class="bg-white p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-fade-in border-t-8 border-indigo-600">
-            <h3 class="text-3xl font-black mb-8 italic text-center text-slate-800">بيانات موظف جديد</h3>
-            <div class="space-y-5">
-                <input type="text" id="n-name" placeholder="الاسم بالكامل" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-right outline-none">
-                <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-center outline-none">
-                <div class="grid grid-cols-2 gap-5 text-right">
-                    <div><label class="text-[10px] font-black text-slate-400 mb-1 block uppercase">تاريخ التعيين</label><input type="date" id="n-hdate" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-xs outline-none"></div>
-                    <div><label class="text-[10px] font-black text-slate-400 mb-1 block uppercase">أجر التأمين</label><input type="number" id="n-ins" placeholder="0.00" class="w-full p-5 bg-slate-50 rounded-2xl font-bold text-center outline-none"></div>
-                </div>
-                <select id="n-type" class="w-full p-5 bg-slate-50 rounded-2xl font-black text-indigo-600 outline-none"><option value="Full-time">Full Time</option><option value="Part-time">Part Time</option></select>
+        <div class="bg-white p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-fade-in">
+            <h3 class="text-2xl font-black mb-8 text-center text-slate-800 italic underline decoration-indigo-500">موظف جديد</h3>
+            <div class="space-y-4">
+                <input type="text" id="n-name" placeholder="الاسم بالكامل" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-right outline-none border">
+                <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center outline-none border">
+                <input type="number" id="n-ins" placeholder="أجر التأمين" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center outline-none border">
             </div>
-            <div class="flex gap-4 mt-10"><button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-lg">حفظ</button><button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-400 py-5 rounded-2xl font-bold">إلغاء</button></div>
+            <div class="flex gap-4 mt-8">
+                <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg">حفظ ✅</button>
+                <button onclick="document.getElementById('modal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-400 py-4 rounded-2xl font-bold">إلغاء</button>
+            </div>
         </div>
     </div>
 
@@ -182,306 +132,111 @@
 
     <script>
         let TOKEN = localStorage.getItem('token');
+        const API_BASE = '/api';
 
-        // دالة موحدة للطلبات مع الـ Backend تضمن المسار الصحيح /api/
         async function apiFetch(url, options = {}) {
-            // إضافة /api لو مش موجودة في أول الرابط
-            const finalUrl = url.startsWith('/api') ? url : `/api${url.startsWith('/') ? '' : '/'}${url}`;
-            
-            options.headers = {
-                ...options.headers, 
-                'Authorization': `Bearer ${TOKEN}`, 
-                'Content-Type': 'application/json'
-            };
+            const finalUrl = url.startsWith('/api') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
 
-            try {
-                const res = await fetch(finalUrl, options);
-                
-                // التعامل مع الـ HTML Fallback (Error 404/500 على Vercel)
-                const contentType = res.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") === -1) {
-                    throw new Error("السيرفر أرسل رد بصيغة HTML بدلاً من JSON. تأكد من أن الرابط /api/ موجود في الـ Backend.");
-                }
-
-                if(res.status === 401) { handleLogout(); throw new Error("Unauthorized"); }
-                
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "خطأ غير معروف");
-                return data;
-            } catch (err) {
-                console.error("Fetch error:", err);
-                alert("حدث خطأ: " + err.message);
-                throw err;
-            }
-        }
-
-        function toggleRegisterMode() {
-            const nameField = document.getElementById('auth-name');
-            const loginBtn = document.getElementById('login-btn');
-            const regBtn = document.getElementById('real-reg-btn');
-            const toggleBtn = document.getElementById('toggle-reg-btn');
-
-            const isRegistering = nameField.classList.toggle('hidden');
-            loginBtn.classList.toggle('hidden');
-            regBtn.classList.toggle('hidden');
-            
-            toggleBtn.innerText = !isRegistering ? "لديك حساب بالفعل؟ دخول آمن" : "إنشاء حساب شركة جديد 🏢";
+            const res = await fetch(finalUrl, options);
+            if(res.status === 401) { handleLogout(); return; }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "خطأ");
+            return data;
         }
 
         async function handleLogin(e) {
-            if(e) e.preventDefault();
+            e.preventDefault();
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
-            if(!email || !password) return alert("الرجاء إدخال البيانات");
-
-            const btn = document.getElementById('login-btn');
-            btn.innerText = "جاري الدخول..."; btn.disabled = true;
-
             try {
-                // استخدام مسار صريح يبدأ بـ /api
-                const res = await fetch('/api/auth/login', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ email: email.toLowerCase().trim(), password }) 
-                });
-                
-                const data = await res.json();
-                
-                if(res.ok && data.token) { 
-                    localStorage.setItem('token', data.token); 
-                    window.location.reload(); 
-                } else {
-                    alert(data.error || "بيانات الدخول غير صحيحة");
-                }
-            } catch (err) {
-                alert("فشل الاتصال بالسيرفر. تأكد من أن الـ API مفعل.");
-            } finally {
-                btn.innerText = "دخول آمن 🔒"; btn.disabled = false;
-            }
-        }
-
-        async function handleRegister(e) {
-            if(e) e.preventDefault();
-            const name = document.getElementById('auth-name').value;
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-pass').value;
-            
-            if(!name || !email || !password) return alert("أكمل كافة البيانات المطلوبة");
-
-            const btn = document.getElementById('real-reg-btn');
-            btn.innerText = "جاري التسجيل..."; btn.disabled = true;
-
-            try {
-                const res = await fetch('/api/auth/register', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ 
-                        name, 
-                        adminEmail: email.toLowerCase().trim(), 
-                        email: email.toLowerCase().trim(), 
-                        password 
-                    }) 
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email: email.toLowerCase().trim(), password })
                 });
                 const data = await res.json();
-                
-                if(res.ok) {
-                    alert("تم تسجيل الشركة بنجاح! يمكنك الآن تسجيل الدخول.");
-                    toggleRegisterMode();
-                } else {
-                    alert(data.error || "خطأ في عملية التسجيل");
-                }
-            } catch (err) {
-                alert("خطأ في الاتصال بالسيرفر");
-            } finally {
-                btn.innerText = "إتمام التسجيل الآن ✅"; btn.disabled = false;
-            }
-        }
-
-        function handleLogout() { localStorage.removeItem('token'); location.reload(); }
-
-        function checkAuth() { 
-            if(TOKEN) { 
-                document.getElementById('login-view').classList.add('hidden'); 
-                document.getElementById('sidebar').classList.remove('hidden'); 
-                document.getElementById('main-content').classList.remove('hidden'); 
-                showDash(); 
-            } 
-        }
-
-        function hideAll() { 
-            ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view', 'settings-view'].forEach(id => {
-                const el = document.getElementById(id);
-                if(el) el.classList.add('hidden');
-            }); 
-        }
-        
-        function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
-        function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); loadEmployees(); }
-        function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
-        
-        async function showSettings() { 
-            hideAll(); document.getElementById('settings-view').classList.remove('hidden'); 
-            try {
-                const data = await apiFetch('/company/settings'); // apiFetch هتضيف /api/ لوحدها
-                document.getElementById('set-exemption').value = data.personalExemption || 20000;
-                document.getElementById('set-maxins').value = data.maxInsSalary || 16700;
-                document.getElementById('set-percent').value = data.insEmployeePercent || 0.11;
-                document.getElementById('set-medical').value = data.medicalExemptionLimit || 10000;
-            } catch(e) {}
-        }
-
-        async function saveSettings() {
-            const body = { 
-                personalExemption: Number(document.getElementById('set-exemption').value), 
-                maxInsSalary: Number(document.getElementById('set-maxins').value), 
-                insEmployeePercent: Number(document.getElementById('set-percent').value),
-                medicalExemptionLimit: Number(document.getElementById('set-medical').value)
-            };
-            try {
-                await apiFetch('/company/settings', { method: 'POST', body: JSON.stringify(body) });
-                alert("تم تحديث إعدادات الشركة بنجاح ✅");
-            } catch(e) {}
+                if(res.ok && data.token) { localStorage.setItem('token', data.token); window.location.reload(); }
+                else alert(data.error || "فشل الدخول");
+            } catch(e) { alert("السيرفر لا يستجيب"); }
         }
 
         async function loadEmployees() {
             try {
                 const data = await apiFetch('/employees');
                 document.getElementById('empTable').innerHTML = data.map(e => `
-                    <tr class="hover:bg-indigo-50/50 cursor-pointer transition border-b border-slate-50" onclick="openProfile('${e._id}')">
-                        <td class="p-5 flex items-center"><div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black ml-4 shadow-sm">${e.name ? e.name[0] : '?'}</div><div class="font-black text-slate-800 text-sm">${e.name}</div></td>
-                        <td class="p-5 text-center font-mono text-slate-400 text-xs">${e.nationalId || '---'}</td>
-                        <td class="p-5 text-center"><span class="${e.status === 'Resigned' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"} px-4 py-2 rounded-xl text-[9px] font-black uppercase">${e.status || 'Active'}</span></td>
+                    <tr class="hover:bg-indigo-50 cursor-pointer border-b" onclick="openProfile('${e.id}')">
+                        <td class="p-5 font-black text-slate-800 text-sm">${e.name}</td>
+                        <td class="p-5 text-center font-mono text-slate-400 text-xs">${e.nationalId}</td>
+                        <td class="p-5 text-center"><span class="bg-emerald-100 text-emerald-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Active</span></td>
                         <td class="p-5 text-center text-indigo-300"><i class="fas fa-arrow-left"></i></td>
                     </tr>`).join('');
             } catch(e) {}
         }
 
         async function openProfile(id) {
+            hideAll(); document.getElementById('profile-view').classList.remove('hidden');
+            document.getElementById('currId').value = id;
             try {
-                hideAll(); document.getElementById('profile-view').classList.remove('hidden');
-                document.getElementById('currId').value = id;
                 const data = await apiFetch(`/employees/${id}/details`);
                 document.getElementById('p-name').innerText = data.emp.name;
-                document.getElementById('p-hdate').value = data.emp.hireDate ? data.emp.hireDate.substring(0, 10) : "";
-                document.getElementById('c-resign').value = data.emp.resignationDate ? data.emp.resignationDate.substring(0, 10) : "";
-                document.getElementById('c-fbasic').value = data.emp.salaryDetails.basicSalary || 0;
-                document.getElementById('c-ftrans').value = data.emp.salaryDetails.allowances || 0;
-                
-                const now = new Date();
-                document.getElementById('c-month').value = now.toISOString().substring(0, 7);
-
-                document.getElementById('histHead').innerHTML = `<tr class="divide-x divide-slate-700 italic uppercase"><th class="p-4">Month</th><th class="p-4">Days</th><th class="p-4">Gross</th><th class="p-4">Insurance</th><th class="p-4 bg-rose-800">Tax</th><th class="p-4 bg-emerald-600">Net</th></tr>`;
+                document.getElementById('c-fbasic').value = data.emp.salaryDetails.basicSalary;
+                document.getElementById('c-month').value = new Date().toISOString().substring(0, 7);
                 document.getElementById('histBody').innerHTML = (data.history || []).map(r => `
-                    <tr class="divide-x divide-slate-100 hover:bg-slate-50 transition">
-                        <td class="p-4 font-black text-slate-900">${r.month}</td>
-                        <td class="p-4">${r.payload?.days || 30}</td>
-                        <td class="p-4">${(r.payload?.grossSalary || 0).toLocaleString()}</td>
-                        <td class="p-4">${(r.payload?.insuranceEmployee || 0).toLocaleString()}</td>
-                        <td class="p-4 text-rose-600">${(r.payload?.taxAmount || 0).toLocaleString()}</td>
-                        <td class="p-4 text-emerald-700 font-black">${(r.payload?.netSalary || 0).toLocaleString()}</td>
+                    <tr class="border-b">
+                        <td class="p-4 font-black">${r.month}</td>
+                        <td class="p-4">${(r.payload.grossSalary).toLocaleString()}</td>
+                        <td class="p-4">${(r.payload.insuranceEmployee).toLocaleString()}</td>
+                        <td class="p-4 text-rose-600">${(r.payload.taxAmount).toLocaleString()}</td>
+                        <td class="p-4 text-emerald-700 font-black">${(r.payload.netSalary).toLocaleString()}</td>
                     </tr>`).join('');
             } catch(e) {}
         }
 
-        async function runNetToGross() {
-            const net = Number(document.getElementById('target-net').value);
-            if(!net) return;
-            const btn = document.getElementById('calc-btn');
-            btn.innerText = "جاري الحساب..."; btn.disabled = true;
+        async function saveEmp() {
+            const body = {
+                name: document.getElementById('n-name').value,
+                nationalId: document.getElementById('n-nid').value,
+                salaryDetails: { basicSalary: Number(document.getElementById('n-ins').value) }
+            };
             try {
-                const data = await apiFetch('/payroll/net-to-gross', { method: 'POST', body: JSON.stringify({ targetNet: net }) });
-                document.getElementById('calc-result').classList.remove('hidden');
-                document.getElementById('result-gross').innerText = data.grossSalary.toLocaleString();
-                document.getElementById('result-tax').innerText = data.monthlyTax.toLocaleString();
-                document.getElementById('result-ins').innerText = data.insuranceEmployee.toLocaleString();
-                document.getElementById('result-base').innerText = data.insBase.toLocaleString();
-            } catch(e) {
-            } finally { btn.innerText = "حساب الراتب الشامل"; btn.disabled = false; }
+                await apiFetch('/employees', { method: 'POST', body: JSON.stringify(body) });
+                document.getElementById('modal').classList.add('hidden');
+                showHR();
+            } catch(e) {}
         }
 
         async function runCalc() {
             const btn = document.getElementById('run-btn');
-            const month = document.getElementById('c-month').value;
-            const empId = document.getElementById('currId').value;
-            if(!month) return alert("اختر الشهر أولاً");
-            
-            btn.innerText = "جاري المعالجة..."; btn.disabled = true;
-            
-            const getItems = (areaId) => Array.from(document.getElementById(areaId).children).map(div => ({
-                name: div.querySelector('input[type="text"]').value,
-                amount: Number(div.querySelector('input[type="number"]').value),
-                type: div.querySelector('select').value,
-                isMedical: div.querySelector('.medical-check')?.checked || false
-            }));
-
-            const body = { 
-                empId: empId, 
-                month, 
-                days: Number(document.getElementById('c-days').value), 
-                fullBasic: Number(document.getElementById('c-fbasic').value), 
-                fullTrans: Number(document.getElementById('c-ftrans').value), 
-                additions: getItems('add-area'), 
-                deductions: getItems('ded-area') 
-            };
-
-            try { 
-                await apiFetch('/payroll/calculate', { method: 'POST', body: JSON.stringify(body) }); 
-                alert("تم حساب المرتب وحفظه بنجاح ✅");
-                await openProfile(empId); 
-            } catch(e) {
-            } finally { 
-                btn.innerText = "RUN PAYROLL ENGINE ⚡"; btn.disabled = false; 
-            }
-        }
-
-        async function saveEmp() {
-            const body = { 
-                name: document.getElementById('n-name').value, 
-                nationalId: document.getElementById('n-nid').value, 
-                hireDate: document.getElementById('n-hdate').value, 
-                salaryDetails: { basicSalary: Number(document.getElementById('n-ins').value) },
-                employmentType: document.getElementById('n-type').value 
-            };
+            btn.innerText = "جاري الحساب..."; btn.disabled = true;
             try {
-                await apiFetch('/employees', { method: 'POST', body: JSON.stringify(body) });
-                document.getElementById('modal').classList.add('hidden'); 
-                showHR();
-            } catch(e) {}
+                await apiFetch('/payroll/calculate', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ 
+                        empId: document.getElementById('currId').value, 
+                        month: document.getElementById('c-month').value,
+                        fullBasic: Number(document.getElementById('c-fbasic').value)
+                    }) 
+                });
+                alert("تم بنجاح ✅");
+                openProfile(document.getElementById('currId').value);
+            } catch(e) { alert("خطأ في الحساب"); }
+            finally { btn.innerText = "إصدار المرتب الشهري ⚡"; btn.disabled = false; }
         }
 
-        async function delEmp() {
-            const id = document.getElementById('currId').value;
-            if(!confirm("هل أنت متأكد من حذف الموظف نهائياً؟")) return;
-            try {
-                await apiFetch(`/employees/${id}`, { method: 'DELETE' });
-                alert("تم الحذف بنجاح");
-                showHR();
-            } catch(e) {}
+        function toggleRegisterMode() {
+            document.getElementById('auth-name').classList.toggle('hidden');
+            document.getElementById('login-btn').classList.toggle('hidden');
+            document.getElementById('real-reg-btn').classList.toggle('hidden');
         }
 
-        function addRow(areaId) {
-            const div = document.createElement('div'); 
-            div.className = "flex gap-2 items-center bg-white/10 p-3 rounded-2xl animate-fade-in";
-            const isDeduction = areaId === 'ded-area';
-            
-            div.innerHTML = `
-                <input type="text" placeholder="الاسم" class="flex-1 bg-transparent p-1 text-xs text-white outline-none border-b border-white/20">
-                <input type="number" placeholder="0" class="w-20 bg-transparent p-1 text-xs text-emerald-400 font-black text-center outline-none border-b border-white/20">
-                <select class="bg-slate-800 text-[10px] text-white rounded-lg p-2">
-                    <option value="Non-Exempted">خاضع للضريبة</option>
-                    <option value="Exempted">معفى</option>
-                </select>
-                ${isDeduction ? '<input type="checkbox" class="medical-check" title="تأمين طبي؟">' : ''}
-                <button onclick="this.parentElement.remove()" class="text-rose-500 px-2"><i class="fas fa-times"></i></button>
-            `;
-            document.getElementById(areaId).appendChild(div);
-        }
-
-        function handleMonthChange() {
-            // يمكن إضافة لوجيك لتحديث البيانات عند تغيير الشهر
-        }
-
-        window.onload = checkAuth;
+        function handleLogout() { localStorage.removeItem('token'); location.reload(); }
+        function hideAll() { ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => document.getElementById(id)?.classList.add('hidden')); }
+        function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
+        function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); loadEmployees(); }
+        function showCalc() { hideAll(); document.getElementById('net-gross-view')?.classList.remove('hidden'); }
+        
+        window.onload = () => { if(TOKEN) { document.getElementById('login-view').classList.add('hidden'); document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('main-content').classList.remove('hidden'); showDash(); } };
     </script>
 </body>
 </html>
