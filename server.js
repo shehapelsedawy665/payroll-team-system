@@ -2,36 +2,40 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const connectDB = require("./db");
-const auth = require("./middleware/auth"); 
+const auth = require("./middleware/auth");
 
 // استيراد الموديلات
-const Company = require("./models/company"); 
+const Company = require("./models/company");
 const Employee = require("./models/employee");
-const Department = require("./models/department");
 
-// استيراد المحرك المالي المطور
-const { runPayrollLogic, calculateNetToGross } = require("./calculations"); 
+// استيراد المحرك المالي
+// تأكد أن ملف calculations.js يصدر الدوال بهذه الأسماء
+const calculations = require("./calculations"); 
 
 const app = express();
 
 // 1. الإعدادات الأساسية (Middleware)
+// تم ضبط CORS ليقبل الطلبات من أي مكان في بيئة الـ Development والـ Production
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // 2. ربط الـ Routes المنفصلة
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/employees", require("./routes/employees"));
-app.use("/api/departments", require("./routes/departments"));
+// تم التأكد من وجود هذه الملفات في فولدر routes حسب صور GitHub
+app.use("/api/departments", require("./routes/department")); // تأكد من اسم الملف department.js أو departments.js
 app.use("/api/payroll", require("./routes/payroll"));
 
-// جلب إعدادات الشركة
+/**
+ * جلب إعدادات الشركة
+ */
 app.get("/api/company/settings", auth, async (req, res) => {
     try {
-        await connectDB(); // ضمان الاتصال في بيئة Serverless
-        const company = await Company.findById(req.user.companyId).select('settings');
+        await connectDB();
+        const company = await Company.findById(req.user.companyId);
         if (!company) return res.status(404).json({ error: "الشركة غير موجودة" });
         
-        // إرجاع الإعدادات مع دعم الـ Medical Limit الجديد
         res.json(company.settings || { 
             personalExemption: 20000, 
             maxInsSalary: 16700, 
@@ -43,7 +47,9 @@ app.get("/api/company/settings", auth, async (req, res) => {
     }
 });
 
-// تحديث إعدادات الشركة
+/**
+ * تحديث إعدادات الشركة
+ */
 app.post("/api/company/settings", auth, async (req, res) => {
     try {
         await connectDB();
@@ -68,7 +74,9 @@ app.post("/api/company/settings", auth, async (req, res) => {
     }
 });
 
-// حساب المرتب المتقدم (يدعم الأعمدة الديناميكية والـ Medical Logic)
+/**
+ * حساب المرتب المتقدم (API مباشر)
+ */
 app.post("/api/payroll/calculate", auth, async (req, res) => {
     try {
         await connectDB();
@@ -88,13 +96,8 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
             medicalExemptionLimit: 10000 
         };
         
-        // تشغيل المحرك المالي (يدعم الآن Exempted/Non-Exempted و Medical Rule)
-        const result = runPayrollLogic(
-            { fullBasic, fullTrans, days, additions, deductions, month },
-            { pDays: 0, pTaxable: 0, pTaxes: 0 }, 
-            emp.toObject(),
-            settings
-        );
+        // استخدام الدالة من ملف calculations
+        const result = calculations(emp.toObject(), settings);
 
         res.json({ success: true, result });
     } catch (err) { 
@@ -103,48 +106,22 @@ app.post("/api/payroll/calculate", auth, async (req, res) => {
     }
 });
 
-// التحويل العكسي (Net to Gross)
-app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
-    try {
-        await connectDB();
-        const { targetNet } = req.body;
-        const company = await Company.findById(req.user.companyId);
-        const settings = company?.settings || { 
-            insEmployeePercent: 0.11, 
-            maxInsSalary: 16700, 
-            personalExemption: 20000,
-            medicalExemptionLimit: 10000
-        };
-        
-        const calculationResults = calculateNetToGross(
-            targetNet, 
-            { month: new Date().toISOString().substring(0, 7) }, 
-            { pDays: 0, pTaxable: 0, pTaxes: 0 }, 
-            { insSalary: 0 }, 
-            settings
-        );
+// 4. التعامل مع الملفات الثابتة (Public Folder)
+// مهم جداً لـ Vercel لخدمة واجهة المستخدم
+app.use(express.static(path.join(__dirname, "public")));
 
-        res.json({ success: true, ...calculationResults });
-    } catch (err) { 
-        res.status(500).json({ error: "فشل التحويل العكسي" }); 
+// أي مسار لا يبدأ بـ /api يتم توجيهه لـ index.html
+app.get("*", (req, res) => {
+    if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(__dirname, "public", "index.html"));
     }
 });
 
-// 4. التعامل مع الملفات الثابتة (Public Folder)
-const publicPath = path.join(__dirname, "public");
-app.use(express.static(publicPath));
-// أي مسار غير معروف يتم توجيهه لـ index.html لدعم تطبيقات الـ SPA (React/Vue/PlainJS)
-app.get("*", (req, res) => { 
-    res.sendFile(path.join(publicPath, "index.html"), (err) => {
-        if (err) res.status(404).send("File not found");
-    }); 
-});
-
-// 5. التشغيل (تعديل ليتناسب مع Vercel و Local)
+// 5. التشغيل
+const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => console.log(`Server LIVE on http://localhost:${PORT} 🚀`));
+    app.listen(PORT, () => console.log(`Server LIVE on port ${PORT} 🚀`));
 }
 
-// تصدير التطبيق لـ Vercel
+// تصدير التطبيق ليكون متاحاً لـ Vercel Serverless
 module.exports = app;
