@@ -29,22 +29,25 @@ const auth = (req, res, next) => {
     try {
         // 3. التحقق من صحة التشفير
         // ملاحظة: تأكد من إضافة JWT_SECRET في إعدادات Vercel Environment Variables
+        // تم توحيد الـ Secret Key لضمان عمل الـ Login مع الـ Middleware
         const secret = process.env.JWT_SECRET || 'SEDAY_ERP_SECRET_2026';
         
         const decoded = jwt.verify(token, secret);
 
-        // 4. وضع بيانات المستخدم والشركة داخل الـ Request
-        // decoded.user بيبقى فيه: { id, companyId, role }
-        req.user = decoded.user; 
+        // 4. وضع بيانات الشركة داخل الـ Request لضمان عزل البيانات (Multi-tenancy)
+        // بنخلي الـ req.user يشيل البيانات اللي جاية من الـ decoded مباشرة
+        req.user = decoded; 
         
-        // التأكد من وجود معرف الشركة في الـ Token
+        // التأكد من وجود معرف الشركة (companyId) لضمان الأمان
         if (!req.user || !req.user.companyId) {
-            throw new Error('Token does not contain company context');
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Token is valid but does not contain company context.' 
+            });
         }
         
-        next(); // اسمح بالمرور للـ Route التالي (مثل قائمة الموظفين)
+        next(); // اسمح بالمرور للـ Route التالي
     } catch (err) {
-        // لو الـ Token منتهي الصلاحية أو تم التلاعب به أو ناقص بيانات
         console.error("Auth Middleware Error:", err.message);
         res.status(401).json({ 
             success: false, 
