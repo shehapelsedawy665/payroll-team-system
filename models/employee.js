@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const employeeSchema = new mongoose.Schema({
-    // البيانات الشخصية الأساسية
+    // 1. البيانات الشخصية (Identity)
     name: { 
         type: String, 
         required: [true, 'اسم الموظف مطلوب'], 
@@ -20,27 +20,31 @@ const employeeSchema = new mongoose.Schema({
     },
     phone: { type: String, trim: true },
 
-    // البيانات الوظيفية (Core HR)
+    // 2. البيانات الوظيفية (Core HR & Multi-tenancy)
     companyId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Company', 
-        required: true 
+        required: [true, 'يجب ربط الموظف بشركة'] 
     },
     department: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Department', 
         required: [true, 'يجب تحديد قسم للموظف'] 
     },
-    jobTitle: { type: String, required: true, trim: true },
+    jobTitle: { 
+        type: String, 
+        required: [true, 'المسمى الوظيفي مطلوب'], 
+        trim: true 
+    },
     
-    // نظام المدير المباشر (Org Chart Logic)
+    // الهيكل التنظيمي (Hierarchy)
     reportingTo: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Employee', 
         default: null 
     },
 
-    // تواريخ التعيين والاستقالة
+    // 3. دورة حياة الموظف (Lifecycle)
     hireDate: { 
         type: Date, 
         required: [true, 'تاريخ التعيين مطلوب'] 
@@ -55,23 +59,28 @@ const employeeSchema = new mongoose.Schema({
         default: 'Full-time' 
     },
 
-    // هيكل الرواتب المطور (Payroll Engine)
+    // 4. محرك الرواتب (Payroll Engine Structure)
     salaryDetails: {
-        basicSalary: { type: Number, required: true, default: 0 },
-        // تم تحديث البدلات والحوافز لتكون مرنة مع الـ Logic الجديد
+        basicSalary: { 
+            type: Number, 
+            required: [true, 'الراتب الأساسي مطلوب'], 
+            default: 0 
+        },
+        // البدلات والحوافز
         additions: [{
-            name: { type: String }, // اسم البند (مثلاً: حافز إنتاج)
+            name: { type: String, required: true },
             amount: { type: Number, default: 0 },
             type: { 
                 type: String, 
-                enum: ['Exempted', 'Non-Exempted'], // التعديل المطلوب لـ Taxable/Non-Taxable
+                enum: ['Exempted', 'Non-Exempted'], // Exempted = معفى من الضريبة
                 default: 'Non-Exempted' 
             }
         }],
+        // الاستقطاعات والخصومات
         deductions: [{
-            name: { type: String }, // اسم الخصم (مثلاً: تأمين طبي)
+            name: { type: String, required: true },
             amount: { type: Number, default: 0 },
-            isMedical: { type: Boolean, default: false }, // علامة عشان الـ 15% Medical Rule
+            isMedical: { type: Boolean, default: false }, // أساسي لحساب بند الـ 15% تأمين طبي
             type: { 
                 type: String, 
                 enum: ['Exempted', 'Non-Exempted'], 
@@ -80,7 +89,7 @@ const employeeSchema = new mongoose.Schema({
         }]
     },
 
-    // إدارة الوثائق (Document Management)
+    // 5. الأرشيف والوثائق (Documents)
     documents: [{
         title: { type: String }, 
         fileUrl: { type: String }, 
@@ -95,12 +104,16 @@ const employeeSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// Indexing لسرعة البحث في الشركة والقسم
+/**
+ * تحسين الأداء (Performance Optimization)
+ * Indexing لسرعة استخراج كشوف المرتبات والبحث بالبطاقة
+ */
 employeeSchema.index({ companyId: 1, department: 1 });
+employeeSchema.index({ companyId: 1, status: 1 }); // مهم لفلترة الموظفين النشطين فقط
 employeeSchema.index({ nationalId: 1 }, { unique: true });
 
 /**
- * التصدير النهائي (Vercel Optimized)
- * يمنع الـ Duplicate model name error تماماً
+ * التصدير النهائي (Serverless Optimized)
+ * حل مشكلة الـ OverwriteModelError في Vercel
  */
 module.exports = mongoose.models.Employee || mongoose.model('Employee', employeeSchema);
