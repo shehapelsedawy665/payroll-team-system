@@ -40,7 +40,7 @@ const payrollSchema = new mongoose.Schema({
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
 // --- [Auth APIs] ---
-// (تم الإبقاء على كود Register و Login كما هو بدون تغيير لضمان الاستقرار)
+
 app.post("/api/auth/register", async (req, res) => {
     try {
         const { companyName, adminEmail, password } = req.body;
@@ -77,6 +77,35 @@ app.post("/api/auth/login", async (req, res) => {
     } catch (err) { res.status(500).json({ error: "فشل تسجيل الدخول" }); }
 });
 
+// --- [Company Settings APIs] ---
+
+app.get("/api/company/settings", auth, async (req, res) => {
+    try {
+        const company = await Company.findById(req.user.companyId).select('settings');
+        if (!company) return res.status(404).json({ error: "الشركة غير موجودة" });
+        res.json(company.settings);
+    } catch (err) { res.status(500).json({ error: "فشل جلب الإعدادات" }); }
+});
+
+app.post("/api/company/settings", auth, async (req, res) => {
+    try {
+        const { personalExemption, maxInsSalary, insEmployeePercent } = req.body;
+        const updatedCompany = await Company.findByIdAndUpdate(
+            req.user.companyId,
+            {
+                $set: {
+                    "settings.personalExemption": Number(personalExemption),
+                    "settings.maxInsSalary": Number(maxInsSalary),
+                    "settings.insEmployeePercent": Number(insEmployeePercent),
+                    "lastSettingsUpdate": Date.now()
+                }
+            },
+            { new: true }
+        );
+        res.json({ success: true, settings: updatedCompany.settings });
+    } catch (err) { res.status(500).json({ error: "فشل تحديث الإعدادات" }); }
+});
+
 // --- [Main APIs] ---
 
 app.get("/api/employees", auth, async (req, res) => {
@@ -94,67 +123,45 @@ app.post("/api/employees", auth, async (req, res) => {
     } catch (err) { res.status(500).json({ error: "فشل الحفظ" }); }
 });
 
-// تعديل جلب التفاصيل لحساب التراكمي بدقة
 app.get("/api/employees/:id/details", auth, async (req, res) => {
     try {
         const emp = await Employee.findOne({ _id: req.params.id, companyId: req.user.companyId });
         if (!emp) return res.status(404).json({ error: "الموظف غير موجود" });
-
         const history = await Payroll.find({ employeeId: req.params.id, companyId: req.user.companyId }).sort({ month: 1 });
-        
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => { 
             pDays += (Number(r.payload.days) || 0); 
-            // الوعاء الضريبي الشهري الفعلي اللي اتحسب عليه الشهر ده
             pTaxable += (Number(r.payload.currentTaxable) || 0); 
             pTaxes += (Number(r.payload.monthlyTax) || 0); 
         });
-        
         res.json({ emp, history, prevData: { pDays, pTaxable, pTaxes } });
     } catch (err) { res.status(500).json({ error: "فشل جلب البيانات" }); }
 });
 
-// التعديل الجوهري هنا في الـ API ده لضمان حسبة الـ YTD
 app.post("/api/payroll/calculate", auth, async (req, res) => {
     try {
         const { empId, month, days, fullBasic, fullTrans, additions, deductions, hiringDate, resignationDate } = req.body;
-        
         const [emp, company, history] = await Promise.all([
             Employee.findOne({ _id: empId, companyId: req.user.companyId }),
             Company.findById(req.user.companyId),
             Payroll.find({ employeeId: empId, companyId: req.user.companyId, month: { $lt: month } })
         ]);
-
         if (!emp || !company) return res.status(404).json({ error: "بيانات ناقصة" });
-
         if (resignationDate) await Employee.findByIdAndUpdate(empId, { resignationDate });
-
-        // تجميع بيانات الشهور السابقة تلقائياً من الـ DB قبل الحساب
         let autoPrevData = { pDays: 0, pTaxable: 0, pTaxes: 0 };
         history.forEach(rec => {
             autoPrevData.pDays += (Number(rec.payload.days) || 0);
             autoPrevData.pTaxable += (Number(rec.payload.currentTaxable) || 0);
             autoPrevData.pTaxes += (Number(rec.payload.monthlyTax) || 0);
         });
-
         const settings = company.settings || { personalExemption: 20000, maxInsSalary: 16700, insEmployeePercent: 0.11 };
-
-        // تشغيل اللوجيك ببيانات التراكمي المستخرجة
-        const result = runPayrollLogic(
-            { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
-            autoPrevData, 
-            emp.toObject(),
-            settings
-        );
-
+        const result = runPayrollLogic({ fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, autoPrevData, emp.toObject(), settings);
         await Payroll.deleteOne({ employeeId: empId, month, companyId: req.user.companyId });
         const record = await new Payroll({ companyId: req.user.companyId, employeeId: empId, month, payload: result }).save();
-        
         res.json(record);
     } catch (err) { res.status(500).json({ error: "خطأ في حساب المرتب" }); }
 });
 
-// (تم الإبقاء على باقي الـ APIs كما هي)
 app.post("/api/payroll/net-to-gross", auth, async (req, res) => {
     try {
         const { targetNet } = req.body;
