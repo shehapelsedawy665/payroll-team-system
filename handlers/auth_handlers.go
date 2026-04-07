@@ -1,19 +1,11 @@
 package handlers
 
 import (
-	"context"
-	"net/http"
-	"os"
-	"time"
-
-	"your-project-name/database"
-	"your-project-name/models"
-
-	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v4"
-	"go.mongodb.org/mongo-driver/bson"
-	"golang.org/x/crypto/bcrypt"
+    "github.com/shehapelsedawy665/payroll-system/database"
+    "github.com/shehapelsedawy665/payroll-system/models" // لو عندك فولدر موديلز
+    // أي imports تانية سيبها زي ما هي
 )
+
 
 // RegisterCompany تسجيل شركة جديدة بكلمة مرور مشفرة
 func RegisterCompany(c *fiber.Ctx) error {
