@@ -134,17 +134,28 @@
         let TOKEN = localStorage.getItem('token');
         const API_BASE = '/api';
 
+        // وظيفة موحدة لإرسال الطلبات للسيرفر
         async function apiFetch(url, options = {}) {
             const finalUrl = url.startsWith('/api') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
-            options.headers = { ...options.headers, 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+            options.headers = { 
+                ...options.headers, 
+                'Authorization': `Bearer ${TOKEN}`, 
+                'Content-Type': 'application/json' 
+            };
 
-            const res = await fetch(finalUrl, options);
-            if(res.status === 401) { handleLogout(); return; }
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "خطأ");
-            return data;
+            try {
+                const res = await fetch(finalUrl, options);
+                if(res.status === 401) { handleLogout(); return; }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "خطأ غير معروف");
+                return data;
+            } catch (err) {
+                console.error("Fetch Error:", err);
+                throw err;
+            }
         }
 
+        // تسجيل الدخول
         async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('auth-email').value;
@@ -156,9 +167,49 @@
                     body: JSON.stringify({ email: email.toLowerCase().trim(), password })
                 });
                 const data = await res.json();
-                if(res.ok && data.token) { localStorage.setItem('token', data.token); window.location.reload(); }
-                else alert(data.error || "فشل الدخول");
-            } catch(e) { alert("السيرفر لا يستجيب"); }
+                if(res.ok && data.token) { 
+                    localStorage.setItem('token', data.token); 
+                    window.location.reload(); 
+                } else {
+                    alert(data.error || "فشل الدخول");
+                }
+            } catch(e) { 
+                alert("السيرفر لا يستجيب - تأكد من اتصالك"); 
+            }
+        }
+
+        // --- التعديل الجذري: إضافة وظيفة التسجيل المفقودة ---
+        async function handleRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('auth-name').value;
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-pass').value;
+
+            if(!name || !email || !password) {
+                alert("برجاء ملء كافة البيانات");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        companyName: name, 
+                        email: email.toLowerCase().trim(), 
+                        password 
+                    })
+                });
+                const data = await res.json();
+                if(res.ok) {
+                    alert("تم إنشاء الحساب بنجاح! يمكنك الدخول الآن.");
+                    toggleRegisterMode(); // العودة لوجهة الدخول
+                } else {
+                    alert(data.error || "فشل التسجيل");
+                }
+            } catch(err) {
+                alert("السيرفر لا يستجيب - تأكد من إعدادات Vercel");
+            }
         }
 
         async function loadEmployees() {
@@ -228,15 +279,23 @@
             document.getElementById('auth-name').classList.toggle('hidden');
             document.getElementById('login-btn').classList.toggle('hidden');
             document.getElementById('real-reg-btn').classList.toggle('hidden');
+            const toggleBtn = document.getElementById('toggle-reg-btn');
+            toggleBtn.innerText = toggleBtn.innerText === "إنشاء حساب جديد 🏢" ? "لديك حساب بالفعل؟" : "إنشاء حساب جديد 🏢";
         }
 
         function handleLogout() { localStorage.removeItem('token'); location.reload(); }
-        function hideAll() { ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => document.getElementById(id)?.classList.add('hidden')); }
+        function hideAll() { ['dashboard-view', 'list-view', 'profile-view'].forEach(id => document.getElementById(id)?.classList.add('hidden')); }
         function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); loadEmployees(); }
-        function showCalc() { hideAll(); document.getElementById('net-gross-view')?.classList.remove('hidden'); }
         
-        window.onload = () => { if(TOKEN) { document.getElementById('login-view').classList.add('hidden'); document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('main-content').classList.remove('hidden'); showDash(); } };
+        window.onload = () => { 
+            if(TOKEN) { 
+                document.getElementById('login-view').classList.add('hidden'); 
+                document.getElementById('sidebar').classList.remove('hidden'); 
+                document.getElementById('main-content').classList.remove('hidden'); 
+                showDash(); 
+            } 
+        };
     </script>
 </body>
 </html>
