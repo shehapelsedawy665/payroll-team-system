@@ -11,7 +11,10 @@ type Payroll struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	CompanyID  primitive.ObjectID `bson:"companyId" json:"companyId"`
 	EmployeeID primitive.ObjectID `bson:"employeeId" json:"employeeId"`
-	Month      string             `bson:"month" json:"month"` // تنسيق "2026-04"
+	
+	// تنسيق الشهر "2026-04" مهم جداً للفلترة والبحث
+	Month      string             `bson:"month" json:"month"` 
+	
 	Payload    PayrollPayload     `bson:"payload" json:"payload"`
 	Status     string             `bson:"status" json:"status"` // Pending, Approved, Paid
 	CreatedAt  time.Time          `bson:"createdAt" json:"createdAt"`
@@ -26,5 +29,8 @@ type PayrollPayload struct {
 	InsuranceCompany  float64                `bson:"insuranceCompany" json:"insuranceCompany"`
 	TotalAdditions    float64                `bson:"totalAdditions" json:"totalAdditions"`
 	TotalDeductions   float64                `bson:"totalDeductions" json:"totalDeductions"`
-	Details           map[string]interface{} `bson:"details" json:"details"` // بديل الـ Object المرن
+	
+	// Details بنستخدمها لتخزين تفاصيل إضافية مرنة (مثل بنود البدلات المحددة)
+	// ميزة omitempty هنا إنها مش هتخزن الحقل لو كان فاضي
+	Details           map[string]interface{} `bson:"details,omitempty" json:"details,omitempty"`
 }
