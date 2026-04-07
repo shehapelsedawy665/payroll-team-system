@@ -155,7 +155,6 @@
             }
         }
 
-        // تسجيل الدخول
         async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('auth-email').value;
@@ -178,14 +177,14 @@
             }
         }
 
-        // --- التعديل الجذري: إضافة وظيفة التسجيل المفقودة ---
+        // --- تعديل دالة التسجيل لضمان توافق الحقول ---
         async function handleRegister(e) {
             e.preventDefault();
-            const name = document.getElementById('auth-name').value;
+            const companyName = document.getElementById('auth-name').value;
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
 
-            if(!name || !email || !password) {
+            if(!companyName || !email || !password) {
                 alert("برجاء ملء كافة البيانات");
                 return;
             }
@@ -195,15 +194,16 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ 
-                        companyName: name, 
+                        name: companyName, // الحقل الأساسي لاسم الشركة
                         email: email.toLowerCase().trim(), 
-                        password 
+                        adminEmail: email.toLowerCase().trim(), // إرسال نفس الايميل كمسؤول نظام
+                        password: password 
                     })
                 });
                 const data = await res.json();
                 if(res.ok) {
                     alert("تم إنشاء الحساب بنجاح! يمكنك الدخول الآن.");
-                    toggleRegisterMode(); // العودة لوجهة الدخول
+                    toggleRegisterMode();
                 } else {
                     alert(data.error || "فشل التسجيل");
                 }
@@ -287,6 +287,8 @@
         function hideAll() { ['dashboard-view', 'list-view', 'profile-view'].forEach(id => document.getElementById(id)?.classList.add('hidden')); }
         function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); loadEmployees(); }
+        function showSettings() { alert("قريباً: إعدادات الضرائب المتقدمة ⚙️"); }
+        function showCalc() { alert("قريباً: محول Net to Gross الذكي 💸"); }
         
         window.onload = () => { 
             if(TOKEN) { 
