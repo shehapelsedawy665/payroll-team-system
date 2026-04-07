@@ -8,55 +8,58 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// MongoClient هو المتغير اللي هنستخدمه في كل مكان في السيستم
 var (
 	MongoClient *mongo.Client
-	once        sync.Once // عشان نضمن إن الاتصال يحصل مرة واحدة بس (Singleton)
+	DB          *mongo.Database // المتغير اللي الـ Handlers بتستخدمه مباشرة
+	once        sync.Once
 )
 
 // ConnectDB وظيفة الاتصال بـ MongoDB Atlas
-func ConnectDB() *mongo.Client {
+func ConnectDB() {
 	once.Do(func() {
+		// 1. سحب الرابط من الـ Environment Variables
 		uri := os.Getenv("MONGODB_URI")
 		if uri == "" {
-			log.Fatal("❌ MONGODB_URI is missing in Environment Variables!")
+			// لو مش موجود، بنستخدم الرابط بتاعك كـ Fallback للتجربة فقط
+			uri = "mongodb+srv://Sedawy:Shehap66Sedawy@egyptian-payroll.a6bquen.mongodb.net/payrollDB?retryWrites=true&w=majority"
 		}
 
-		// إعدادات الاتصال (Optimized for Vercel & Atlas)
+		// 2. إعدادات الاتصال Optimized لـ Vercel (Serverless)
 		clientOptions := options.Client().
 			ApplyURI(uri).
-			SetMaxPoolSize(1). // زي ما عملت في Node بالظبط عشان الـ Serverless
+			SetMaxPoolSize(1).             // مهم جداً لعدم استهلاك الـ Connections في Vercel
 			SetConnectTimeout(10 * time.Second).
 			SetServerSelectionTimeout(5 * time.Second)
 
-		// إنشاء سياق (Context) للاتصال بمهلة زمنية
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// الاتصال الفعلي
+		// 3. تنفيذ الاتصال
 		client, err := mongo.Connect(ctx, clientOptions)
 		if err != nil {
 			log.Fatalf("❌ MongoDB Connection Error: %v", err)
 		}
 
-		// التأكد من أن السيرفر شغال (Ping)
+		// 4. اختبار الاتصال (Ping)
 		err = client.Ping(ctx, nil)
 		if err != nil {
 			log.Fatalf("❌ MongoDB Ping Error: %v", err)
 		}
 
-		log.Println("✅ MongoDB Connected | Ready for Go-Payroll Operations")
+		log.Println("✅ Seday ERP: MongoDB Connected Successfully!")
+		
 		MongoClient = client
+		DB = client.Database("payrollDB") // تحديد قاعدة البيانات الافتراضية للسيستم
 	})
-
-	return MongoClient
 }
 
-// GetCollection وظيفة مساعدة للوصول لأي جدول (Collection) بسهولة
+// GetCollection وظيفة مساعدة للوصول لأي جدول بسهولة
 func GetCollection(collectionName string) *mongo.Collection {
-	return MongoClient.Database("payrollDB").Collection(collectionName)
+	if DB == nil {
+		ConnectDB()
+	}
+	return DB.Collection(collectionName)
 }
