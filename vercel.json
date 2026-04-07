@@ -1,23 +1,11 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "main.go",
-      "use": "@vercel/go"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
-    }
+    { "src": "main.go", "use": "@vercel/go" },
+    { "src": "public/**", "use": "@vercel/static" }
   ],
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "main.go"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/public/index.html"
-    }
+    { "source": "/api/:path*", "destination": "main.go" },
+    { "source": "/(.*)", "destination": "/public/index.html" }
   ]
 }
