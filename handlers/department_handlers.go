@@ -5,8 +5,8 @@ import (
 	"time"
 
 	// التعديل الجوهري: ربط المسارات باسم الموديول الصحيح لمشروعك
-	"github.com/shehapelsedawy665/payroll-system/database"
-	"github.com/shehapelsedawy665/payroll-system/models"
+	"github.com/shehapelsedawy665/payroll-team-system/database"
+	"github.com/shehapelsedawy665/payroll-team-system/models"
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"

@@ -10,8 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	// التعديل الصحيح للمسارات بناءً على go.mod الخاص بك
-	"github.com/shehapelsedawy665/payroll-system/database"
-	"github.com/shehapelsedawy665/payroll-system/models"
+	"github.com/shehapelsedawy665/payroll-team-system/database"
+	"github.com/shehapelsedawy665/payroll-team-system/models"
 )
 
 // 1. إضافة موظف جديد (POST /api/employees)

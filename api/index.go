@@ -10,9 +10,9 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
 	// التعديل الجوهري: ربط المسارات باسم الموديول الصحيح
-	"github.com/shehapelsedawy665/payroll-system/database"
-	"github.com/shehapelsedawy665/payroll-system/handlers"
-	"github.com/shehapelsedawy665/payroll-system/middleware"
+	"github.com/shehapelsedawy665/payroll-team-system/database"
+	"github.com/shehapelsedawy665/payroll-team-system/handlers"
+	"github.com/shehapelsedawy665/payroll-team-system/middleware"
 )
 
 var app *fiber.App

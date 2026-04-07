@@ -1,4 +1,4 @@
-module github.com/shehapelsedawy665/payroll-system
+module github.com/shehapelsedawy665/payroll-team-system
 
 go 1.21
 

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	// التعديل هنا: استخدام المسار الصحيح للموديول بتاعك
-	"github.com/shehapelsedawy665/payroll-system/database"
-	"github.com/shehapelsedawy665/payroll-system/models"
+	"github.com/shehapelsedawy665/payroll-team-system/database"
+	"github.com/shehapelsedawy665/payroll-team-system/models"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"

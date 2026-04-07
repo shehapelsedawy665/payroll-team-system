@@ -5,9 +5,9 @@ import (
 	"time"
 
 	// التعديل الجوهري للمسارات بناءً على الموديول بتاعك
-	"github.com/shehapelsedawy665/payroll-system/database"
-	"github.com/shehapelsedawy665/payroll-system/models"
-	"github.com/shehapelsedawy665/payroll-system/pkg/calculations"
+	"github.com/shehapelsedawy665/payroll-team-system/database"
+	"github.com/shehapelsedawy665/payroll-team-system/models"
+	"github.com/shehapelsedawy665/payroll-team-system/pkg/calculations"
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
