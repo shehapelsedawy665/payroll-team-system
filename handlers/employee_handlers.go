@@ -9,14 +9,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	// التعديل الصحيح للمسارات بناءً على go.mod الخاص بك
 	"github.com/shehapelsedawy665/payroll-team-system/database"
 	"github.com/shehapelsedawy665/payroll-team-system/models"
 )
 
 // 1. إضافة موظف جديد (POST /api/employees)
 func CreateEmployee(c *fiber.Ctx) error {
-	// الوصول للـ Collection مباشرة من قاعدة البيانات المتصلة
 	collection := database.DB.Collection("employees")
 	
 	var emp models.Employee
@@ -29,15 +27,14 @@ func CreateEmployee(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "الاسم والرقم القومي بيانات إجبارية"})
 	}
 
-	// إعداد البيانات التلقائية
-	emp.ID = primitive.NewObjectID()
-	
 	// استخراج ID الشركة من الـ Middleware (التوكن) لضمان الأمان
 	companyIDStr, ok := c.Locals("companyId").(string)
 	if !ok || companyIDStr == "" {
-		return c.Status(401).JSON(fiber.Map{"error": "غير مصرح لك بالوصول"})
+		return c.Status(401).JSON(fiber.Map{"error": "غير مصرح لك بالوصول، سجل دخول مجدداً"})
 	}
 	
+	// إعداد البيانات التلقائية
+	emp.ID = primitive.NewObjectID()
 	emp.CompanyID, _ = primitive.ObjectIDFromHex(companyIDStr)
 	emp.CreatedAt = time.Now()
 	
@@ -50,7 +47,6 @@ func CreateEmployee(c *fiber.Ctx) error {
 
 	_, err := collection.InsertOne(ctx, emp)
 	if err != nil {
-		// معالجة حالة تكرار الرقم القومي إذا كان هناك Index فريد
 		if mongo.IsDuplicateKeyError(err) {
 			return c.Status(400).JSON(fiber.Map{"error": "عفواً، الرقم القومي مسجل مسبقاً لموظف آخر"})
 		}
@@ -68,6 +64,7 @@ func CreateEmployee(c *fiber.Ctx) error {
 func GetEmployees(c *fiber.Ctx) error {
 	collection := database.DB.Collection("employees")
 	
+	// سحب الـ ID من الـ Locals اللي الميدل وير حطهولنا
 	companyIDStr, ok := c.Locals("companyId").(string)
 	if !ok {
 		return c.Status(401).JSON(fiber.Map{"error": "انتهت الجلسة، سجل دخول مجدداً"})
@@ -77,7 +74,8 @@ func GetEmployees(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// فلترة لجلب موظفين هذه الشركة فقط
+	// فلترة لجلب موظفين هذه الشركة فقط باستخدام حقل "companyId"
+	// تأكد أن الموديل عندك يستخدم bson:"companyId" بنفس الحروف
 	filter := bson.M{"companyId": companyID}
 	cursor, err := collection.Find(ctx, filter)
 	if err != nil {
@@ -90,7 +88,6 @@ func GetEmployees(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "خطأ في معالجة البيانات المستلمة"})
 	}
 
-	// نضمن رجوع مصفوفة فارغة [] بدل null
 	if employees == nil {
 		employees = []models.Employee{}
 	}
@@ -107,11 +104,12 @@ func GetEmployeeDetails(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "ID الموظف غير صحيح"})
 	}
 
-	companyIDStr := c.Locals("companyId").(string)
+	companyIDStr, ok := c.Locals("companyId").(string)
+	if !ok { return c.Status(401).JSON(fiber.Map{"error": "غير مصرح"}) }
 	companyID, _ := primitive.ObjectIDFromHex(companyIDStr)
 
 	var emp models.Employee
-	// التحقق من ID الموظف وتبعيتة للشركة في نفس الوقت لزيادة الأمان
+	// فلتر مزدوج: الـ ID بتاع الموظف ولازم يكون تبع شركتك
 	filter := bson.M{"_id": id, "companyId": companyID}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -119,7 +117,7 @@ func GetEmployeeDetails(c *fiber.Ctx) error {
 
 	err = collection.FindOne(ctx, filter).Decode(&emp)
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "عفواً، الموظف غير موجود أو تم حذفه"})
+		return c.Status(404).JSON(fiber.Map{"error": "عفواً، الموظف غير موجود أو لا تملك صلاحية رؤيته"})
 	}
 
 	return c.JSON(fiber.Map{
@@ -137,16 +135,18 @@ func DeleteEmployee(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "ID الموظف غير صحيح"})
 	}
 
-	companyIDStr := c.Locals("companyId").(string)
+	companyIDStr, ok := c.Locals("companyId").(string)
+	if !ok { return c.Status(401).JSON(fiber.Map{"error": "غير مصرح"}) }
 	companyID, _ := primitive.ObjectIDFromHex(companyIDStr)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// الأمان أولاً: لا يمكن حذف موظف إلا لو كان يتبع للشركة صاحبة الطلب
 	filter := bson.M{"_id": id, "companyId": companyID}
 	result, err := collection.DeleteOne(ctx, filter)
 	if err != nil || result.DeletedCount == 0 {
-		return c.Status(404).JSON(fiber.Map{"error": "فشل الحذف، الموظف قد لا يكون موجوداً أو لا يتبع لشركتك"})
+		return c.Status(404).JSON(fiber.Map{"error": "فشل الحذف، قد لا تملك صلاحية حذف هذا الموظف"})
 	}
 
 	return c.JSON(fiber.Map{"success": true, "message": "تم حذف الموظف بنجاح من النظام"})
