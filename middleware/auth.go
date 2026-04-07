@@ -10,12 +10,11 @@ import (
 )
 
 // AuthRequired هو المفتش اللي بيتحقق من الـ Token (Middleware)
-// تم تغيير الاسم ليتوافق مع المنادى عليه في api/index.go
 func AuthRequired(c *fiber.Ctx) error {
 	// 1. الحصول على الـ Header (Authorization)
 	authHeader := c.Get("Authorization")
 
-	// التحقق من وجود كلمة Bearer وتنسيق الهيدر
+	// التحقق من وجود الهيدر
 	if authHeader == "" {
 		return c.Status(401).JSON(fiber.Map{
 			"success": false,
@@ -23,7 +22,7 @@ func AuthRequired(c *fiber.Ctx) error {
 		})
 	}
 
-	// استخراج التوكن الفعلي (تجنب الـ Index Out of Range لو الهيدر غريب)
+	// 2. استخراج التوكن الفعلي من صيغة Bearer <token>
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
 		return c.Status(401).JSON(fiber.Map{
@@ -33,26 +32,24 @@ func AuthRequired(c *fiber.Ctx) error {
 	}
 	tokenString := parts[1]
 
-	// 3. التحقق من التوكن (Verification)
+	// 3. الحصول على السر (Secret Key)
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		// القيمة الافتراضية - تأكد من مطابقتها لما في الـ Login Handler
 		secret = "seday_erp_secret_key_2026" 
 	}
 
-	// Parse الـ Token وفك التشفير
+	// 4. Parse الـ Token وفك التشفير باستخدام خوارزمية HMAC
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// التأكد من أن خوارزمية التشفير هي HMAC
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(secret), nil
 	})
 
-	// 4. معالجة الأخطاء (Expired أو Invalid)
+	// 5. معالجة أخطاء الصلاحية (Expired أو Invalid)
 	if err != nil || !token.Valid {
 		message := "الـ Token غير صالح أو تالف"
-		if err != nil && strings.Contains(err.Error(), "expired") {
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), "expired") {
 			message = "انتهت صلاحية الجلسة، برجاء تسجيل الدخول مرة أخرى"
 		}
 		return c.Status(401).JSON(fiber.Map{
@@ -61,23 +58,34 @@ func AuthRequired(c *fiber.Ctx) error {
 		})
 	}
 
-	// 5. استخراج البيانات (Claims) ووضعها في الـ Context (Locals)
+	// 6. استخراج البيانات (Claims) وحفظها في الـ Context (Locals)
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		// استخراج companyId
-		companyID, ok := claims["companyId"].(string)
-		if !ok || companyID == "" {
+		
+		// أ. استخراج الـ Company ID (أساسي لكل العمليات)
+		companyID, okID := claims["companyId"].(string)
+		if !okID || companyID == "" {
 			return c.Status(401).JSON(fiber.Map{
 				"success": false,
-				"message": "الـ Token لا يحتوي على بيانات الشركة التعريفية",
+				"message": "الـ Token لا يحتوي على معرف الشركة",
 			})
 		}
 
-		// حفظ الـ companyId في الـ Locals عشان الـ Handlers يوصلوله بسهولة
-		// ده بديل لـ req.user في Node.js
+		// ب. استخراج الـ Role (عشان نفرق بين الأدمن والشركة العادية)
+		role, _ := claims["role"].(string)
+		if role == "" {
+			role = "company" // قيمة افتراضية للأمان
+		}
+
+		// حفظ البيانات في الـ Locals عشان الـ Handlers يوصلولها فوراً بـ c.Locals("key")
 		c.Locals("companyId", companyID)
+		c.Locals("role", role)
+		c.Locals("email", claims["email"])
 		
-		return c.Next() // اسمح بالمرور للمسار التالي (الـ Handler)
+		return c.Next() // مبروك، اعدي للـ Handler اللي بعده
 	}
 
-	return c.Status(401).JSON(fiber.Map{"success": false, "message": "فشل التحقق من الهوية"})
+	return c.Status(401).JSON(fiber.Map{
+		"success": false, 
+		"message": "فشل التحقق من بيانات الهوية داخل التوكن",
+	})
 }
