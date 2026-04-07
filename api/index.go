@@ -9,7 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	// التعديل الجوهري: ربط المسارات باسم الموديول الصحيح
+	// الربط بالموديول الخاص بك
 	"github.com/shehapelsedawy665/payroll-team-system/database"
 	"github.com/shehapelsedawy665/payroll-team-system/handlers"
 	"github.com/shehapelsedawy665/payroll-team-system/middleware"
@@ -30,10 +30,10 @@ func init() {
 	app.Use(recover.New())
 	app.Use(logger.New())
 	
-	// إعدادات الـ CORS لضمان قبول الطلبات من المتصفح
+	// إعدادات الـ CORS المعدلة لضمان عدم حدوث Block من المتصفح
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "*",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Requested-With",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
@@ -41,18 +41,19 @@ func init() {
 	// تعريف المسارات (Routes) تحت مظلة /api
 	api := app.Group("/api")
 
-	// مسارات المصادقة
+	// 1. مسارات المصادقة (مفتوحة للجميع)
 	auth := api.Group("/auth")
 	auth.Post("/register", handlers.RegisterCompany)
 	auth.Post("/login", handlers.LoginCompany)
 
-	// المسارات المحمية بـ JWT
+	// 2. المسارات المحمية بـ JWT (تحتاج Token صالح)
+	// تأكد أن middleware.AuthRequired يقرأ الـ Role والـ CompanyId ويخزنهم في الـ Context
 	protected := api.Group("/", middleware.AuthRequired)
 
-	// إدارة الموظفين
+	// إدارة الموظفين - مربوطة بـ CompanyId الخاص بالتوكن
 	employees := protected.Group("/employees")
-	employees.Get("/", handlers.GetEmployees)
-	employees.Post("/", handlers.CreateEmployee)
+	employees.Get("/", handlers.GetEmployees)            // جلب موظفي الشركة فقط
+	employees.Post("/", handlers.CreateEmployee)        // إضافة موظف للشركة
 	employees.Get("/:id/details", handlers.GetEmployeeDetails)
 	employees.Delete("/:id", handlers.DeleteEmployee)
 
@@ -61,7 +62,7 @@ func init() {
 	departments.Get("/", handlers.GetAllDepartments)
 	departments.Post("/add", handlers.AddDepartment)
 
-	// عمليات الرواتب
+	// عمليات الرواتب - تعتمد على قوانين 2026 المخزنة في الموديل
 	payroll := protected.Group("/payroll")
 	payroll.Post("/calculate", handlers.CalculateAndSavePayroll)
 	payroll.Post("/net-to-gross", handlers.NetToGrossCalculator)
