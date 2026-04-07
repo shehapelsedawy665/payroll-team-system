@@ -151,14 +151,20 @@
         }
 
         async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('auth-email').value;
+            if(e) e.preventDefault();
+            const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-pass').value;
+            
+            if(!email || !password) {
+                alert("برجاء إدخال البريد وكلمة المرور");
+                return;
+            }
+
             try {
                 const res = await fetch(`${API_BASE}/auth/login`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email: email.toLowerCase().trim(), password })
+                    body: JSON.stringify({ email: email.toLowerCase(), password })
                 });
                 const data = await res.json();
                 if(res.ok && data.token) { 
@@ -169,14 +175,17 @@
         }
 
         async function handleRegister(e) {
-            e.preventDefault();
-            const name = document.getElementById('auth-name').value;
-            const email = document.getElementById('auth-email').value;
-            const adminEmail = document.getElementById('auth-admin-email').value; // القيمة من الحقل الجديد
+            if(e) e.preventDefault();
+            
+            // جلب البيانات مع التنظيف
+            const name = document.getElementById('auth-name').value.trim();
+            const email = document.getElementById('auth-email').value.trim();
+            const adminEmail = document.getElementById('auth-admin-email').value.trim();
             const password = document.getElementById('auth-pass').value;
 
+            // التأكد من ملء الحقول المطلوبة للتسجيل
             if(!name || !email || !adminEmail || !password) {
-                alert("برجاء ملء كافة البيانات المطلوبة");
+                alert("برجاء ملء جميع البيانات المطلوبة");
                 return;
             }
 
@@ -185,10 +194,10 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ 
-                        name, 
-                        email: email.toLowerCase().trim(), 
-                        adminEmail: adminEmail.toLowerCase().trim(), 
-                        password 
+                        name: name, 
+                        email: email.toLowerCase(), 
+                        adminEmail: adminEmail.toLowerCase(), 
+                        password: password 
                     })
                 });
                 const data = await res.json();
@@ -196,23 +205,32 @@
                     alert("تم التسجيل بنجاح! سجل دخولك الآن.");
                     toggleRegisterMode();
                 } else { alert(data.error || "فشل التسجيل"); }
-            } catch(err) { alert("خطأ في الاتصال"); }
+            } catch(err) { alert("خطأ في الاتصال بالسيرفر"); }
         }
 
-        // دالة التبديل - تم تحديثها لتشمل الحقل الجديد
         function toggleRegisterMode() {
-            document.getElementById('auth-name').classList.toggle('hidden');
-            document.getElementById('auth-admin-email').classList.toggle('hidden'); // إظهار/إخفاء حقل الأدمن
-            document.getElementById('login-btn').classList.toggle('hidden');
-            document.getElementById('real-reg-btn').classList.toggle('hidden');
-            const btn = document.getElementById('toggle-reg-btn');
-            btn.innerText = btn.innerText === "إنشاء حساب جديد 🏢" ? "لديك حساب بالفعل؟" : "إنشاء حساب جديد 🏢";
+            const nameField = document.getElementById('auth-name');
+            const adminField = document.getElementById('auth-admin-email');
+            const loginBtn = document.getElementById('login-btn');
+            const regBtn = document.getElementById('real-reg-btn');
+            const toggleBtn = document.getElementById('toggle-reg-btn');
+
+            nameField.classList.toggle('hidden');
+            adminField.classList.toggle('hidden');
+            loginBtn.classList.toggle('hidden');
+            regBtn.classList.toggle('hidden');
+
+            if (nameField.classList.contains('hidden')) {
+                toggleBtn.innerText = "إنشاء حساب جديد 🏢";
+            } else {
+                toggleBtn.innerText = "لديك حساب بالفعل؟ سجل دخولك";
+            }
         }
 
         async function loadEmployees() {
             try {
                 const data = await apiFetch('/employees');
-                document.getElementById('empTable').innerHTML = data.map(e => `
+                document.getElementById('empTable').innerHTML = (data || []).map(e => `
                     <tr class="hover:bg-indigo-50 cursor-pointer border-b" onclick="openProfile('${e.id}')">
                         <td class="p-5 font-black text-slate-800 text-sm">${e.name}</td>
                         <td class="p-5 text-center font-mono text-slate-400 text-xs">${e.nationalId}</td>
@@ -223,7 +241,9 @@
         }
 
         async function openProfile(id) {
-            hideAll(); document.getElementById('profile-view').classList.remove('hidden');
+            hideAll(); 
+            const view = document.getElementById('profile-view');
+            if(view) view.classList.remove('hidden');
             document.getElementById('currId').value = id;
             try {
                 const data = await apiFetch(`/employees/${id}/details`);
