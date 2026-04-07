@@ -1,11 +1,19 @@
 package handlers
 
 import (
-    "github.com/shehapelsedawy665/payroll-system/database"
-    "github.com/shehapelsedawy665/payroll-system/models" // لو عندك فولدر موديلز
-    // أي imports تانية سيبها زي ما هي
-)
+	"context"
+	"os"
+	"time"
 
+	// التعديل هنا: استخدام المسار الصحيح للموديول بتاعك
+	"github.com/shehapelsedawy665/payroll-system/database"
+	"github.com/shehapelsedawy665/payroll-system/models"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v4"
+	"go.mongodb.org/mongo-driver/bson"
+	"golang.org/x/crypto/bcrypt"
+)
 
 // RegisterCompany تسجيل شركة جديدة بكلمة مرور مشفرة
 func RegisterCompany(c *fiber.Ctx) error {
