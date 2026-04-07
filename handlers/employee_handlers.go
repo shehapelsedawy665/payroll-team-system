@@ -22,22 +22,24 @@ func CreateEmployee(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "بيانات الموظف غير صالحة"})
 	}
 
-	// التأكد من البيانات الأساسية
+	// 1. التأكد من البيانات الأساسية وتواريخ التعيين
 	if emp.Name == "" || emp.NationalID == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "الاسم والرقم القومي بيانات إجبارية"})
 	}
 
-	// استخراج ID الشركة من الـ Middleware (التوكن) لضمان الأمان
+	// 2. استخراج ID الشركة من الـ Middleware
 	companyIDStr, ok := c.Locals("companyId").(string)
 	if !ok || companyIDStr == "" {
 		return c.Status(401).JSON(fiber.Map{"error": "غير مصرح لك بالوصول، سجل دخول مجدداً"})
 	}
 	
-	// إعداد البيانات التلقائية
+	// 3. إعداد البيانات التلقائية والـ IDs
 	emp.ID = primitive.NewObjectID()
 	emp.CompanyID, _ = primitive.ObjectIDFromHex(companyIDStr)
 	emp.CreatedAt = time.Now()
+	emp.Status = "Active" // الوضع الافتراضي عند الإضافة
 	
+	// ضبط تاريخ التعيين (لو جاي فاضي ياخد النهاردة)
 	if emp.HireDate.IsZero() {
 		emp.HireDate = time.Now()
 	}
@@ -64,7 +66,6 @@ func CreateEmployee(c *fiber.Ctx) error {
 func GetEmployees(c *fiber.Ctx) error {
 	collection := database.DB.Collection("employees")
 	
-	// سحب الـ ID من الـ Locals اللي الميدل وير حطهولنا
 	companyIDStr, ok := c.Locals("companyId").(string)
 	if !ok {
 		return c.Status(401).JSON(fiber.Map{"error": "انتهت الجلسة، سجل دخول مجدداً"})
@@ -74,8 +75,6 @@ func GetEmployees(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// فلترة لجلب موظفين هذه الشركة فقط باستخدام حقل "companyId"
-	// تأكد أن الموديل عندك يستخدم bson:"companyId" بنفس الحروف
 	filter := bson.M{"companyId": companyID}
 	cursor, err := collection.Find(ctx, filter)
 	if err != nil {
@@ -95,38 +94,38 @@ func GetEmployees(c *fiber.Ctx) error {
 	return c.JSON(employees)
 }
 
-// 3. جلب تفاصيل موظف محدد (GET /api/employees/:id/details)
-func GetEmployeeDetails(c *fiber.Ctx) error {
+// 3. تحديث بيانات الموظف (PUT /api/employees/:id) - يشمل تاريخ الاستقالة
+func UpdateEmployee(c *fiber.Ctx) error {
 	collection := database.DB.Collection("employees")
-	
-	id, err := primitive.ObjectIDFromHex(c.Params("id"))
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "ID الموظف غير صحيح"})
-	}
-
-	companyIDStr, ok := c.Locals("companyId").(string)
-	if !ok { return c.Status(401).JSON(fiber.Map{"error": "غير مصرح"}) }
+	id, _ := primitive.ObjectIDFromHex(c.Params("id"))
+	companyIDStr := c.Locals("companyId").(string)
 	companyID, _ := primitive.ObjectIDFromHex(companyIDStr)
 
-	var emp models.Employee
-	// فلتر مزدوج: الـ ID بتاع الموظف ولازم يكون تبع شركتك
-	filter := bson.M{"_id": id, "companyId": companyID}
+	var updateData models.Employee
+	if err := c.BodyParser(&updateData); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "بيانات غير صالحة"})
+	}
+
+	// لو تم إضافة تاريخ استقالة، نحول الحالة لـ Resigned تلقائياً
+	if updateData.ResignationDate != nil && !updateData.ResignationDate.IsZero() {
+		updateData.Status = "Resigned"
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err = collection.FindOne(ctx, filter).Decode(&emp)
+	filter := bson.M{"_id": id, "companyId": companyID}
+	update := bson.M{"$set": updateData}
+
+	_, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "عفواً، الموظف غير موجود أو لا تملك صلاحية رؤيته"})
+		return c.Status(500).JSON(fiber.Map{"error": "فشل تحديث البيانات"})
 	}
 
-	return c.JSON(fiber.Map{
-		"emp":     emp,
-		"history": emp.History,
-	})
+	return c.JSON(fiber.Map{"success": true, "message": "تم تحديث بيانات الموظف بنجاح"})
 }
 
-// 4. حذف موظف (DELETE /api/employees/:id)
+// 4. حذف موظف نهائياً (DELETE /api/employees/:id)
 func DeleteEmployee(c *fiber.Ctx) error {
 	collection := database.DB.Collection("employees")
 	
@@ -135,19 +134,19 @@ func DeleteEmployee(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "ID الموظف غير صحيح"})
 	}
 
-	companyIDStr, ok := c.Locals("companyId").(string)
-	if !ok { return c.Status(401).JSON(fiber.Map{"error": "غير مصرح"}) }
+	companyIDStr := c.Locals("companyId").(string)
 	companyID, _ := primitive.ObjectIDFromHex(companyIDStr)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// الأمان أولاً: لا يمكن حذف موظف إلا لو كان يتبع للشركة صاحبة الطلب
+	// الحذف فقط لو الموظف يخص الشركة دي
 	filter := bson.M{"_id": id, "companyId": companyID}
 	result, err := collection.DeleteOne(ctx, filter)
+	
 	if err != nil || result.DeletedCount == 0 {
-		return c.Status(404).JSON(fiber.Map{"error": "فشل الحذف، قد لا تملك صلاحية حذف هذا الموظف"})
+		return c.Status(404).JSON(fiber.Map{"error": "فشل الحذف، الموظف غير موجود أو لا تملك صلاحية"})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "message": "تم حذف الموظف بنجاح من النظام"})
+	return c.JSON(fiber.Map{"success": true, "message": "تم حذف الموظف نهائياً من قاعدة البيانات"})
 }
