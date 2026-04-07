@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	// ملاحظة: تأكد أن "golangtest" هو الاسم المكتوب في أول سطر في ملف go.mod عندك
+	// تأكد أن "golangtest" هو الموديول الصحيح في go.mod
 	"golangtest/database"
 	"golangtest/handlers"
 	"golangtest/middleware"
@@ -18,19 +18,19 @@ import (
 
 func main() {
 	// 1. الاتصال بقاعدة البيانات (MongoDB Atlas) 
-	// دي أهم خطوة، لو فشلت هنا السيرفر هيطبع السبب في الـ Vercel Logs ويقفل
+	// السطر ده لو فشل، السيرفر هيطبع Error واضح جداً في Vercel Logs
 	database.ConnectDB()
 
-	// 2. إنشاء تطبيق Fiber بإعدادات متوافقة مع Vercel
+	// 2. إنشاء تطبيق Fiber
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: false,
 		AppName:               "Seday ERP Core v2 - Go Engine",
-		BodyLimit:             10 * 1024 * 1024, // دعم ملفات لحد 10 ميجا
+		BodyLimit:             10 * 1024 * 1024, 
 	})
 
-	// 3. Middlewares الأساسية لضمان عدم توقف السيرفر
-	app.Use(recover.New()) // الحماية من الـ Panic والـ Crash
-	app.Use(logger.New())  // لمراقبة الطلبات في الـ Dashboard
+	// 3. Middlewares الأساسية
+	app.Use(recover.New()) // يمنع السيرفر من الانهيار (Crash)
+	app.Use(logger.New())  // مراقبة الطلبات لحظياً
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
@@ -45,7 +45,7 @@ func main() {
 	auth.Post("/register", handlers.RegisterCompany)
 	auth.Post("/login", handlers.LoginCompany)
 
-	// --- [B] المسارات المحمية (تحتاج JWT Token) ---
+	// --- [B] المسارات المحمية (JWT Required) ---
 	protected := api.Group("/", middleware.AuthRequired)
 
 	// إدارة الموظفين
@@ -60,7 +60,7 @@ func main() {
 	departments.Get("/", handlers.GetAllDepartments)
 	departments.Post("/add", handlers.AddDepartment)
 
-	// محرك المرتبات الضرائب (Egyptian Tax Logic)
+	// محرك المرتبات (الضرائب والتأمينات المصرية)
 	payroll := protected.Group("/payroll")
 	payroll.Post("/calculate", handlers.CalculateAndSavePayroll)
 	payroll.Post("/net-to-gross", handlers.NetToGrossCalculator)
@@ -74,21 +74,22 @@ func main() {
 		})
 	})
 
-	// 5. خدمة ملفات الـ Frontend (المهمة جداً لظهور الموقع)
-	// تأكد أن فولدر public موجود في الـ Root بجانب main.go
-	app.Static("/", "./public")
+	// 5. خدمة ملفات الـ Frontend (Public Folder)
+	// استخدمنا Absolute Path لضمان عملها في Vercel
+	workDir, _ := os.Getwd()
+	app.Static("/", filepath.Join(workDir, "public"))
 
 	// 6. التعامل مع الـ 404 والـ SPA Routing
 	app.Use(func(c *fiber.Ctx) error {
-		// لو الطلب لـ API غير موجود نرجع JSON 404
+		// لو API مش موجود
 		if len(c.Path()) >= 4 && c.Path()[:4] == "/api" {
 			return c.Status(404).JSON(fiber.Map{"error": "الرابط المطلوب غير موجود في نظام سداد"})
 		}
-		// لو أي مسار تاني نبعت الـ index.html عشان الـ Frontend يكمل (SPA)
-		return c.SendFile(filepath.Join("public", "index.html"))
+		// تحويل أي مسار آخر لـ index.html لدعم React/Vue/Svelte
+		return c.SendFile(filepath.Join(workDir, "public", "index.html"))
 	})
 
-	// 7. تحديد المنفذ (Port) والتشغيل
+	// 7. تحديد المنفذ والتشغيل
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
@@ -96,7 +97,6 @@ func main() {
 
 	log.Printf("🚀 Seday ERP Go Engine is LIVE on port %s", port)
 	
-	// تشغيل السيرفر مع مراقبة الأخطاء
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("❌ Failed to start server: %v", err)
 	}
