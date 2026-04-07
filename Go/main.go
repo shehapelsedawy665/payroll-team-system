@@ -10,80 +10,90 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	"your-project/database"   // استبدل your-project باسم المديول بتاعك
-	"your-project/handlers"   // الملفات اللي عملناها قبل كدة
+	// ملاحظة: استبدل "your-project" بالاسم الموجود في أول سطر في ملف go.mod عندك
+	"your-project/database"
+	"your-project/handlers"
 	"your-project/middleware"
 )
 
 func main() {
-	// 1. الاتصال بقاعدة البيانات (مرة واحدة عند التشغيل)
+	// 1. الاتصال بقاعدة البيانات (MongoDB Atlas)
 	database.ConnectDB()
 
-	// 2. إنشاء تطبيق Fiber (بديل Express)
+	// 2. إنشاء تطبيق Fiber بأداء عالي
 	app := fiber.New(fiber.Config{
-		// إعدادات لتقليل استهلاك الـ Memory في الـ Serverless
 		DisableStartupMessage: false,
-		AppName:               "Seday ERP Core v2",
+		AppName:               "Seday ERP Core v2 - Go Engine",
 	})
 
-	// 3. Middlewares الأساسية
-	app.Use(logger.New())    // لمتابعة الـ Logs في السيرفر
-	app.Use(recover.New())   // عشان لو حصل Crash السيرفر ما يوقعش
+	// 3. Middlewares الأساسية للاستقرار والأمان
+	app.Use(logger.New())  // لمراقبة الطلبات (Requests)
+	app.Use(recover.New()) // الحماية من الـ Crash المفاجئ
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*", // تقدر تحدد دومين الموبايل هنا للأمان
+		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
-	// 4. ربط الـ Routes
+	// 4. ربط الـ Routes (التقسيم المنطقي)
 	api := app.Group("/api")
 
-	// --- مسارات الموظفين (محمية بالـ JWT) ---
-	employees := api.Group("/employees", middleware.AuthMiddleware)
-	employees.Post("/", handlers.CreateEmployee)
-	employees.Get("/", handlers.GetEmployees)
-	employees.Get("/:id/details", handlers.GetEmployeeDetails)
-	employees.Delete("/:id", handlers.DeleteEmployee)
+	// --- [A] مسارات الهوية (بدون حماية - للـ Login والـ Register) ---
+	auth := api.Group("/auth")
+	auth.Post("/register", handlers.RegisterCompany)
+	auth.Post("/login", handlers.LoginCompany)
 
-	// --- إعدادات الشركة (محمية بالـ JWT) ---
-	company := api.Group("/company", middleware.AuthMiddleware)
-	
-	// جلب الإعدادات
+	// --- [B] المسارات المحمية (تحتاج Token) ---
+	// بنستخدم هنا الميدل وير اللي عملناه عشان نحمي البيانات
+	protected := api.Group("/", middleware.AuthRequired)
+
+	// 1. الموظفين (Employees)
+	protected.Get("/employees", handlers.GetEmployees)
+	protected.Post("/employees", handlers.CreateEmployee) // أو handlers.AddEmployee حسب ملفك
+	protected.Get("/employees/:id/details", handlers.GetEmployeeDetails)
+	protected.Delete("/employees/:id", handlers.DeleteEmployee)
+
+	// 2. الأقسام (Departments)
+	protected.Get("/departments", handlers.GetAllDepartments)
+	protected.Post("/departments/add", handlers.AddDepartment)
+
+	// 3. محرك المرتبات (Payroll)
+	protected.Post("/payroll/calculate", handlers.CalculateAndSavePayroll)
+	protected.Post("/payroll/net-to-gross", handlers.NetToGrossCalculator)
+
+	// 4. إعدادات الشركة (Settings)
+	company := protected.Group("/company")
 	company.Get("/settings", func(c *fiber.Ctx) error {
-		// هنا تقدر تستخدم الـ Handler اللي بيجيب الداتا من Mongo
-		// هكتبلك مثال سريع لجلب الـ Settings
+		// مثال لاسترجاع الإعدادات (يفضل نقلها لـ Handler لاحقاً)
 		return c.JSON(fiber.Map{
 			"personalExemption": 20000,
 			"maxInsSalary":      16700,
 			"insEmployeePercent": 0.11,
 		})
 	})
-
-	// تحديث الإعدادات
 	company.Post("/settings", func(c *fiber.Ctx) error {
-		// تنفيذ منطق الـ Update باستخدام c.BodyParser
-		return c.JSON(fiber.Map{"success": true, "message": "تم التحديث بنجاح"})
+		return c.JSON(fiber.Map{"success": true, "message": "تم تحديث الإعدادات بنجاح ✅"})
 	})
 
-	// 5. التعامل مع الملفات الثابتة (Public Folder)
-	// ده بيخدم الـ index.html وأي ملفات CSS/JS عندك
+	// 5. خدمة ملفات الـ Frontend (Public Folder)
+	// لخدمة ملف الـ index.html والـ CSS/JS
 	app.Static("/", "./public")
 
-	// 6. التعامل مع أي مسار غير معروف (404 Fallback)
+	// 6. التعامل مع الـ 404 والـ SPA Routing
 	app.Use(func(c *fiber.Ctx) error {
-		// لو الرابط بيبدأ بـ /api نرجع JSON
+		// لو الطلب للـ API مش موجود نرجع 404 JSON
 		if len(c.Path()) >= 4 && c.Path()[:4] == "/api" {
-			return c.Status(404).JSON(fiber.Map{"error": "الرابط المطلوب غير موجود في الـ API"})
+			return c.Status(404).JSON(fiber.Map{"error": "الرابط المطلوب غير موجود في نظام السداد"})
 		}
-		// أي حاجة تانية تخدم ملف الـ index.html بتاع الـ Frontend
+		// لو أي مسار تاني (زي البروفايل أو الموظفين في الـ URL) نرجع الـ index.html
 		return c.SendFile(filepath.Join("public", "index.html"))
 	})
 
-	// 7. التشغيل
+	// 7. تحديد المنفذ (Port) والتشغيل
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
-	log.Printf("Server LIVE on port %s 🚀", port)
+	log.Printf("🚀 Seday ERP Go Engine is LIVE on port %s", port)
 	log.Fatal(app.Listen(":" + port))
 }
