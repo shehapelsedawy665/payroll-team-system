@@ -138,9 +138,14 @@
         let TOKEN = localStorage.getItem('token');
         const API_BASE = '/api';
 
+        // 1. الدالة الأساسية لجلب البيانات من السيرفر
         async function apiFetch(url, options = {}) {
             const finalUrl = url.startsWith('/api') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
-            options.headers = { ...options.headers, 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+            options.headers = { 
+                ...options.headers, 
+                'Authorization': `Bearer ${TOKEN}`, 
+                'Content-Type': 'application/json' 
+            };
             try {
                 const res = await fetch(finalUrl, options);
                 if(res.status === 401) { handleLogout(); return; }
@@ -150,64 +155,7 @@
             } catch (err) { throw err; }
         }
 
-        async function handleLogin(e) {
-            if(e) e.preventDefault();
-            const email = document.getElementById('auth-email').value.trim();
-            const password = document.getElementById('auth-pass').value;
-            
-            if(!email || !password) {
-                alert("برجاء إدخال البريد وكلمة المرور");
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API_BASE}/auth/login`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email: email.toLowerCase(), password })
-                });
-                const data = await res.json();
-                if(res.ok && data.token) { 
-                    localStorage.setItem('token', data.token); 
-                    window.location.reload(); 
-                } else { alert(data.error || "فشل الدخول"); }
-            } catch(e) { alert("السيرفر لا يستجيب"); }
-        }
-
-        async function handleRegister(e) {
-            if(e) e.preventDefault();
-            
-            // جلب البيانات مع التنظيف
-            const name = document.getElementById('auth-name').value.trim();
-            const email = document.getElementById('auth-email').value.trim();
-            const adminEmail = document.getElementById('auth-admin-email').value.trim();
-            const password = document.getElementById('auth-pass').value;
-
-            // التأكد من ملء الحقول المطلوبة للتسجيل
-            if(!name || !email || !adminEmail || !password) {
-                alert("برجاء ملء جميع البيانات المطلوبة");
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API_BASE}/auth/register`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        name: name, 
-                        email: email.toLowerCase(), 
-                        adminEmail: adminEmail.toLowerCase(), 
-                        password: password 
-                    })
-                });
-                const data = await res.json();
-                if(res.ok) {
-                    alert("تم التسجيل بنجاح! سجل دخولك الآن.");
-                    toggleRegisterMode();
-                } else { alert(data.error || "فشل التسجيل"); }
-            } catch(err) { alert("خطأ في الاتصال بالسيرفر"); }
-        }
-
+        // 2. دالة التبديل بين الدخول والتسجيل (مهمة جداً لإظهار الحقول)
         function toggleRegisterMode() {
             const nameField = document.getElementById('auth-name');
             const adminField = document.getElementById('auth-admin-email');
@@ -227,6 +175,69 @@
             }
         }
 
+        // 3. دالة التسجيل (المصلحة)
+        async function handleRegister(e) {
+            if (e) e.preventDefault();
+            
+            const name = document.getElementById('auth-name').value.trim();
+            const email = document.getElementById('auth-email').value.trim();
+            const adminEmail = document.getElementById('auth-admin-email').value.trim();
+            const password = document.getElementById('auth-pass').value;
+
+            console.log("Checking data:", { name, email, adminEmail, password });
+
+            if(!name || !email || !adminEmail || !password) {
+                alert("⚠️ خطأ: يجب ملء (اسم الشركة، بريد الشركة، بريد الأدمن، وكلمة المرور)");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        name: name,
+                        email: email.toLowerCase(), 
+                        adminEmail: adminEmail.toLowerCase(), 
+                        password: password 
+                    })
+                });
+                const data = await res.json();
+                if(res.ok) {
+                    alert("تم التسجيل بنجاح! سجل دخولك الآن ✅");
+                    toggleRegisterMode();
+                } else { 
+                    alert("عفواً: " + (data.error || "بيانات غير صالحة")); 
+                }
+            } catch(err) { alert("تعذر الاتصال بالسيرفر ❌"); }
+        }
+
+        // 4. دالة الدخول
+        async function handleLogin(e) {
+            if (e) e.preventDefault();
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-pass').value;
+            
+            if(!email || !password) {
+                alert("برجاء إدخال البريد وكلمة المرور");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email: email.toLowerCase(), password })
+                });
+                const data = await res.json();
+                if(res.ok && data.token) { 
+                    localStorage.setItem('token', data.token); 
+                    window.location.reload(); 
+                } else { alert(data.error || "بيانات الدخول غير صحيحة"); }
+            } catch(e) { alert("السيرفر لا يستجيب"); }
+        }
+
+        // 5. باقي وظائف الـ HR والرواتب
         async function loadEmployees() {
             try {
                 const data = await apiFetch('/employees');
@@ -242,8 +253,7 @@
 
         async function openProfile(id) {
             hideAll(); 
-            const view = document.getElementById('profile-view');
-            if(view) view.classList.remove('hidden');
+            document.getElementById('profile-view').classList.remove('hidden');
             document.getElementById('currId').value = id;
             try {
                 const data = await apiFetch(`/employees/${id}/details`);
