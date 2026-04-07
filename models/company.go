@@ -20,9 +20,10 @@ const (
 type Company struct {
 	ID                 primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Name               string             `bson:"name" json:"name"`
-	AdminEmail         string             `bson:"adminEmail" json:"adminEmail"`
+	AdminEmail         string             `bson:"adminEmail" json:"adminEmail"` // بريد الأدمن المسؤول
 	Email              string             `bson:"email" json:"email"`
-	Password           string             `bson:"password" json:"-"` // إخفاء الباسورد عند الإرجاع كـ JSON
+	Password           string             `bson:"password" json:"-"`
+	Role               string             `bson:"role" json:"role"` // "admin" أو "company"
 	Settings           CompanySettings    `bson:"settings" json:"settings"`
 	CreatedAt          time.Time          `bson:"createdAt" json:"createdAt"`
 	LastSettingsUpdate time.Time          `bson:"lastSettingsUpdate" json:"lastSettingsUpdate"`
@@ -39,7 +40,6 @@ type CompanySettings struct {
 }
 
 // NewCompanySettings دالة لإنشاء إعدادات افتراضية عند تسجيل شركة جديدة
-// بنستخدمها في الـ Register Handler عشان نملأ الـ Settings أوتوماتيكياً
 func NewCompanySettings() CompanySettings {
 	return CompanySettings{
 		InsEmployeePercent:    InsEmployeePercent,
