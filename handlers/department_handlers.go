@@ -2,11 +2,11 @@ package handlers
 
 import (
 	"context"
-	"net/http"
 	"time"
 
-	"your-project-name/database"
-	"your-project-name/models"
+	// التعديل الجوهري: ربط المسارات باسم الموديول الصحيح لمشروعك
+	"github.com/shehapelsedawy665/payroll-system/database"
+	"github.com/shehapelsedawy665/payroll-system/models"
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -16,8 +16,15 @@ import (
 // AddDepartment إضافة قسم جديد وربطه بالشركة أوتوماتيكياً
 func AddDepartment(c *fiber.Ctx) error {
 	// 1. استخراج companyId من التوكن (عن طريق Middleware)
-	companyIdStr := c.Locals("companyId").(string)
-	objID, _ := primitive.ObjectIDFromHex(companyIdStr)
+	companyIdStr, ok := c.Locals("companyId").(string)
+	if !ok || companyIdStr == "" {
+		return c.Status(401).JSON(fiber.Map{"error": "غير مصرح لك بالوصول، سجل الدخول أولاً"})
+	}
+
+	objID, err := primitive.ObjectIDFromHex(companyIdStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID الشركة غير صالح"})
+	}
 
 	var dept models.Department
 	if err := c.BodyParser(&dept); err != nil {
@@ -29,7 +36,7 @@ func AddDepartment(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "الاسم والكود مطلوبان"})
 	}
 
-	// ربط القسم بالشركة
+	// ربط القسم بالشركة وتحديد وقت الإنشاء
 	dept.CompanyID = objID
 	dept.CreatedAt = time.Now()
 
@@ -37,12 +44,14 @@ func AddDepartment(c *fiber.Ctx) error {
 	defer cancel()
 
 	collection := database.DB.Collection("departments")
+	
+	// حفظ القسم في MongoDB
 	result, err := collection.InsertOne(ctx, dept)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "فشل في حفظ القسم"})
+		return c.Status(500).JSON(fiber.Map{"error": "فشل في حفظ القسم في قاعدة البيانات"})
 	}
 
-	// إرجاع الـ ID الجديد مع البيانات
+	// تحديث الـ ID الخاص بالقسم بعد الحفظ بنجاح
 	dept.ID = result.InsertedID.(primitive.ObjectID)
 
 	return c.Status(201).JSON(fiber.Map{
@@ -51,32 +60,39 @@ func AddDepartment(c *fiber.Ctx) error {
 	})
 }
 
-// GetAllDepartments جلب كل أقسام الشركة الحالية فقط
+// GetAllDepartments جلب كل أقسام الشركة الحالية فقط لضمان الخصوصية
 func GetAllDepartments(c *fiber.Ctx) error {
 	// استخراج companyId من التوكن
-	companyIdStr := c.Locals("companyId").(string)
-	objID, _ := primitive.ObjectIDFromHex(companyIdStr)
+	companyIdStr, ok := c.Locals("companyId").(string)
+	if !ok || companyIdStr == "" {
+		return c.Status(401).JSON(fiber.Map{"error": "غير مصرح لك بالوصول"})
+	}
+
+	objID, err := primitive.ObjectIDFromHex(companyIdStr)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID الشركة غير صالح"})
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := database.DB.Collection("departments")
 	
-	// الفلترة بناءً على الـ CompanyID لضمان الخصوصية
+	// الفلترة بناءً على الـ CompanyID لضمان أن كل شركة ترى أقسامها فقط
 	filter := bson.M{"companyId": objID}
 	
 	cursor, err := collection.Find(ctx, filter)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "خطأ في جلب الأقسام"})
+		return c.Status(500).JSON(fiber.Map{"error": "خطأ أثناء جلب الأقسام من السيرفر"})
 	}
 	defer cursor.Close(ctx)
 
 	var departments []models.Department
 	if err = cursor.All(ctx, &departments); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "خطأ في معالجة البيانات"})
+		return c.Status(500).JSON(fiber.Map{"error": "خطأ في معالجة بيانات الأقسام"})
 	}
 
-	// لو المصفوفة فاضية نرجع لستة فاضية بدل null
+	// التأكد من إرجاع مصفوفة فارغة [] بدلاً من null في حالة عدم وجود بيانات
 	if departments == nil {
 		departments = []models.Department{}
 	}
