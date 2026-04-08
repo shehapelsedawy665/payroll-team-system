@@ -188,17 +188,78 @@
             document.getElementById('master-key-area').classList.toggle('hidden', role !== 'admin');
         }
 
+        // تم إضافة دالة التسجيل بالكامل عشان تشتغل معاك
+        async function handleRegister(e) {
+            e.preventDefault();
+            const role = document.getElementById('auth-role').value;
+            const masterInput = document.getElementById('master-password').value;
+            const name = document.getElementById('auth-name').value;
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-pass').value;
+
+            if(role === 'admin' && masterInput !== MASTER_SECRET) {
+                return alert("❌ كود تفعيل المطور غير صحيح. لا يمكنك إنشاء حساب مدير.");
+            }
+
+            const body = {
+                name: name || "New User",
+                email: email,
+                password: password,
+                role: role
+            };
+
+            if(!email || !password) return alert("البريد وكلمة المرور مطلوبين");
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/register`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(body) 
+                });
+                
+                const data = await res.json();
+                
+                if(res.ok) {
+                    alert("تم التسجيل بنجاح! تقدر تدخل دلوقتي.");
+                } else {
+                    alert("خطأ في التسجيل: " + (data.error || "تأكد من البيانات"));
+                }
+            } catch(err) {
+                alert("فشل الاتصال بالسيرفر. تأكد إن الـ Backend شغال.");
+                console.error(err);
+            }
+        }
+
+        // تم تحديث دالة الدخول لحماية الـ Admin وربطها صح
         async function handleLogin(e) {
             e.preventDefault();
-            const body = {
-                email: document.getElementById('auth-email').value,
-                password: document.getElementById('auth-pass').value,
-                role: document.getElementById('auth-role').value
-            };
-            const res = await fetch(`${API_BASE}/auth/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-            const data = await res.json();
-            if(data.token) { localStorage.setItem('token', data.token); location.reload(); }
-            else alert("فشل الدخول");
+            const role = document.getElementById('auth-role').value;
+            const masterInput = document.getElementById('master-password').value;
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-pass').value;
+
+            if(role === 'admin' && masterInput !== MASTER_SECRET) {
+                return alert("❌ لا تملك صلاحية الدخول كمدير (الكود السري خطأ)");
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ email, password, role }) 
+                });
+                
+                const data = await res.json();
+                
+                if(data.token) { 
+                    localStorage.setItem('token', data.token); 
+                    location.reload(); 
+                } else {
+                    alert("بيانات الدخول غير صحيحة.");
+                }
+            } catch(err) {
+                alert("فشل الاتصال بالسيرفر.");
+            }
         }
 
         async function apiFetch(url, options = {}) {
@@ -281,6 +342,17 @@
             hideAll(); document.getElementById('calc-view').classList.remove('hidden'); 
             const data = await apiFetch('/employees');
             document.getElementById('ntg-emp-id').innerHTML = (data || []).map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+        }
+
+        // دوال مضافة عشان الأزرار اللي في الـ HTML متطلعش إيرور
+        async function saveEmp() {
+            // سيتم ربطها بالـ Backend لاحقاً
+            alert("جاري تجهيز إضافة الموظف...");
+        }
+
+        async function updateResignation() {
+            // سيتم ربطها بالـ Backend لاحقاً
+            alert("جاري تجهيز التحديث...");
         }
 
         window.onload = () => { if(TOKEN) { 
