@@ -32,9 +32,15 @@
             <h2 class="text-3xl font-black text-slate-800 mb-2">SEDAY ERP</h2>
             <p class="text-slate-400 text-sm mb-8 font-bold italic">Go Engine 2026 ⚡</p>
             <div class="space-y-4">
-                <input type="email" id="auth-email" placeholder="البريد الإلكتروني للشركة" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
-                <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center">
+                <input type="text" id="auth-name" placeholder="اسم الشركة" class="hidden w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center border">
+                <input type="email" id="auth-email" placeholder="البريد الإلكتروني للشركة" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center border">
+                <input type="email" id="auth-admin-email" placeholder="بريد المدير (Admin)" class="hidden w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center border">
+                <input type="password" id="auth-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500 transition font-bold text-center border">
+                
                 <button type="button" onclick="handleLogin(event)" id="login-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">دخول آمن 🔒</button>
+                <button type="button" onclick="handleRegister(event)" id="reg-btn" class="hidden w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">إتمام التسجيل ✅</button>
+                
+                <button type="button" onclick="toggleAuthMode()" id="toggle-btn" class="text-indigo-600 font-bold text-xs mt-4">إنشاء حساب جديد؟ اضغط هنا</button>
             </div>
         </div>
     </div>
@@ -52,10 +58,10 @@
     </aside>
 
     <main id="main-content" class="flex-1 lg:mr-[60px] p-4 md:p-8 transition-all hidden">
-        
-        <div id="dashboard-view" class="animate-fade-in">
-            <header class="mb-10 text-center lg:text-right">
+        <div id="dashboard-view" class="animate-fade-in text-right">
+            <header class="mb-10">
                 <h1 class="text-3xl md:text-5xl font-black text-slate-800 italic">أهلاً <span class="text-indigo-600">يا بطل!</span></h1>
+                <p class="text-slate-400 font-bold mt-2">نظام إدارة الرواتب الذكي - Golang 2026</p>
             </header>
         </div>
 
@@ -77,18 +83,20 @@
         <div id="profile-view" class="hidden animate-fade-in">
             <div class="flex justify-between items-center mb-8">
                 <button onclick="showHR()" class="text-indigo-600 font-black text-sm bg-indigo-50 px-6 py-3 rounded-2xl">← عودة</button>
+                <div class="flex gap-2">
+                    <input type="date" id="p-res-date" class="p-2 border rounded-xl text-xs font-bold">
+                    <button onclick="updateResignation()" class="bg-rose-100 text-rose-600 px-4 py-2 rounded-xl text-xs font-black">تحديث تاريخ الاستقالة</button>
+                </div>
             </div>
             <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border mb-8 text-right">
                 <h2 id="p-name" class="text-2xl font-black text-indigo-600 mb-4"></h2>
-                
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div><label class="text-xs font-black text-slate-400">المرتب الأساسي</label><input type="number" id="c-fbasic" class="w-full p-4 bg-slate-50 rounded-xl font-black outline-none"></div>
-                    <div><label class="text-xs font-black text-slate-400">أيام العمل</label><input type="number" id="c-days" value="30" class="w-full p-4 bg-slate-50 rounded-xl font-black outline-none border-2 border-indigo-100"></div>
-                    <div><label class="text-xs font-black text-slate-400">إضافات أخرى</label><input type="number" id="c-additions" value="0" class="w-full p-4 bg-emerald-50 rounded-xl font-black outline-none"></div>
-                    <div><label class="text-xs font-black text-slate-400">خصومات</label><input type="number" id="c-deductions" value="0" class="w-full p-4 bg-rose-50 rounded-xl font-black outline-none"></div>
+                    <div><label class="text-xs font-black text-slate-400">المرتب الأساسي</label><input type="number" id="c-fbasic" class="w-full p-4 bg-slate-50 rounded-xl font-black outline-none border"></div>
+                    <div><label class="text-xs font-black text-slate-400">أيام العمل</label><input type="number" id="c-days" value="30" class="w-full p-4 bg-slate-50 rounded-xl font-black outline-none border"></div>
+                    <div><label class="text-xs font-black text-slate-400">إضافات أخرى</label><input type="number" id="c-additions" value="0" class="w-full p-4 bg-emerald-50 rounded-xl font-black outline-none border"></div>
+                    <div><label class="text-xs font-black text-slate-400">خصومات</label><input type="number" id="c-deductions" value="0" class="w-full p-4 bg-rose-50 rounded-xl font-black outline-none border"></div>
                 </div>
-                <div class="w-full md:w-1/2 mb-4"><label class="text-xs font-black text-slate-400">شهر الحساب</label><input type="month" id="c-month" class="w-full p-4 bg-indigo-50 rounded-xl font-black outline-none"></div>
-                
+                <div class="w-full md:w-1/2 mb-4"><label class="text-xs font-black text-slate-400">شهر الحساب</label><input type="month" id="c-month" class="w-full p-4 bg-indigo-50 rounded-xl font-black outline-none border"></div>
                 <button onclick="runCalc()" id="run-btn" class="w-full bg-emerald-500 py-6 rounded-2xl font-black text-slate-900 text-xl shadow-xl active:scale-95 transition">إصدار المرتب الشهري ⚡</button>
             </div>
             <div class="table-container bg-white border shadow-sm">
@@ -102,19 +110,11 @@
         <div id="calc-view" class="hidden animate-fade-in">
             <h1 class="text-3xl font-black text-slate-800 mb-8">المحول الذكي Net to Gross 💸</h1>
             <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border text-right max-w-2xl mx-auto">
-                <div class="mb-6">
-                    <label class="text-sm font-black text-slate-400 block mb-2">اختر الموظف (لتطبيق إعداداته وتأميناته)</label>
-                    <select id="ntg-emp-id" class="w-full p-4 bg-slate-50 rounded-xl font-black outline-none border"></select>
-                </div>
-                <div class="mb-6">
-                    <label class="text-sm font-black text-slate-400 block mb-2">الصافي المستهدف (Target Net)</label>
-                    <input type="number" id="ntg-target" placeholder="مثال: 15000" class="w-full p-4 bg-emerald-50 rounded-xl font-black text-2xl outline-none border border-emerald-200">
-                </div>
-                <button onclick="runNetToGross()" id="ntg-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition">احسب الإجمالي المطلوب 🚀</button>
-                
+                <div class="mb-6"><label class="text-sm font-black text-slate-400 block mb-2">اختر الموظف</label><select id="ntg-emp-id" class="w-full p-4 bg-slate-50 rounded-xl font-black border"></select></div>
+                <div class="mb-6"><label class="text-sm font-black text-slate-400 block mb-2">الصافي المستهدف</label><input type="number" id="ntg-target" placeholder="مثال: 15000" class="w-full p-4 bg-emerald-50 rounded-xl font-black text-2xl border"></div>
+                <button onclick="runNetToGross()" id="ntg-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl transition">احسب الإجمالي المطلوب 🚀</button>
                 <div id="ntg-result" class="hidden mt-8 p-6 bg-slate-900 text-white rounded-2xl text-center">
-                    <p class="text-slate-400 mb-2">الإجمالي المطلوب (Gross Salary)</p>
-                    <p id="ntg-gross-val" class="text-4xl font-black text-emerald-400"></p>
+                    <p class="text-slate-400 mb-2">Gross Salary:</p><p id="ntg-gross-val" class="text-4xl font-black text-emerald-400"></p>
                 </div>
             </div>
         </div>
@@ -122,12 +122,12 @@
 
     <div id="modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[200] p-4">
         <div class="bg-white p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-fade-in">
-            <h3 class="text-2xl font-black mb-8 text-center text-slate-800">بيانات الموظف</h3>
+            <h3 class="text-2xl font-black mb-8 text-center text-slate-800">إضافة موظف جديد</h3>
             <div class="space-y-4 text-right">
-                <div><label class="text-xs font-bold text-slate-500">الاسم</label><input type="text" id="n-name" class="w-full p-4 bg-slate-50 rounded-2xl font-bold border outline-none"></div>
-                <div><label class="text-xs font-bold text-slate-500">الرقم القومي</label><input type="text" id="n-nid" class="w-full p-4 bg-slate-50 rounded-2xl font-bold border outline-none"></div>
-                <div><label class="text-xs font-bold text-slate-500">المرتب الأساسي</label><input type="number" id="n-ins" class="w-full p-4 bg-slate-50 rounded-2xl font-bold border outline-none"></div>
-                <div><label class="text-xs font-bold text-slate-500">تاريخ الاستقالة (إن وجد)</label><input type="date" id="n-res" class="w-full p-4 bg-rose-50 rounded-2xl font-bold border outline-none"></div>
+                <input type="text" id="n-name" placeholder="الاسم بالكامل" class="w-full p-4 bg-slate-50 rounded-2xl font-bold border">
+                <input type="text" id="n-nid" placeholder="الرقم القومي" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center border">
+                <input type="number" id="n-ins" placeholder="أجر التأمين" class="w-full p-4 bg-slate-50 rounded-2xl font-bold text-center border">
+                <div><label class="text-xs font-bold text-slate-500">تاريخ التعيين</label><input type="date" id="n-hire" class="w-full p-4 bg-indigo-50 rounded-2xl font-bold border"></div>
             </div>
             <div class="flex gap-4 mt-8">
                 <button onclick="saveEmp()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg">حفظ ✅</button>
@@ -142,15 +142,27 @@
         let TOKEN = localStorage.getItem('token');
         const API_BASE = '/api';
 
-        async function apiFetch(url, options = {}) {
-            options.headers = { ...options.headers, 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+        function toggleAuthMode() {
+            const isLogin = document.getElementById('reg-btn').classList.contains('hidden');
+            document.getElementById('auth-name').classList.toggle('hidden');
+            document.getElementById('auth-admin-email').classList.toggle('hidden');
+            document.getElementById('login-btn').classList.toggle('hidden');
+            document.getElementById('reg-btn').classList.toggle('hidden');
+            document.getElementById('toggle-btn').innerText = isLogin ? "لديك حساب بالفعل؟ دخول" : "إنشاء حساب جديد؟ اضغط هنا";
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const body = {
+                name: document.getElementById('auth-name').value,
+                email: document.getElementById('auth-email').value,
+                adminEmail: document.getElementById('auth-admin-email').value,
+                password: document.getElementById('auth-pass').value
+            };
             try {
-                const res = await fetch(`${API_BASE}${url}`, options);
-                if(res.status === 401) { handleLogout(); return; }
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
-                return data;
-            } catch (err) { throw err; }
+                const res = await fetch(`${API_BASE}/auth/register`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+                if(res.ok) { alert("تم التسجيل! يمكنك الدخول الآن."); toggleAuthMode(); } else { alert("خطأ في البيانات"); }
+            } catch(e) { alert("السيرفر لا يستجيب"); }
         }
 
         async function handleLogin(e) {
@@ -158,99 +170,87 @@
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
             try {
-                const data = await (await fetch(`${API_BASE}/auth/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) })).json();
-                if(data.token) { localStorage.setItem('token', data.token); location.reload(); }
-            } catch(e) { alert("خطأ في الدخول"); }
+                const res = await fetch(`${API_BASE}/auth/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) });
+                const data = await res.json();
+                if(data.token) { localStorage.setItem('token', data.token); location.reload(); } else { alert(data.error); }
+            } catch(e) { alert("فشل الدخول"); }
+        }
+
+        async function apiFetch(url, options = {}) {
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+            const res = await fetch(`${API_BASE}${url}`, options);
+            if(res.status === 401) { handleLogout(); return; }
+            return await res.json();
         }
 
         async function loadEmployees() {
-            try {
-                const data = await apiFetch('/employees');
-                document.getElementById('empTable').innerHTML = (data || []).map(e => `
-                    <tr class="hover:bg-indigo-50 cursor-pointer border-b" onclick="openProfile('${e.id}')">
-                        <td class="p-5 font-black text-sm">${e.name}</td>
-                        <td class="p-5 text-center text-xs">${e.nationalId}</td>
-                        <td class="p-5 text-center text-xs">${e.status === 'Resigned' ? '<span class="text-rose-500">مستقيل</span>' : '<span class="text-emerald-500">نشط</span>'}</td>
-                    </tr>`).join('');
-            } catch(e) {}
-        }
-
-        async function openProfile(id) {
-            hideAll(); document.getElementById('profile-view').classList.remove('hidden'); document.getElementById('currId').value = id;
-            try {
-                const data = await apiFetch(`/employees/${id}/details`);
-                document.getElementById('p-name').innerText = data.emp.name;
-                document.getElementById('c-fbasic').value = data.emp.salaryDetails.basicSalary;
-                document.getElementById('c-month').value = new Date().toISOString().substring(0, 7);
-                document.getElementById('histBody').innerHTML = (data.history || []).map(r => `
-                    <tr class="border-b">
-                        <td class="p-4 font-black">${r.month}</td>
-                        <td class="p-4">${r.payload.grossSalary.toLocaleString()}</td>
-                        <td class="p-4 text-rose-600">${r.payload.taxAmount.toLocaleString()}</td>
-                        <td class="p-4 text-emerald-700 font-black">${r.payload.netSalary.toLocaleString()}</td>
-                    </tr>`).join('');
-            } catch(e) {}
+            const data = await apiFetch('/employees');
+            document.getElementById('empTable').innerHTML = (data || []).map(e => `
+                <tr class="hover:bg-indigo-50 cursor-pointer border-b text-right" onclick="openProfile('${e.id}')">
+                    <td class="p-5 font-black text-sm">${e.name}</td>
+                    <td class="p-5 text-center text-xs font-mono">${e.nationalId}</td>
+                    <td class="p-5 text-center text-xs">${e.status === 'Resigned' ? '<span class="text-rose-500 font-black">مستقيل</span>' : '<span class="text-emerald-500 font-black">نشط</span>'}</td>
+                </tr>`).join('');
         }
 
         async function saveEmp() {
-            const resDate = document.getElementById('n-res').value;
             const body = {
                 name: document.getElementById('n-name').value,
                 nationalId: document.getElementById('n-nid').value,
                 salaryDetails: { basicSalary: Number(document.getElementById('n-ins').value) },
-                resignationDate: resDate ? new Date(resDate).toISOString() : null
+                hiringDate: new Date(document.getElementById('n-hire').value).toISOString()
             };
-            try {
-                await apiFetch('/employees', { method: 'POST', body: JSON.stringify(body) });
-                document.getElementById('modal').classList.add('hidden');
-                showHR();
-            } catch(e) { alert("خطأ في الحفظ"); }
+            await apiFetch('/employees', { method: 'POST', body: JSON.stringify(body) });
+            document.getElementById('modal').classList.add('hidden');
+            showHR();
         }
 
-        // التعديل الكبير هنا: بنبعت الأيام والإضافات للـ Backend
+        async function openProfile(id) {
+            hideAll(); document.getElementById('profile-view').classList.remove('hidden');
+            document.getElementById('currId').value = id;
+            const data = await apiFetch(`/employees/${id}/details`);
+            document.getElementById('p-name').innerText = data.emp.name;
+            document.getElementById('c-fbasic').value = data.emp.salaryDetails.basicSalary;
+            document.getElementById('c-month').value = new Date().toISOString().substring(0, 7);
+            document.getElementById('histBody').innerHTML = (data.history || []).map(r => `
+                <tr class="border-b"><td class="p-4 font-black">${r.month}</td><td class="p-4">${r.payload.grossSalary.toLocaleString()}</td><td class="p-4 text-rose-600">${r.payload.taxAmount.toLocaleString()}</td><td class="p-4 text-emerald-700 font-black">${r.payload.netSalary.toLocaleString()}</td></tr>`).join('');
+        }
+
+        async function updateResignation() {
+            const id = document.getElementById('currId').value;
+            const date = document.getElementById('p-res-date').value;
+            if(!date) return alert("اختر التاريخ أولاً");
+            await apiFetch(`/employees/${id}/resign`, { method: 'PUT', body: JSON.stringify({ resignationDate: new Date(date).toISOString() }) });
+            alert("تم التحديث"); openProfile(id);
+        }
+
         async function runCalc() {
             const btn = document.getElementById('run-btn');
             btn.innerText = "جاري الحساب..."; btn.disabled = true;
             try {
-                await apiFetch('/payroll/calculate', { 
-                    method: 'POST', 
-                    body: JSON.stringify({ 
-                        empId: document.getElementById('currId').value, 
-                        month: document.getElementById('c-month').value,
-                        fullBasic: Number(document.getElementById('c-fbasic').value),
-                        days: Number(document.getElementById('c-days').value),
-                        additions: Number(document.getElementById('c-additions').value),
-                        deductions: Number(document.getElementById('c-deductions').value)
-                    }) 
-                });
-                alert("تم الحساب بنجاح ✅");
+                const res = await apiFetch('/payroll/calculate', { method: 'POST', body: JSON.stringify({ 
+                    empId: document.getElementById('currId').value, 
+                    month: document.getElementById('c-month').value,
+                    fullBasic: Number(document.getElementById('c-fbasic').value),
+                    days: Number(document.getElementById('c-days').value),
+                    additions: Number(document.getElementById('c-additions').value),
+                    deductions: Number(document.getElementById('c-deductions').value)
+                })});
+                if(res.error) alert(res.error); else alert("تم الحساب ✅");
                 openProfile(document.getElementById('currId').value);
-            } catch(e) { alert("يجب حساب الشهور بالترتيب"); }
-            finally { btn.innerText = "إصدار المرتب الشهري ⚡"; btn.disabled = false; }
+            } finally { btn.innerText = "إصدار المرتب الشهري ⚡"; btn.disabled = false; }
         }
 
-        // دالة جديدة كلياً للـ Net To Gross
         async function runNetToGross() {
             const target = Number(document.getElementById('ntg-target').value);
             const empId = document.getElementById('ntg-emp-id').value;
-            if(!target || !empId) { alert("برجاء إدخال الصافي واختيار الموظف"); return; }
-            
-            const btn = document.getElementById('ntg-btn');
-            btn.innerText = "جاري التحليل..."; btn.disabled = true;
-            try {
-                const data = await apiFetch('/payroll/net-to-gross', {
-                    method: 'POST',
-                    body: JSON.stringify({ targetNet: target, empId: empId })
-                });
-                document.getElementById('ntg-result').classList.remove('hidden');
-                document.getElementById('ntg-gross-val').innerText = data.grossSalary.toLocaleString() + " EGP";
-            } catch(e) { alert("حدث خطأ في المحرك الذكي"); }
-            finally { btn.innerText = "احسب الإجمالي المطلوب 🚀"; btn.disabled = false; }
+            const data = await apiFetch('/payroll/net-to-gross', { method: 'POST', body: JSON.stringify({ targetNet: target, empId: empId }) });
+            document.getElementById('ntg-result').classList.remove('hidden');
+            document.getElementById('ntg-gross-val').innerText = data.grossSalary.toLocaleString() + " EGP";
         }
 
         async function showCalc() { 
             hideAll(); document.getElementById('calc-view').classList.remove('hidden'); 
-            // جلب الموظفين لملء القائمة المنسدلة
             const data = await apiFetch('/employees');
             document.getElementById('ntg-emp-id').innerHTML = (data || []).map(e => `<option value="${e.id}">${e.name}</option>`).join('');
         }
@@ -260,14 +260,7 @@
         function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); loadEmployees(); }
         
-        window.onload = () => { 
-            if(TOKEN) { 
-                document.getElementById('login-view').classList.add('hidden'); 
-                document.getElementById('sidebar').classList.remove('hidden'); 
-                document.getElementById('main-content').classList.remove('hidden'); 
-                showDash(); 
-            } 
-        };
+        window.onload = () => { if(TOKEN) { document.getElementById('login-view').classList.add('hidden'); document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('main-content').classList.remove('hidden'); showDash(); } };
     </script>
 </body>
 </html>
