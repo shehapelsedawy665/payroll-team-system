@@ -288,44 +288,50 @@
 
         // --- FIXED SAVE EMP (No UI Blocking) ---
         async function saveEmp() {
-            const btn = document.getElementById('save-btn');
-            const name = document.getElementById('n-name').value;
-            const nid = document.getElementById('n-nid').value;
-            const ins = document.getElementById('n-ins').value;
-            const hire = document.getElementById('n-hire').value;
+    const btn = document.getElementById('save-btn');
+    const name = document.getElementById('n-name').value;
+    const nid = document.getElementById('n-nid').value;
+    const insSalary = document.getElementById('n-ins').value;
+    const hireDate = document.getElementById('n-hire').value;
 
-            if(!name || !nid) return alert("الاسم والرقم القومي مطلوبين!");
+    if(!name || !nid) return alert("يا شهاب الاسم والرقم القومي مطلوبين!");
 
-            btn.disabled = true; btn.innerText = "جاري الحفظ... ⏳";
+    // تغيير حالة الزرار عشان تعرف إن فيه استجابة
+    btn.disabled = true;
+    btn.innerText = "جاري الحفظ في القاعدة... ⏳";
 
-            try {
-                const res = await apiFetch('/employees', {
-                    method: 'POST',
-                    body: JSON.stringify({ name, nationalId: nid, hiringDate: hire, salaryDetails: { basicSalary: Number(ins) } })
-                });
-                if(res) {
-                    alert("تم الإضافة ✅");
-                    document.getElementById('modal').classList.add('hidden');
-                    loadEmployees();
+    try {
+        console.log("Sending Data to Backend:", { name, nid, insSalary, hireDate });
+
+        const res = await apiFetch('/employees', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: name,
+                nationalId: nid,
+                hiringDate: hireDate,
+                salaryDetails: {
+                    basicSalary: Number(insSalary)
                 }
-            } catch(e) { alert("خطأ في الحفظ"); }
-            finally { btn.disabled = false; btn.innerText = "حفظ ✅"; }
-        }
+            })
+        });
 
-        async function updateResignation() {
-            const btn = document.getElementById('resign-btn');
-            const date = document.getElementById('p-res-date').value;
-            const id = document.getElementById('currId').value;
-            if(!date) return alert("حدد تاريخ الاستقالة");
+        console.log("Server Response:", res);
 
-            btn.disabled = true; btn.innerText = "جاري التحديث...";
-            try {
-                await apiFetch(`/employees/${id}/resign`, { method: 'PUT', body: JSON.stringify({ resignationDate: date }) });
-                alert("تم تحديث الحالة");
-                openProfile(id);
-            } catch(e) { alert("خطأ"); }
-            finally { btn.disabled = false; btn.innerText = "تحديث الاستقالة"; }
+        if(res && (res.id || res.success)) {
+            alert("تم الحفظ بنجاح ✅");
+            document.getElementById('modal').classList.add('hidden');
+            loadEmployees(); // تحديث الجدول
+        } else {
+            alert("السيرفر رد بس مفيش تأكيد حفظ. راجع الـ Console");
         }
+    } catch (err) {
+        console.error("Fetch Error:", err);
+        alert("فشل الاتصال بالـ Backend. تأكد إن السيرفر شغال (Go run main.go)");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "حفظ ✅";
+    }
+}
 
         async function runCalc() {
             const btn = document.getElementById('run-btn');
