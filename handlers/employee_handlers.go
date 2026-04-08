@@ -35,6 +35,7 @@ func CreateEmployee(c *fiber.Ctx) error {
 	emp.CompanyID, _ = primitive.ObjectIDFromHex(companyIDStr)
 	emp.CreatedAt = time.Now()
 	emp.Status = "Active"
+	emp.History = []models.HistoryRecord{} // التأكد من تهيئة المصفوفة فارغة
 	
 	if emp.HireDate.IsZero() {
 		emp.HireDate = time.Now()
@@ -90,7 +91,7 @@ func GetEmployees(c *fiber.Ctx) error {
 	return c.JSON(employees)
 }
 
-// 3. جلب تفاصيل موظف محدد (GET /api/employees/:id/details) - الدالة المطلوبة للـ Build
+// 3. جلب تفاصيل موظف محدد
 func GetEmployeeDetails(c *fiber.Ctx) error {
 	collection := database.DB.Collection("employees")
 	
@@ -122,27 +123,32 @@ func GetEmployeeDetails(c *fiber.Ctx) error {
 	})
 }
 
-// 4. تحديث بيانات الموظف (PUT /api/employees/:id)
+// 4. تحديث بيانات الموظف (تم التعديل ليكون Update جزئي وآمن)
 func UpdateEmployee(c *fiber.Ctx) error {
 	collection := database.DB.Collection("employees")
 	id, _ := primitive.ObjectIDFromHex(c.Params("id"))
 	companyIDStr := c.Locals("companyId").(string)
 	companyID, _ := primitive.ObjectIDFromHex(companyIDStr)
 
-	var updateData models.Employee
-	if err := c.BodyParser(&updateData); err != nil {
+	// نستخدم Map بدلاً من Struct في التحديث لتجنب مسح الحقول الفارغة
+	var updateBody map[string]interface{}
+	if err := c.BodyParser(&updateBody); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "بيانات غير صالحة"})
 	}
 
-	if updateData.ResignationDate != nil && !updateData.ResignationDate.IsZero() {
-		updateData.Status = "Resigned"
+	// منع تعديل الـ IDs يدوياً للأمان
+	delete(updateBody, "_id")
+	delete(updateBody, "companyId")
+
+	if resDate, ok := updateBody["resignationDate"]; ok && resDate != nil {
+		updateBody["status"] = "Resigned"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	filter := bson.M{"_id": id, "companyId": companyID}
-	update := bson.M{"$set": updateData}
+	update := bson.M{"$set": updateBody}
 
 	_, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
@@ -152,7 +158,7 @@ func UpdateEmployee(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "message": "تم تحديث بيانات الموظف بنجاح"})
 }
 
-// 5. حذف موظف نهائياً (DELETE /api/employees/:id)
+// 5. حذف موظف نهائياً
 func DeleteEmployee(c *fiber.Ctx) error {
 	collection := database.DB.Collection("employees")
 	

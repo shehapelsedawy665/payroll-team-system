@@ -2,6 +2,7 @@ package calculations
 
 import (
 	"math"
+	"time"
 
 	"github.com/shehapelsedawy665/payroll-team-system/models"
 )
@@ -14,7 +15,7 @@ func R(n float64) float64 {
 // CalculateEgyptianPayroll المحرك المالي الاحترافي لعام 2026
 func CalculateEgyptianPayroll(emp models.Employee, settings models.CompanySettings, days int, externalAdditions float64, externalDeductions float64) models.PayrollPayload {
 	
-	// 1. حساب التأمينات الاجتماعية (نقطة 1)
+	// 1. حساب التأمينات الاجتماعية
 	insEEPercent := 0.11
 	if settings.InsEmployeePercent > 0 {
 		insEEPercent = settings.InsEmployeePercent
@@ -25,12 +26,11 @@ func CalculateEgyptianPayroll(emp models.Employee, settings models.CompanySettin
 		maxLimit = settings.MaxInsSalary
 	}
 
-	// أجر الاشتراك التأميني (لا يقل عن الحد الأدنى ولا يزيد عن الأقصى)
 	insSalary := math.Min(math.Max(emp.SalaryDetails.BasicSalary, 2325), maxLimit)
 	insuranceEmployee := R(insSalary * insEEPercent)
 	insuranceCompany := R(insSalary * 0.1875)
 
-	// 2. حساب الأيام الفعلية والرواتب النسبية (Proration - نقطة 8 و 10)
+	// 2. حساب الأيام الفعلية والرواتب النسبية
 	totalDaysInMonth := 30.0
 	if settings.WorkingDays > 0 {
 		totalDaysInMonth = float64(settings.WorkingDays)
@@ -39,7 +39,7 @@ func CalculateEgyptianPayroll(emp models.Employee, settings models.CompanySettin
 	proratedBasic := R((emp.SalaryDetails.BasicSalary / totalDaysInMonth) * float64(days))
 	proratedTransportation := R((emp.SalaryDetails.Transportation / totalDaysInMonth) * float64(days))
 
-	// 3. تصنيف الإضافات والبدلات (نقطة 4، 5، 11)
+	// 3. تصنيف الإضافات والبدلات
 	var taxableAdditions float64
 	var medicalAdditions float64
 	var otherExemptedAdditions float64
@@ -58,23 +58,20 @@ func CalculateEgyptianPayroll(emp models.Employee, settings models.CompanySettin
 			taxableAdditions += add.Amount
 		}
 	}
-	// إضافة المبلغ اليدوي الخارجي كبند خاضع للضريبة
+	
 	if externalAdditions > 0 {
 		taxableAdditions += externalAdditions
 	}
 
 	// 4. إجمالي الاستحقاقات (Gross Salary)
-	// الإجمالي = الأساسي النسبي + الانتقالات النسبية + كل الإضافات
 	grossSalary := proratedBasic + proratedTransportation + taxableAdditions + medicalAdditions + otherExemptedAdditions
 
-	// 5. حساب الوعاء الضريبي والإعفاءات (نقطة 7)
+	// 5. حساب الوعاء الضريبي والإعفاءات
 	personalExemptionMonthly := settings.PersonalExemption / 12
 	if personalExemptionMonthly == 0 {
 		personalExemptionMonthly = 20000.0 / 12.0
 	}
 
-	// حساب الوعاء الأولي لخصم الطبي (نقطة 7)
-	// الوعاء الأولي = (الخاضع للضريبة) - (التأمينات + الإعفاء الشخصي)
 	initialTaxableForMedical := (proratedBasic + taxableAdditions) - insuranceEmployee - personalExemptionMonthly
 	if initialTaxableForMedical < 0 { initialTaxableForMedical = 0 }
 
@@ -83,11 +80,9 @@ func CalculateEgyptianPayroll(emp models.Employee, settings models.CompanySettin
 	
 	fifteenPercentOfTaxable := initialTaxableForMedical * 0.15
 	
-	// الإعفاء الطبي هو الأقل بين (15% من الوعاء) أو (المبلغ الطبي الفعلي) أو (الحد القانوني المتبقي)
 	appliedMedicalExemption := math.Min(math.Min(fifteenPercentOfTaxable, medicalAdditions), medicalLimit)
 	if appliedMedicalExemption < 0 { appliedMedicalExemption = 0 }
 
-	// الوعاء النهائي الخاضع للضريبة
 	finalTaxable := math.Max(0, initialTaxableForMedical - appliedMedicalExemption)
 
 	// 6. حساب الضريبة السنوية والشهرية
@@ -95,7 +90,7 @@ func CalculateEgyptianPayroll(emp models.Employee, settings models.CompanySettin
 	totalAnnualTax := CalculateAnnualTax(annualTaxable)
 	monthlyTax := R(totalAnnualTax / 12)
 
-	// 7. مساهمة الشهداء والخصومات (نقطة 10)
+	// 7. مساهمة الشهداء والخصومات
 	martyrs := R(grossSalary * 0.0005)
 	
 	var deductionsList []models.PayrollAdjustment
