@@ -11,17 +11,19 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// RegisterCompany تسجيل شركة جديدة مع دعم أول مستخدم كـ Admin
+// RegisterCompany تسجيل شركة جديدة مع دعم اختيار الـ Role
 func RegisterCompany(c *fiber.Ctx) error {
-	// استخدمنا ماب مؤقتة لاستلام البيانات عشان نضمن إن مفيش حقل يقع بسبب الـ Struct Tag
+	// تحديث الـ Input ليشمل الـ Role القادم من الـ HTML
 	type RegisterInput struct {
 		Name       string `json:"name"`
 		Email      string `json:"email"`
 		AdminEmail string `json:"adminEmail"`
 		Password   string `json:"password"`
+		Role       string `json:"role"` // الحقل ده ضروري لاستقبال اختيار المستخدم
 	}
 
 	var input RegisterInput
@@ -45,13 +47,14 @@ func RegisterCompany(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "هذا البريد الإلكتروني مسجل بالفعل"})
 	}
 
-	// 3. منطق الأدمن: لو الداتابيز فاضية، أول واحد هو الأدمن
-	totalCompanies, _ := collection.CountDocuments(ctx, bson.M{})
-	var role string
-	if totalCompanies == 0 {
-		role = "admin"
-	} else {
-		// لو مش أول شركة، لازم نتحقق إن بريد الأدمن المكتوب موجود وفعلاً هو أدمن
+	// 3. تحديد الصلاحية (Role Logic)
+	finalRole := input.Role
+	if finalRole == "" {
+		finalRole = "company" // القيمة الافتراضية
+	}
+
+	// لو المستخدم بيسجل كـ Company (User)، لازم نتحقق من بريد الأدمن
+	if finalRole == "company" {
 		if input.AdminEmail == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "برجاء إدخال بريد الأدمن المسؤول"})
 		}
@@ -60,7 +63,6 @@ func RegisterCompany(c *fiber.Ctx) error {
 		if err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "بريد الأدمن غير موجود أو ليس لديه صلاحية"})
 		}
-		role = "company"
 	}
 
 	// 4. تشفير كلمة المرور
@@ -69,13 +71,15 @@ func RegisterCompany(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "خطأ في تشفير البيانات"})
 	}
 
-	// 5. تجهيز الموديل للحفظ
+	// 5. تجهيز الموديل للحفظ مع الإعدادات الافتراضية
 	newCompany := models.Company{
+		ID:         primitive.NewObjectID(),
 		Name:       input.Name,
 		Email:      input.Email,
 		Password:   string(hashedPassword),
-		Role:       role,
+		Role:       finalRole,
 		AdminEmail: input.AdminEmail,
+		Settings:   models.NewCompanySettings(), // تفعيل الإعدادات الافتراضية فوراً
 		CreatedAt:  time.Now(),
 	}
 
@@ -86,7 +90,7 @@ func RegisterCompany(c *fiber.Ctx) error {
 	}
 
 	return c.Status(201).JSON(fiber.Map{
-		"message": "تم التسجيل بنجاح كـ " + role,
+		"message": "تم التسجيل بنجاح كـ " + finalRole,
 		"status":  "success",
 	})
 }
