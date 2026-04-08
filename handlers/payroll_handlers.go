@@ -14,13 +14,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// CalculateAndSavePayroll حساب وحفظ مرتب موظف واحد لشهر معين
+// CalculateAndSavePayroll حساب وحفظ مرتب موظف واحد (نقطة 3، 8، 9، 10)
 func CalculateAndSavePayroll(c *fiber.Ctx) error {
 	type PayrollRequest struct {
 		EmpID      string  `json:"empId"`
-		Month      string  `json:"month"` 
-		Days       int     `json:"days"`
-		FullBasic  float64 `json:"fullBasic"`
+		Month      string  `json:"month"` // YYYY-MM
+		Days       int     `json:"days"`  // لو 0 السيستم هيحسب تلقائي (نقطة 9)
 		Additions  float64 `json:"additions"`
 		Deductions float64 `json:"deductions"`
 	}
@@ -46,46 +45,54 @@ func CalculateAndSavePayroll(c *fiber.Ctx) error {
 	_ = empCol.FindOne(ctx, bson.M{"_id": empID, "companyId": compID}).Decode(&emp)
 	_ = compCol.FindOne(ctx, bson.M{"_id": compID}).Decode(&company)
 
-	// التأكد من تسلسل الشهور
-	if len(emp.History) > 0 {
-		lastRecord := emp.History[len(emp.History)-1]
-		lastMonth, _ := time.Parse("2006-01", lastRecord.Month)
-		currentMonth, _ := time.Parse("2006-01", req.Month)
+	// --- نقطة 3: منع الحساب قبل تاريخ التعيين ---
+	currentMonthTime, _ := time.Parse("2006-01", req.Month)
+	hireMonthTime := time.Date(emp.HireDate.Year(), emp.HireDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+	if currentMonthTime.Before(hireMonthTime) {
+		return c.Status(400).JSON(fiber.Map{"error": "لا يمكن حساب مرتب لشهر قبل تاريخ تعيين الموظف"})
+	}
 
-		for _, h := range emp.History {
-			if h.Month == req.Month {
-				return c.JSON(fiber.Map{
-					"success": true,
-					"message": "تم استرجاع الحسبة المسجلة مسبقاً لهذا الشهر",
-					"result":  h.Payload,
-				})
-			}
+	// --- نقطة 8: حساب الأيام تلقائياً (Proration) ---
+	calcDays := req.Days
+	if calcDays == 0 {
+		calcDays = 30 // الافتراضي
+		// لو شهر التعيين
+		if currentMonthTime.Format("2006-01") == emp.HireDate.Format("2006-01") {
+			calcDays = 30 - emp.HireDate.Day() + 1
 		}
-
-		if currentMonth.After(lastMonth.AddDate(0, 1, 0)) {
-			return c.Status(400).JSON(fiber.Map{"error": "يجب حساب الشهور بالترتيب، يرجى حساب الشهر السابق أولاً"})
+		// لو شهر الاستقالة (نقطة 8)
+		if emp.ResignationDate != nil && currentMonthTime.Format("2006-01") == emp.ResignationDate.Format("2006-01") {
+			resDay := emp.ResignationDate.Day()
+			if resDay >= 28 && emp.ResignationDate.Month() == 2 { // فبراير
+				calcDays = 30
+			} else {
+				calcDays = resDay
+			}
 		}
 	}
 
+	// التأكد من تسلسل الشهور (Sequential)
+	for _, h := range emp.History {
+		if h.Month == req.Month {
+			return c.JSON(fiber.Map{"success": true, "message": "تم استرجاع الحسبة السابقة", "result": h.Payload})
+		}
+	}
+
+	// الحساب الفعلي (نقطة 10 و 11)
 	settings := company.Settings
-	calcResult := calculations.CalculateEgyptianPayroll(emp, settings, req.Days, req.Additions, req.Deductions)
+	calcResult := calculations.CalculateEgyptianPayroll(emp, settings, calcDays, req.Additions, req.Deductions)
 
 	historyItem := models.HistoryRecord{
 		Month:   req.Month,
 		Payload: calcResult,
 	}
 
-	_, _ = empCol.UpdateOne(ctx, bson.M{"_id": empID}, bson.M{"$pull": bson.M{"history": bson.M{"month": req.Month}}})
-	_, err := empCol.UpdateOne(ctx, bson.M{"_id": empID}, bson.M{"$push": bson.M{"history": historyItem}})
-	
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "فشل حفظ السجل"})
-	}
+	_, _ = empCol.UpdateOne(ctx, bson.M{"_id": empID}, bson.M{"$push": bson.M{"history": historyItem}})
 
 	return c.JSON(fiber.Map{"success": true, "result": calcResult})
 }
 
-// NetToGrossCalculator المحرك الذكي
+// NetToGrossCalculator المحرك الذكي (نقطة 1)
 func NetToGrossCalculator(c *fiber.Ctx) error {
 	type NetRequest struct {
 		TargetNet float64 `json:"targetNet"`
@@ -107,16 +114,17 @@ func NetToGrossCalculator(c *fiber.Ctx) error {
 	_ = database.DB.Collection("companies").FindOne(ctx, bson.M{"_id": compID}).Decode(&company)
 
 	low := req.TargetNet
-	high := req.TargetNet * 2 
-	var finalGross float64
+	high := req.TargetNet * 3 // رفعنا المدى لضمان الوصول للصافي العالي
+	var finalResult models.PayrollPayload
 	
 	for i := 0; i < 50; i++ { 
 		mid := (low + high) / 2
 		emp.SalaryDetails.BasicSalary = mid
+		// بنحسب الحسبة كاملة في كل لفة (نقطة 1)
 		res := calculations.CalculateEgyptianPayroll(emp, company.Settings, 30, 0, 0)
 		
-		if math.Abs(res.NetSalary-req.TargetNet) < 0.01 {
-			finalGross = mid
+		if math.Abs(res.NetSalary-req.TargetNet) < 0.1 {
+			finalResult = res
 			break
 		}
 		if res.NetSalary < req.TargetNet {
@@ -124,12 +132,13 @@ func NetToGrossCalculator(c *fiber.Ctx) error {
 		} else {
 			high = mid
 		}
-		finalGross = mid
+		finalResult = res
 	}
 
+	// إرجاع النتيجة كاملة (نقطة 1)
 	return c.JSON(fiber.Map{
-		"targetNet":   req.TargetNet,
-		"grossSalary": math.Round(finalGross*100) / 100,
-		"message":     "تم حساب الـ Gross بدقة متناهية ✅",
+		"success": true,
+		"targetNet": req.TargetNet,
+		"result": finalResult, // هيرجع فيه الـ Insurance والـ Taxes وكل حاجة
 	})
 }

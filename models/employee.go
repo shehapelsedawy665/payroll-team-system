@@ -20,6 +20,7 @@ type Employee struct {
 	// يسمح بوجود موظفين معندهمش مدير
 	ReportingTo     *primitive.ObjectID `bson:"reportingTo,omitempty" json:"reportingTo"` 
 	
+	// تواريخ هامة للـ Logic (نقطة 3 و 8)
 	HireDate        time.Time           `bson:"hireDate" json:"hireDate"`
 	ResignationDate *time.Time          `bson:"resignationDate,omitempty" json:"resignationDate"`
 	
@@ -33,23 +34,23 @@ type Employee struct {
 	CreatedAt       time.Time           `bson:"createdAt" json:"createdAt"`
 }
 
-// SalaryDetails تفاصيل الراتب والبدلات والخصومات
+// SalaryDetails تفاصيل الراتب والبدلات والخصومات (نقطة 4 و 5)
 type SalaryDetails struct {
-	BasicSalary float64     `bson:"basicSalary" json:"basicSalary"`
-	// NetToGrossTarget يستخدم لو الشركة عايزة تدخل الصافي والسيستم يحسب الـ Gross
-	NetToGrossTarget float64 `bson:"netToGrossTarget,omitempty" json:"netToGrossTarget"` 
-	Additions   []Component `bson:"additions,omitempty" json:"additions"`
-	Deductions  []Component `bson:"deductions,omitempty" json:"deductions"`
+	BasicSalary       float64     `bson:"basicSalary" json:"basicSalary"`
+	Transportation    float64     `bson:"transportation" json:"transportation"` // فصلنا الانتقالات عشان جدول نقطة 10
+	NetToGrossTarget  float64     `bson:"netToGrossTarget,omitempty" json:"netToGrossTarget"` 
+	Additions         []Component `bson:"additions,omitempty" json:"additions"`
+	Deductions        []Component `bson:"deductions,omitempty" json:"deductions"`
 }
 
-// Component يمثل بند مالي (بدل أو خصم)
+// Component يمثل بند مالي ديناميكي (نقطة 4 و 6 و 7)
 type Component struct {
 	Name       string  `bson:"name" json:"name"`
 	Amount     float64 `bson:"amount" json:"amount"`
-	// Type: "Exempted" (معفي من الضرائب) أو "Non-Exempted" (خاضع للضرائب)
+	// Type: "Exempted" أو "Non-Exempted"
 	Type       string  `bson:"type" json:"type"` 
-	// IsMedical: لو true، السيستم هيطبق معادلة الـ (أيهما أقل) اللي طلبتها
-	IsMedical  bool    `bson:"isMedical,omitempty" json:"isMedical"`
+	// IsMedical: لو true، السيستم هيطبق معادلة الـ (أيهما أقل) نقطة 7
+	IsMedical  bool    `bson:"isMedical" json:"isMedical"`
 }
 
 // HistoryRecord سجل المرتبات الشهري
