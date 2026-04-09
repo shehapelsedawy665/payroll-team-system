@@ -116,7 +116,7 @@
 
             <div class="bg-white p-4 md:p-6 rounded-[2rem] shadow-sm border mb-6 grid grid-cols-2 md:grid-cols-5 gap-4 italic text-right">
                 <div class="col-span-2 md:col-span-1"><label class="text-[9px] text-slate-400 block uppercase">Name</label><p id="p-name" class="font-black text-slate-800"></p></div>
-                <div><label class="text-[9px] text-indigo-600 block font-bold uppercase">Month</label><input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg font-black text-sm outline-none border border-indigo-200"></div>
+                <div><label class="text-[9px] text-indigo-600 block font-bold uppercase">Month</label><input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg font-black text-sm outline-none border border-indigo-200" readonly></div>
                 <div><label class="text-[9px] text-slate-400 block uppercase">Hiring</label><input type="date" id="p-hdate" class="w-full bg-slate-50 p-2 rounded-lg font-bold text-sm outline-none" readonly></div>
                 <div><label class="text-[9px] text-orange-500 block font-bold uppercase">Resign</label><input type="date" id="c-resign" class="w-full bg-orange-50 p-2 rounded-lg font-bold text-sm outline-none"></div>
                 <div><label class="text-[9px] text-indigo-600 block font-bold uppercase">Days</label><input type="number" id="c-days" value="30" class="w-full bg-indigo-50 p-2 rounded-lg font-black text-sm outline-none"></div>
@@ -170,13 +170,34 @@
         </div>
     </div>
 
-    <input type="hidden" id="currId"><input type="hidden" id="pD"><input type="hidden" id="pTxbl"><input type="hidden" id="pTx">
+    <input type="hidden" id="currId">
+    <input type="hidden" id="pD">
+    <input type="hidden" id="pTxbl">
+    <input type="hidden" id="pTx">
 
     <script>
-        function hideAll() { ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); }); }
-        function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
-        function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
-        function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
+        function hideAll() { 
+            ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => { 
+                const el = document.getElementById(id); 
+                if(el) el.classList.add('hidden'); 
+            }); 
+        }
+
+        function showDash() { 
+            hideAll(); 
+            document.getElementById('dashboard-view').classList.remove('hidden'); 
+        }
+
+        function showHR() { 
+            hideAll(); 
+            document.getElementById('list-view').classList.remove('hidden'); 
+            load(); 
+        }
+
+        function showCalc() { 
+            hideAll(); 
+            document.getElementById('net-gross-view').classList.remove('hidden'); 
+        }
 
         function addRow(areaId) {
             const div = document.createElement('div');
@@ -215,7 +236,6 @@
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
             
-            // --- تعديل حساب الشهر التالي وإغلاق الاختيار العشوائي ---
             const monthInput = document.getElementById('c-month');
             let nextMonth;
             if (data.history && data.history.length > 0) {
@@ -227,9 +247,6 @@
                 nextMonth = data.emp.hiringDate.substring(0, 7); 
             }
             monthInput.value = nextMonth;
-            monthInput.min = nextMonth; 
-            monthInput.max = nextMonth; // إجبار المستخدم على الشهر الحالي في السلسلة فقط
-            // -------------------------------------------------------
 
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
@@ -254,14 +271,12 @@
                 let rowHTML = `<tr class="divide-x divide-slate-50 hover:bg-slate-50/50"><td class="p-3 bg-slate-50/50 text-slate-950 font-black">${r.month}</td><td class="text-indigo-500">${d.days || 30}</td><td>${d.fullBasic.toLocaleString()}</td><td>${d.fullTrans.toLocaleString()}</td><td>${d.proratedBasic.toLocaleString()}</td><td>${d.proratedTrans.toLocaleString()}</td>`;
                 dynamicAdds.forEach(key => { 
                     const found = d.additions ? d.additions.find(a => a.name === key) : null; 
-                    const style = found && found.type === 'exempted' ? 'text-blue-400' : 'text-emerald-600';
-                    rowHTML += `<td class="${style} font-black" title="${found ? found.type : ''}">${found ? found.amount.toLocaleString() : 0}</td>`; 
+                    rowHTML += `<td class="font-black text-emerald-600">${found ? found.amount.toLocaleString() : 0}</td>`; 
                 });
                 rowHTML += `<td class="bg-indigo-50 font-black">${d.gross.toLocaleString()}</td><td class="text-orange-500">${d.insuranceEmployee.toLocaleString()}</td><td>${d.currentTaxable.toLocaleString()}</td><td>${d.taxPoolYTD.toLocaleString()}</td><td class="text-[7px] text-slate-300">${d.annualProjected.toLocaleString()}</td><td class="bg-rose-50 text-rose-600 font-black">${d.monthlyTax.toLocaleString()}</td><td>${d.martyrs.toLocaleString()}</td>`;
                 dynamicDeds.forEach(key => { 
                     const found = d.deductions ? d.deductions.find(de => de.name === key) : null; 
-                    const style = found && found.type === 'exempted' ? 'text-orange-400' : 'text-rose-600';
-                    rowHTML += `<td class="${style} font-black" title="${found ? found.type : ''}">${found ? found.amount.toLocaleString() : 0}</td>`; 
+                    rowHTML += `<td class="font-black text-rose-600">${found ? found.amount.toLocaleString() : 0}</td>`; 
                 });
                 rowHTML += `<td>${d.totalAllDeductions.toLocaleString()}</td><td class="bg-emerald-50 text-emerald-700 text-[11px] font-black border-l-4 border-emerald-500">${d.net.toLocaleString()}</td></tr>`;
                 return rowHTML;
@@ -276,25 +291,15 @@
                 insSalary: Number(document.getElementById('n-ins').value), 
                 jobType: document.getElementById('n-type').value 
             };
-            
-            if(!body.name || !body.nationalId || !body.hiringDate) return alert("الرجاء إكمال كافة البيانات المطلوبة");
-            
-            try {
-                const res = await fetch('/api/employees', { 
-                    method: 'POST', 
-                    headers: {'Content-Type':'application/json'}, 
-                    body: JSON.stringify(body) 
-                });
-                
-                if(res.ok) {
-                    document.getElementById('modal').classList.add('hidden');
-                    ['n-name', 'n-nid', 'n-hdate', 'n-ins'].forEach(id => document.getElementById(id).value = "");
-                    showHR();
-                } else {
-                    const err = await res.json();
-                    alert(err.error || "فشل الحفظ");
-                }
-            } catch (e) { alert("تعذر الاتصال بالسيرفر"); }
+            const res = await fetch('/api/employees', { 
+                method: 'POST', 
+                headers: {'Content-Type':'application/json'}, 
+                body: JSON.stringify(body) 
+            });
+            if(res.ok) { 
+                document.getElementById('modal').classList.add('hidden'); 
+                showHR(); 
+            }
         }
 
         async function runNetToGross() {
@@ -303,15 +308,21 @@
             if(!net) return alert("أدخل الصافي!");
             btn.innerText = "CALCULATING..."; btn.disabled = true;
             try {
-                const res = await fetch('/api/payroll/net-to-gross', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ targetNet: net }) });
-                if(res.ok) {
-                    const data = await res.json();
-                    document.getElementById('calc-result').classList.remove('hidden');
-                    document.getElementById('result-gross').innerText = data.gross.toLocaleString();
-                    document.getElementById('res-ins-ee').innerText = data.insEmployee.toLocaleString();
-                    document.getElementById('res-tax').innerText = data.taxes.toLocaleString();
-                } else { alert("فشل الحساب"); }
-            } catch (e) { alert("Error!"); } finally { btn.innerText = "Run Prediction ⚡"; btn.disabled = false; }
+                const res = await fetch('/api/payroll/net-to-gross', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ targetNet: net }) 
+                });
+                const data = await res.json();
+                document.getElementById('calc-result').classList.remove('hidden');
+                document.getElementById('result-gross').innerText = data.gross.toLocaleString();
+                document.getElementById('res-ins-ee').innerText = data.insEmployee.toLocaleString();
+                document.getElementById('res-tax').innerText = data.taxes.toLocaleString();
+            } catch (e) { alert("فشل الحساب"); } 
+            finally { 
+                btn.innerText = "Run Prediction ⚡"; 
+                btn.disabled = false; 
+            }
         }
 
         async function runCalc() {
@@ -320,7 +331,6 @@
                 amount: Number(r.children[1].value),
                 type: r.children[2].value
             }));
-            
             const body = {
                 empId: document.getElementById('currId').value, 
                 month: document.getElementById('c-month').value,
@@ -331,23 +341,31 @@
                 resignationDate: document.getElementById('c-resign').value,
                 additions: getItems('add-area'), 
                 deductions: getItems('ded-area'),
-                prevData: { pDays: Number(document.getElementById('pD').value), pTaxable: Number(document.getElementById('pTxbl').value), pTaxes: Number(document.getElementById('pTx').value) }
+                prevData: { 
+                    pDays: Number(document.getElementById('pD').value), 
+                    pTaxable: Number(document.getElementById('pTxbl').value), 
+                    pTaxes: Number(document.getElementById('pTx').value) 
+                }
             };
-
             const res = await fetch('/api/payroll/calculate', { 
                 method: 'POST', 
                 headers: {'Content-Type':'application/json'}, 
                 body: JSON.stringify(body) 
             });
-
             if(res.ok) { 
                 document.getElementById('add-area').innerHTML = ''; 
                 document.getElementById('ded-area').innerHTML = ''; 
                 openProfile(body.empId); 
-            } else { alert("خطأ في الحساب"); }
+            }
         }
 
-        async function delEmp() { if(confirm("حذف الموظف وسجلاته نهائياً؟")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); showHR(); } }
+        async function delEmp() { 
+            if(confirm("حذف الموظف وسجلاته نهائياً؟")) { 
+                await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); 
+                showHR(); 
+            } 
+        }
+
         window.onload = showDash;
     </script>
 </body>
