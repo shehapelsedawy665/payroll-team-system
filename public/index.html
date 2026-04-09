@@ -206,6 +206,7 @@
             document.getElementById('p-name').innerText = data.emp.name;
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
+            
             let nextMonth;
             if (data.history && data.history.length > 0) {
                 const lastMonth = data.history[data.history.length - 1].month;
@@ -252,10 +253,35 @@
         }
 
         async function saveEmp() {
-            const body = { name: document.getElementById('n-name').value, nationalId: document.getElementById('n-nid').value, hiringDate: document.getElementById('n-hdate').value, insSalary: Number(document.getElementById('n-ins').value), jobType: document.getElementById('n-type').value };
-            if(!body.name || !body.nationalId) return alert("البيانات ناقصة!");
-            await fetch('/api/employees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-            location.reload();
+            const body = { 
+                name: document.getElementById('n-name').value, 
+                nationalId: document.getElementById('n-nid').value, 
+                hiringDate: document.getElementById('n-hdate').value, 
+                insSalary: Number(document.getElementById('n-ins').value), 
+                jobType: document.getElementById('n-type').value 
+            };
+            
+            if(!body.name || !body.nationalId || !body.hiringDate) return alert("الرجاء إكمال كافة البيانات المطلوبة");
+            
+            try {
+                const res = await fetch('/api/employees', { 
+                    method: 'POST', 
+                    headers: {'Content-Type':'application/json'}, 
+                    body: JSON.stringify(body) 
+                });
+                
+                if(res.ok) {
+                    document.getElementById('modal').classList.add('hidden');
+                    // تفريغ الفورم
+                    ['n-name', 'n-nid', 'n-hdate', 'n-ins'].forEach(id => document.getElementById(id).value = "");
+                    showHR(); // تحديث القائمة فوراً
+                } else {
+                    const err = await res.json();
+                    alert(err.error || "فشل الحفظ");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر");
+            }
         }
 
         async function runNetToGross() {
@@ -265,11 +291,15 @@
             btn.innerText = "CALCULATING..."; btn.disabled = true;
             try {
                 const res = await fetch('/api/payroll/net-to-gross', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ targetNet: net }) });
-                const data = await res.json();
-                document.getElementById('calc-result').classList.remove('hidden');
-                document.getElementById('result-gross').innerText = data.gross.toLocaleString();
-                document.getElementById('res-ins-ee').innerText = data.insEmployee.toLocaleString();
-                document.getElementById('res-tax').innerText = data.taxes.toLocaleString();
+                if(res.ok) {
+                    const data = await res.json();
+                    document.getElementById('calc-result').classList.remove('hidden');
+                    document.getElementById('result-gross').innerText = data.gross.toLocaleString();
+                    document.getElementById('res-ins-ee').innerText = data.insEmployee.toLocaleString();
+                    document.getElementById('res-tax').innerText = data.taxes.toLocaleString();
+                } else {
+                    alert("فشل الحساب، تأكد من المدخلات");
+                }
             } catch (e) { alert("Error!"); } finally { btn.innerText = "Run Prediction ⚡"; btn.disabled = false; }
         }
 
@@ -292,12 +322,23 @@
                 deductions: getItems('ded-area'),
                 prevData: { pDays: Number(document.getElementById('pD').value), pTaxable: Number(document.getElementById('pTxbl').value), pTaxes: Number(document.getElementById('pTx').value) }
             };
-            const res = await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-            if(res.ok) { document.getElementById('add-area').innerHTML = ''; document.getElementById('ded-area').innerHTML = ''; openProfile(body.empId); } 
-            else alert("Error!");
+
+            const res = await fetch('/api/payroll/calculate', { 
+                method: 'POST', 
+                headers: {'Content-Type':'application/json'}, 
+                body: JSON.stringify(body) 
+            });
+
+            if(res.ok) { 
+                document.getElementById('add-area').innerHTML = ''; 
+                document.getElementById('ded-area').innerHTML = ''; 
+                openProfile(body.empId); 
+            } else {
+                alert("خطأ في الحساب، يرجى مراجعة البيانات");
+            }
         }
 
-        async function delEmp() { if(confirm("حذف نهائي؟")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); location.reload(); } }
+        async function delEmp() { if(confirm("حذف الموظف وسجلاته نهائياً؟")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); showHR(); } }
         window.onload = showDash;
     </script>
 </body>
