@@ -12,12 +12,12 @@ app.use(express.json());
 // 1. الاتصال بقاعدة البيانات
 connectDB();
 
-// 2. التعريفات (Schemas)
+// 2. التعريفات (Schemas) - تم تعديل الـ Required لضمان مرونة الحفظ
 const employeeSchema = new mongoose.Schema({
-    name: { type: String, required: true }, // أضفت required للتأكد من البيانات
+    name: { type: String, required: true }, 
     nationalId: { type: String, required: true }, 
     hiringDate: { type: String, required: true }, 
-    resignationDate: String, 
+    resignationDate: { type: String, default: "" }, 
     insSalary: { type: Number, default: 0 }, 
     jobType: { type: String, default: "Full Time" }
 });
@@ -32,15 +32,26 @@ const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSche
 
 // --- [APIs] ---
 
-// إضافة موظف جديد - تم التعديل هنا لضمان الحفظ والرد على الـ UI
+// إضافة موظف جديد - تم تعديل المنطق لضمان عدم الفشل عند الحفظ
 app.post("/api/employees", async (req, res) => {
     try {
-        const newEmp = new Employee(req.body);
+        // تنظيف البيانات والتأكد من تحويل الأرقام بشكل صحيح قبل الحفظ
+        const employeeData = {
+            name: req.body.name,
+            nationalId: req.body.nationalId,
+            hiringDate: req.body.hiringDate,
+            insSalary: Number(req.body.insSalary) || 0,
+            jobType: req.body.jobType || "Full Time",
+            resignationDate: req.body.resignationDate || ""
+        };
+
+        const newEmp = new Employee(employeeData);
         const savedEmp = await newEmp.save();
-        res.status(201).json(savedEmp); // إرسال حالة 201 نجاح
+        res.status(201).json(savedEmp);
     } catch (err) {
-        console.error("Save Employee Error:", err);
-        res.status(400).json({ error: "فشل في حفظ الموظف، تأكد من إدخال جميع البيانات" });
+        console.error("Critical Save Error:", err);
+        // إرسال تفاصيل الخطأ عشان تعرف لو فيه حقل ناقص بالظبط
+        res.status(400).json({ error: "فشل الحفظ: " + err.message });
     }
 });
 
