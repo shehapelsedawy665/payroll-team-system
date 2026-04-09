@@ -22,28 +22,41 @@ const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSche
 
 // --- [نظام الحماية والـ Authentication] ---
 
-// 1. تسجيل مستخدم جديد (Sign-up)
+// 1. تسجيل مستخدم جديد (Sign-up) - تم تعديل المنطق لضمان الربط الصحيح
 app.post("/api/auth/signup", async (req, res) => {
     try {
         const { email, password, role, companyName, companyPassword } = req.body;
+
+        // التحقق يدوياً إذا كان المستخدم موجوداً لتجنب رسالة الخطأ العامة
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ error: "هذا البريد الإلكتروني مسجل بالفعل" });
+        }
         
         let companyId = null;
 
         if (role === 'admin') {
             // إنشاء شركة جديدة وربطها بالأدمن
             const newCompany = new Company({
-                name: companyName,
+                name: companyName || "New Company",
                 adminPassword: companyPassword // الباسورد الخاصة بالشركة
             });
             const savedCompany = await newCompany.save();
             companyId = savedCompany._id;
         }
 
-        const newUser = new User({ email, password, role, companyId });
+        const newUser = new User({ 
+            email, 
+            password, 
+            role: role || 'admin', 
+            companyId 
+        });
+        
         await newUser.save();
         res.status(201).json({ success: true, message: "User created successfully" });
     } catch (err) {
-        res.status(400).json({ error: "Email already exists or invalid data" });
+        console.error("Signup Error:", err);
+        res.status(400).json({ error: "بيانات غير مكتملة أو خطأ في التسجيل" });
     }
 });
 
@@ -51,10 +64,11 @@ app.post("/api/auth/signup", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
+        // استخدام populate لجلب بيانات الشركة مع المستخدم
         const user = await User.findOne({ email }).populate('companyId');
 
         if (!user || user.password !== password) {
-            return res.status(401).json({ error: "Invalid email or password" });
+            return res.status(401).json({ error: "الإيميل أو كلمة المرور غير صحيحة" });
         }
 
         res.json({
@@ -63,18 +77,19 @@ app.post("/api/auth/login", async (req, res) => {
                 email: user.email,
                 role: user.role,
                 companyId: user.companyId ? user.companyId._id : null,
-                companyName: user.companyId ? user.companyId.name : ""
+                companyName: user.companyId ? user.companyId.name : "System"
             }
         });
     } catch (err) {
-        res.status(500).json({ error: "Login failed" });
+        console.error("Login Error:", err);
+        res.status(500).json({ error: "فشل تسجيل الدخول" });
     }
 });
 
 // 3. بوابة المطور السرية (Developer Core Login)
 app.post("/api/settings/dev-login", (req, res) => {
     const { password } = req.body;
-    // الباسورد التي طلبتها: CO.Sedawy.2026
+    // الباسورد: CO.Sedawy.2026
     if (password === "CO.Sedawy.2026") {
         return res.json({ success: true, token: "dev-session-valid-2026" });
     }
@@ -106,7 +121,6 @@ app.post("/api/employees", async (req, res) => {
 
 app.get("/api/employees", async (req, res) => {
     try {
-        // إذا كان هناك companyId في الـ Query يفلتر الموظفين حسب الشركة
         const filter = req.query.companyId ? { companyId: req.query.companyId } : {};
         const employees = await Employee.find(filter).sort({_id: -1});
         res.json(employees);
@@ -140,7 +154,6 @@ app.post("/api/payroll/calculate", async (req, res) => {
         const emp = await Employee.findById(empId);
         const company = await Company.findById(companyId);
 
-        // استخدام إعدادات الشركة في الحسابات (أو الثوابت الافتراضية)
         const settings = company ? company.settings : { medicalLimit: 10000, taxExemptionLimit: 20000 };
 
         const MAX_INS = 16700;
