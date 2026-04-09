@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
-const connectDB = require("./db");
+const { connectDB, Company, User, Employee } = require("./db"); // استيراد النماذج من db.js
 const { runPayrollLogic } = require("./calculations");
 
 const app = express();
@@ -12,17 +12,7 @@ app.use(express.json());
 // 1. الاتصال بقاعدة البيانات
 connectDB();
 
-// 2. التعريفات (Schemas) - تم تعديل الـ Required لضمان مرونة الحفظ
-const employeeSchema = new mongoose.Schema({
-    name: { type: String, required: true }, 
-    nationalId: { type: String, required: true }, 
-    hiringDate: { type: String, required: true }, 
-    resignationDate: { type: String, default: "" }, 
-    insSalary: { type: Number, default: 0 }, 
-    jobType: { type: String, default: "Full Time" }
-});
-const Employee = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);
-
+// تعريف نموذج الـ Payroll (باقي النماذج تم نقلها لـ db.js)
 const payrollSchema = new mongoose.Schema({
     employeeId: mongoose.Schema.Types.ObjectId, 
     month: String, 
@@ -30,19 +20,79 @@ const payrollSchema = new mongoose.Schema({
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
-// --- [APIs] ---
+// --- [نظام الحماية والـ Authentication] ---
 
-// إضافة موظف جديد - تم تعديل المنطق لضمان عدم الفشل عند الحفظ
+// 1. تسجيل مستخدم جديد (Sign-up)
+app.post("/api/auth/signup", async (req, res) => {
+    try {
+        const { email, password, role, companyName, companyPassword } = req.body;
+        
+        let companyId = null;
+
+        if (role === 'admin') {
+            // إنشاء شركة جديدة وربطها بالأدمن
+            const newCompany = new Company({
+                name: companyName,
+                adminPassword: companyPassword // الباسورد الخاصة بالشركة
+            });
+            const savedCompany = await newCompany.save();
+            companyId = savedCompany._id;
+        }
+
+        const newUser = new User({ email, password, role, companyId });
+        await newUser.save();
+        res.status(201).json({ success: true, message: "User created successfully" });
+    } catch (err) {
+        res.status(400).json({ error: "Email already exists or invalid data" });
+    }
+});
+
+// 2. تسجيل الدخول (Login)
+app.post("/api/auth/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email }).populate('companyId');
+
+        if (!user || user.password !== password) {
+            return res.status(401).json({ error: "Invalid email or password" });
+        }
+
+        res.json({
+            success: true,
+            user: {
+                email: user.email,
+                role: user.role,
+                companyId: user.companyId ? user.companyId._id : null,
+                companyName: user.companyId ? user.companyId.name : ""
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Login failed" });
+    }
+});
+
+// 3. بوابة المطور السرية (Developer Core Login)
+app.post("/api/settings/dev-login", (req, res) => {
+    const { password } = req.body;
+    // الباسورد التي طلبتها: CO.Sedawy.2026
+    if (password === "CO.Sedawy.2026") {
+        return res.json({ success: true, token: "dev-session-valid-2026" });
+    }
+    res.status(401).json({ success: false, message: "Unauthorized" });
+});
+
+// --- [APIs الموظفين والرواتب] ---
+
 app.post("/api/employees", async (req, res) => {
     try {
-        // تنظيف البيانات والتأكد من تحويل الأرقام بشكل صحيح قبل الحفظ
         const employeeData = {
             name: req.body.name,
             nationalId: req.body.nationalId,
             hiringDate: req.body.hiringDate,
             insSalary: Number(req.body.insSalary) || 0,
             jobType: req.body.jobType || "Full Time",
-            resignationDate: req.body.resignationDate || ""
+            resignationDate: req.body.resignationDate || "",
+            companyId: req.body.companyId // ربط الموظف بالشركة
         };
 
         const newEmp = new Employee(employeeData);
@@ -50,14 +100,15 @@ app.post("/api/employees", async (req, res) => {
         res.status(201).json(savedEmp);
     } catch (err) {
         console.error("Critical Save Error:", err);
-        // إرسال تفاصيل الخطأ عشان تعرف لو فيه حقل ناقص بالظبط
         res.status(400).json({ error: "فشل الحفظ: " + err.message });
     }
 });
 
 app.get("/api/employees", async (req, res) => {
     try {
-        const employees = await Employee.find().sort({_id: -1});
+        // إذا كان هناك companyId في الـ Query يفلتر الموظفين حسب الشركة
+        const filter = req.query.companyId ? { companyId: req.query.companyId } : {};
+        const employees = await Employee.find(filter).sort({_id: -1});
         res.json(employees);
     } catch (err) {
         res.status(500).json({ error: "Error fetching employees" });
@@ -84,8 +135,13 @@ app.get("/api/employees/:id/details", async (req, res) => {
 
 app.post("/api/payroll/calculate", async (req, res) => {
     try {
-        const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
+        const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate, companyId } = req.body;
+        
         const emp = await Employee.findById(empId);
+        const company = await Company.findById(companyId);
+
+        // استخدام إعدادات الشركة في الحسابات (أو الثوابت الافتراضية)
+        const settings = company ? company.settings : { medicalLimit: 10000, taxExemptionLimit: 20000 };
 
         const MAX_INS = 16700;
         const MIN_INS = 5384.62;
