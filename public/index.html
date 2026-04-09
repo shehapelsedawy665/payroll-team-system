@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Payroll Pro - Company View</title>
+    <title>Payroll Pro - System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -31,38 +31,43 @@
 <body class="bg-slate-100 flex min-h-screen">
 
     <div id="auth-view" class="fixed inset-0 bg-slate-900 z-[300] flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-fade-in">
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-fade-in text-right">
             <div class="text-center mb-8">
                 <div class="inline-block p-4 bg-indigo-100 text-indigo-600 rounded-3xl mb-4"><i class="fas fa-bolt text-3xl"></i></div>
                 <h2 id="auth-title" class="text-3xl font-black text-slate-800">تسجيل الدخول</h2>
             </div>
             
             <div id="login-form" class="space-y-4">
-                <input type="email" id="log-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold">
-                <input type="password" id="log-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold">
-                <button onclick="handleLogin()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-indigo-200 active:scale-95 transition">دخول ⚡</button>
-                <p class="text-center text-sm text-slate-400 font-bold">ليس لديك حساب؟ <span onclick="toggleAuth()" class="text-indigo-600 cursor-pointer">إنشاء حساب جديد</span></p>
+                <input type="email" id="log-email" placeholder="البريد الإلكتروني" class="w-full p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold transition-all">
+                <input type="password" id="log-pass" placeholder="كلمة المرور" class="w-full p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold transition-all">
+                <button onclick="handleLogin()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg active:scale-95 transition">دخول ⚡</button>
+                <p class="text-center text-sm text-slate-400 font-bold mt-4">ليس لديك حساب؟ <span onclick="toggleAuth()" class="text-indigo-600 cursor-pointer underline">إنشاء حساب جديد</span></p>
             </div>
 
             <div id="signup-form" class="hidden space-y-4">
-                <input type="email" id="sig-email" placeholder="البريد الإلكتروني" class="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold">
-                <input type="password" id="sig-pass" placeholder="كلمة المرور" class="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold">
-                <select id="sig-role" onchange="checkRole()" class="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-indigo-500">
+                <input type="email" id="sig-email" placeholder="البريد الإلكتروني الجديد" class="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold transition-all">
+                <input type="password" id="sig-pass" placeholder="كلمة المرور" class="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold transition-all">
+                
+                <label class="block text-right text-[10px] text-slate-400 font-bold uppercase mr-1">نوع الحساب</label>
+                <select id="sig-role" onchange="checkRole()" class="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none border-2 border-slate-100 focus:border-indigo-500 cursor-pointer">
                     <option value="employee">موظف (Employee)</option>
                     <option value="admin">مدير شركة (Admin)</option>
                 </select>
+
                 <div id="admin-extra" class="hidden space-y-4 animate-fade-in">
+                    <div class="h-px bg-slate-100 my-2"></div>
                     <input type="text" id="sig-comp" placeholder="اسم الشركة" class="w-full p-3 bg-indigo-50 rounded-xl border-2 border-indigo-200 outline-none text-right font-bold">
                     <input type="password" id="sig-comp-pass" placeholder="كلمة سر الشركة (Internal)" class="w-full p-3 bg-indigo-50 rounded-xl border-2 border-indigo-200 outline-none text-right font-bold">
                 </div>
-                <button onclick="handleSignup()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg active:scale-95 transition">إنشاء الحساب</button>
-                <p class="text-center text-sm text-slate-400 font-bold">لديك حساب بالفعل؟ <span onclick="toggleAuth()" class="text-indigo-600 cursor-pointer">تسجيل الدخول</span></p>
+
+                <button onclick="handleSignup()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg active:scale-95 transition mt-2">إنشاء الحساب</button>
+                <p class="text-center text-sm text-slate-400 font-bold mt-4">لديك حساب بالفعل؟ <span onclick="toggleAuth()" class="text-indigo-600 cursor-pointer underline">تسجيل الدخول</span></p>
             </div>
         </div>
     </div>
 
     <aside id="sidebar" class="bg-slate-900 text-white fixed h-full right-0 top-0 z-[100] flex flex-col shadow-2xl hidden">
-        <div class="p-4 mb-10 text-indigo-500 font-black text-2xl border-b border-slate-800 hidden lg:block">
+        <div class="p-4 mb-10 text-indigo-500 font-black text-2xl border-b border-slate-800 hidden lg:block text-center">
             <i class="fas fa-bolt ml-4"></i> <span class="nav-text italic uppercase" id="display-company">System</span>
         </div>
         <nav class="flex-1">
@@ -75,25 +80,22 @@
             <div onclick="showCalc()" class="p-4 hover:bg-indigo-600 flex items-center cursor-pointer transition text-emerald-400 rounded-xl lg:rounded-none">
                 <i class="fas fa-calculator lg:ml-4 text-xl"></i> <span class="nav-text">Net to Gross</span>
             </div>
-            
             <div id="admin-sidebar" class="hidden border-t border-slate-800 mt-4">
-                <div onclick="alert('Company Settings Coming Soon!')" class="p-4 hover:bg-orange-600 flex items-center cursor-pointer transition text-orange-400">
+                <div onclick="alert('Settings Coming Soon!')" class="p-4 hover:bg-orange-600 flex items-center cursor-pointer transition text-orange-400">
                     <i class="fas fa-cogs lg:ml-4 text-xl"></i> <span class="nav-text font-bold">إعدادات الشركة</span>
                 </div>
             </div>
-
             <div id="dev-sidebar" class="hidden border-t border-red-900 bg-red-950/20">
-                <div onclick="alert('Developer Core Activated')" class="p-4 hover:bg-red-600 flex items-center cursor-pointer transition text-red-500">
+                <div onclick="alert('Dev Mode Active')" class="p-4 hover:bg-red-600 flex items-center cursor-pointer transition text-red-500">
                     <i class="fas fa-user-ninja lg:ml-4 text-xl"></i> <span class="nav-text font-black uppercase text-[10px]">Dev Core</span>
                 </div>
             </div>
-
             <div onclick="document.getElementById('modal').classList.remove('hidden')" class="p-4 hover:bg-emerald-600 flex items-center cursor-pointer transition text-white lg:mt-4 bg-emerald-500/10 rounded-xl lg:rounded-none">
                 <i class="fas fa-user-plus lg:ml-4 text-xl"></i> <span class="nav-text">إضافة موظف</span>
             </div>
         </nav>
         <div onclick="logout()" class="p-4 border-t border-slate-800 text-rose-500 cursor-pointer hover:bg-rose-900 transition">
-             <i class="fas fa-sign-out-alt lg:ml-4 text-xl"></i> <span class="nav-text font-bold">تسجيل الخروج</span>
+             <i class="fas fa-sign-out-alt lg:ml-4 text-xl"></i> <span class="nav-text font-bold">خروج</span>
         </div>
     </aside>
 
@@ -103,13 +105,13 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                 <div onclick="showHR()" class="bg-white p-6 md:p-8 rounded-[2rem] shadow-xl border-4 border-transparent hover:border-indigo-500 cursor-pointer transition group">
                     <div class="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition"><i class="fas fa-users-cog"></i></div>
-                    <h3 class="text-xl font-black mb-2 text-slate-800">إدارة الموظفين</h3>
-                    <p class="text-slate-400 text-xs font-bold">عرض البيانات، حساب الرواتب، وإدارة الاستقالات.</p>
+                    <h3 class="text-xl font-black mb-2 text-slate-800 text-right">إدارة الموظفين</h3>
+                    <p class="text-slate-400 text-xs font-bold text-right">عرض البيانات، حساب الرواتب، وإدارة الاستقالات.</p>
                 </div>
                 <div onclick="showCalc()" class="bg-white p-6 md:p-8 rounded-[2rem] shadow-xl border-4 border-transparent hover:border-emerald-500 cursor-pointer transition group">
                     <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition"><i class="fas fa-calculator"></i></div>
-                    <h3 class="text-xl font-black mb-2 text-slate-800">Net to Gross</h3>
-                    <p class="text-slate-400 text-xs font-bold">حساب الشامل من الصافي بمعادلات تكرارية.</p>
+                    <h3 class="text-xl font-black mb-2 text-slate-800 text-right">Net to Gross</h3>
+                    <p class="text-slate-400 text-xs font-bold text-right">حساب الشامل من الصافي بمعادلات تكرارية.</p>
                 </div>
             </div>
         </div>
@@ -127,12 +129,12 @@
         </div>
 
         <div id="net-gross-view" class="hidden animate-fade-in">
-            <button onclick="showDash()" class="text-emerald-600 font-bold mb-6 block">← العودة</button>
+            <button onclick="showDash()" class="text-emerald-600 font-bold mb-6 block text-right">← العودة</button>
             <div class="max-w-2xl mx-auto bg-slate-900 text-white p-6 md:p-10 rounded-[2rem] shadow-2xl text-center">
                 <h2 class="text-2xl font-black mb-2 italic underline decoration-emerald-500">Reverse Calculator</h2>
                 <div class="space-y-6 mt-8">
                     <input type="number" id="target-net" class="w-full bg-slate-800 p-6 rounded-3xl font-black text-4xl text-emerald-400 text-center outline-none" placeholder="0.00">
-                    <button onclick="runNetToGross()" id="calc-btn" class="w-full bg-emerald-500 py-6 rounded-2xl font-black text-slate-900 text-xl active:scale-95 transition">Run Prediction ⚡</button>
+                    <button onclick="runNetToGross()" class="w-full bg-emerald-500 py-6 rounded-2xl font-black text-slate-900 text-xl active:scale-95 transition">Run Prediction ⚡</button>
                     <div id="calc-result" class="hidden mt-8 space-y-4 animate-fade-in">
                         <div class="bg-white/5 p-6 rounded-2xl border border-white/10"><p class="text-slate-400 text-[10px] uppercase">Gross Salary</p><h4 id="result-gross" class="text-5xl font-black text-emerald-400">0.00</h4></div>
                     </div>
@@ -160,18 +162,26 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-right">
                 <div class="bg-indigo-950 text-white p-6 rounded-[2rem] shadow-xl">
-                    <div class="flex justify-between items-center mb-4 border-b border-indigo-900 pb-2"><h4 class="font-black italic text-indigo-300 text-sm">Additions (+)</h4><button onclick="addRow('add-area')" class="text-[9px] bg-indigo-800 px-3 py-1 rounded-full">+ Add Item</button></div>
+                    <div class="flex justify-between items-center mb-4 border-b border-indigo-900 pb-2">
+                        <h4 class="font-black italic text-indigo-300 text-sm">Additions (+)</h4>
+                        <button onclick="addRow('add-area')" class="text-[9px] bg-indigo-800 px-3 py-1 rounded-full">+ Item</button>
+                    </div>
                     <div id="add-area" class="space-y-2 min-h-[60px]"></div>
                 </div>
                 <div class="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl flex flex-col">
-                    <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2"><h4 class="font-black italic text-rose-400 text-sm">Deductions (-)</h4><button onclick="addRow('ded-area')" class="text-[9px] bg-slate-800 px-3 py-1 rounded-full">+ Add Item</button></div>
+                    <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                        <h4 class="font-black italic text-rose-400 text-sm">Deductions (-)</h4>
+                        <button onclick="addRow('ded-area')" class="text-[9px] bg-slate-800 px-3 py-1 rounded-full">+ Item</button>
+                    </div>
                     <div id="ded-area" class="space-y-2 min-h-[60px]"></div>
                     <button onclick="runCalc()" class="w-full mt-6 bg-emerald-500 py-4 rounded-xl font-black text-slate-900 shadow-lg active:scale-95 transition">RUN PAYROLL ⚡</button>
                 </div>
             </div>
             <div class="table-container bg-white border border-slate-200">
                 <table class="w-full text-[10px] text-center whitespace-nowrap" dir="ltr">
-                    <thead id="histHead" class="bg-slate-800 text-white"></thead>
+                    <thead class="bg-slate-800 text-white">
+                        <tr><th class="p-2">Month</th><th class="p-2">Days</th><th class="p-2">Gross</th><th class="p-2">Tax</th><th class="p-2">Net</th></tr>
+                    </thead>
                     <tbody id="histBody" class="divide-y divide-slate-100 font-bold text-slate-600 italic"></tbody>
                 </table>
             </div>
@@ -181,9 +191,9 @@
     <div id="modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
         <div class="bg-white p-6 md:p-10 rounded-[2rem] w-full max-w-md">
             <h3 class="text-2xl font-black mb-6 italic text-center text-indigo-600">New Employee</h3>
-            <div class="space-y-4">
-                <input type="text" id="n-name" placeholder="Full Name" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-right outline-none">
-                <input type="text" id="n-nid" placeholder="National ID" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-center outline-none">
+            <div class="space-y-4 text-right">
+                <input type="text" id="n-name" placeholder="Full Name" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-right outline-none border-2 border-transparent focus:border-indigo-500">
+                <input type="text" id="n-nid" placeholder="National ID" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-center outline-none border-2 border-transparent focus:border-indigo-500">
                 <div class="grid grid-cols-2 gap-4">
                     <input type="date" id="n-hdate" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none">
                     <input type="number" id="n-ins" placeholder="Insurance" class="p-3 bg-slate-50 rounded-xl font-bold text-center outline-none">
@@ -198,55 +208,75 @@
     </div>
 
     <input type="hidden" id="currId">
-    <input type="hidden" id="pD">
-    <input type="hidden" id="pTxbl">
-    <input type="hidden" id="pTx">
 
     <script>
-        // --- [Authentication Logic] ---
+        // --- 1. الـ Auth Logic (المعدلة والمختبرة) ---
         let currentUser = JSON.parse(localStorage.getItem('user')) || null;
 
         function toggleAuth() {
-            const isLogin = document.getElementById('login-form').classList.contains('hidden');
-            document.getElementById('login-form').classList.toggle('hidden', isLogin);
-            document.getElementById('signup-form').classList.toggle('hidden', !isLogin);
-            document.getElementById('auth-title').innerText = isLogin ? "تسجيل الدخول" : "إنشاء حساب";
+            const loginForm = document.getElementById('login-form');
+            const signupForm = document.getElementById('signup-form');
+            const authTitle = document.getElementById('auth-title');
+
+            if (loginForm.classList.contains('hidden')) {
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                authTitle.innerText = "تسجيل الدخول";
+            } else {
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                authTitle.innerText = "إنشاء حساب جديد";
+            }
         }
 
         function checkRole() {
             const role = document.getElementById('sig-role').value;
-            document.getElementById('admin-extra').classList.toggle('hidden', role !== 'admin');
+            const extra = document.getElementById('admin-extra');
+            if (role === 'admin') {
+                extra.classList.remove('hidden');
+            } else {
+                extra.classList.add('hidden');
+            }
         }
 
         async function handleLogin() {
             const email = document.getElementById('log-email').value;
             const password = document.getElementById('log-pass').value;
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if(data.success) {
-                localStorage.setItem('user', JSON.stringify(data.user));
-                initSystem(data.user);
-            } else { alert("خطأ في البيانات!"); }
+            if(!email || !password) return alert("املا البيانات!");
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    initSystem(data.user);
+                } else { alert("البيانات غلط يا بطل!"); }
+            } catch(e) { alert("Server Error!"); }
         }
 
         async function handleSignup() {
-            const body = {
-                email: document.getElementById('sig-email').value,
-                password: document.getElementById('sig-pass').value,
-                role: document.getElementById('sig-role').value,
-                companyName: document.getElementById('sig-comp').value,
-                companyPassword: document.getElementById('sig-comp-pass').value
-            };
+            const email = document.getElementById('sig-email').value;
+            const password = document.getElementById('sig-pass').value;
+            const role = document.getElementById('sig-role').value;
+            const companyName = document.getElementById('sig-comp').value;
+            const companyPassword = document.getElementById('sig-comp-pass').value;
+
+            if(!email || !password) return alert("اكتب الايميل والباسورد!");
+            if(role === 'admin' && !companyName) return alert("اسم الشركة فين؟");
+
             const res = await fetch('/api/auth/signup', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(body)
+                body: JSON.stringify({ email, password, role, companyName, companyPassword })
             });
-            if(res.ok) { alert("تم إنشاء الحساب! سجل دخولك الآن."); toggleAuth(); }
+            if(res.ok) { 
+                alert("مبروك الحساب اتعمل! سجل دخول دلوقتي."); 
+                toggleAuth(); 
+            } else { alert("في حاجة غلط حصلت!"); }
         }
 
         function initSystem(user) {
@@ -258,49 +288,30 @@
             showDash();
         }
 
-        function logout() {
-            localStorage.removeItem('user');
-            location.reload();
+        function logout() { localStorage.removeItem('user'); location.reload(); }
+
+        // --- 2. التحكم في الشاشات ---
+        function hideAll() {
+            ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.classList.add('hidden');
+            });
         }
-
-        // --- [Secret Developer Trigger] ---
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
-                const handleSix = (event) => {
-                    if (event.key === '6') {
-                        const pass = prompt("Enter Developer Security Key:");
-                        if (pass === "CO.Sedawy.2026") {
-                            alert("Welcome Shehab! Dev Mode On.");
-                            document.getElementById('dev-sidebar').classList.remove('hidden');
-                        }
-                    }
-                    document.removeEventListener('keydown', handleSix);
-                };
-                document.addEventListener('keydown', handleSix);
-            }
-        });
-
-        // --- [Original Logic Revised] ---
-        function hideAll() { 
-            ['dashboard-view', 'list-view', 'profile-view', 'net-gross-view'].forEach(id => { 
-                const el = document.getElementById(id); if(el) el.classList.add('hidden'); 
-            }); 
-        }
-
         function showDash() { hideAll(); document.getElementById('dashboard-view').classList.remove('hidden'); }
         function showHR() { hideAll(); document.getElementById('list-view').classList.remove('hidden'); load(); }
         function showCalc() { hideAll(); document.getElementById('net-gross-view').classList.remove('hidden'); }
 
+        // --- 3. بيانات الموظفين ---
         async function load() {
             const user = JSON.parse(localStorage.getItem('user'));
             const res = await fetch(`/api/employees?companyId=${user.companyId || ""}`);
             const data = await res.json();
             document.getElementById('empTable').innerHTML = data.map(e => `
-                <tr class="hover:bg-slate-50 cursor-pointer" onclick="openProfile('${e._id}')">
+                <tr class="hover:bg-slate-50 cursor-pointer border-b border-slate-50 transition" onclick="openProfile('${e._id}')">
                     <td class="p-4"><div class="flex items-center"><div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center font-black ml-3">${e.name[0]}</div><div class="font-black text-slate-700 text-xs">${e.name}</div></div></td>
                     <td class="p-4 text-center font-mono text-slate-400 text-xs">${e.nationalId}</td>
                     <td class="p-4 text-center"><span class="${e.resignationDate ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"} px-3 py-1 rounded-full text-[9px] font-black uppercase">${e.resignationDate ? "Resigned" : "Active"}</span></td>
-                    <td class="p-4 text-center"><i class="fas fa-chevron-left text-slate-300"></i></td>
+                    <td class="p-4 text-center text-indigo-300"><i class="fas fa-chevron-left"></i></td>
                 </tr>`).join('');
         }
 
@@ -309,27 +320,27 @@
             document.getElementById('currId').value = id;
             const res = await fetch(`/api/employees/${id}/details`);
             const data = await res.json();
+            
             document.getElementById('p-name').innerText = data.emp.name;
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
             
-            // Logic Month Calculation
+            // حساب الشهر القادم
             let nextMonth;
-            if (data.history?.length > 0) {
+            if (data.history && data.history.length > 0) {
                 let [y, m] = data.history[data.history.length - 1].month.split('-').map(Number);
                 m++; if(m > 12) { m = 1; y++; }
                 nextMonth = `${y}-${String(m).padStart(2, '0')}`;
             } else { nextMonth = data.emp.hiringDate.substring(0, 7); }
             document.getElementById('c-month').value = nextMonth;
 
-            // التاريخ (History Table)
             document.getElementById('histBody').innerHTML = data.history.map(r => `
-                <tr class="divide-x divide-slate-50">
-                    <td class="p-3 font-black">${r.month}</td>
-                    <td>${r.payload.days}</td>
-                    <td>${r.payload.gross.toLocaleString()}</td>
-                    <td class="bg-rose-50 text-rose-600">${r.payload.monthlyTax.toLocaleString()}</td>
-                    <td class="bg-emerald-50 text-emerald-700 font-black">${r.payload.net.toLocaleString()}</td>
+                <tr>
+                    <td class="p-2">${r.month}</td>
+                    <td class="p-2">${r.payload.days}</td>
+                    <td class="p-2 font-black">${r.payload.gross.toLocaleString()}</td>
+                    <td class="p-2 text-rose-500">${r.payload.monthlyTax.toLocaleString()}</td>
+                    <td class="p-2 bg-emerald-50 text-emerald-600 font-black">${r.payload.net.toLocaleString()}</td>
                 </tr>`).join('');
         }
 
@@ -343,8 +354,10 @@
                 jobType: document.getElementById('n-type').value,
                 companyId: user.companyId
             };
+            if(!body.name || !body.nationalId) return alert("كمل البيانات");
             await fetch('/api/employees', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-            document.getElementById('modal').classList.add('hidden'); showHR();
+            document.getElementById('modal').classList.add('hidden'); 
+            showHR();
         }
 
         async function runCalc() {
@@ -362,8 +375,7 @@
                 hiringDate: document.getElementById('p-hdate').value,
                 resignationDate: document.getElementById('c-resign').value,
                 additions: getItems('add-area'),
-                deductions: getItems('ded-area'),
-                prevData: { pDays: 0, pTaxable: 0, pTaxes: 0 }
+                deductions: getItems('ded-area')
             };
             const res = await fetch('/api/payroll/calculate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
             if(res.ok) { openProfile(body.empId); }
@@ -379,6 +391,23 @@
             `;
             document.getElementById(areaId).appendChild(div);
         }
+
+        // اختصار المطور
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
+                const handleSix = (event) => {
+                    if (event.key === '6') {
+                        const pass = prompt("Enter Developer Security Key:");
+                        if (pass === "CO.Sedawy.2026") {
+                            document.getElementById('dev-sidebar').classList.remove('hidden');
+                            alert("Welcome Shehab! Dev Mode On.");
+                        }
+                    }
+                    document.removeEventListener('keydown', handleSix);
+                };
+                document.addEventListener('keydown', handleSix);
+            }
+        });
 
         window.onload = () => { if(currentUser) initSystem(currentUser); };
     </script>
