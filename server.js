@@ -2,15 +2,12 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
-const { connectDB, Company, User, Employee } = require("./db"); // استيراد النماذج من db.js
+const { connectDB, Company, User, Employee } = require("./db"); 
 const { runPayrollLogic } = require("./calculations");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// 1. الاتصال بقاعدة البيانات
-connectDB();
 
 // تعريف نموذج الـ Payroll
 const payrollSchema = new mongoose.Schema({
@@ -20,24 +17,36 @@ const payrollSchema = new mongoose.Schema({
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
-// --- [نظام الحماية والـ Authentication المعدل] ---
+// --- [تعديل 1: ضمان الاتصال قبل أي طلب] ---
+const startApp = async () => {
+    try {
+        await connectDB();
+        console.log("Database Ready ✅");
+        
+        const PORT = process.env.PORT || 3000;
+        app.listen(PORT, () => console.log(`Server LIVE on ${PORT} 🚀`));
+    } catch (err) {
+        console.error("Critical: DB Connection Failed", err);
+    }
+};
+
+// --- [نظام الحماية والـ Authentication المعدل بأمان] ---
 
 app.post("/api/auth/signup", async (req, res) => {
     try {
         const { email, password, role, companyName, companyPassword } = req.body;
         
-        // التحقق من وجود المستخدم منعاً للرسائل الوهمية
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: "الإيميل مسجل بالفعل" });
         }
 
         let companyId = null;
-        // تعديل مهم: التأكد من إنشاء الشركة ببيانات كاملة لمنع فشل الحفظ
         if (role === 'admin' || (companyName && companyName.trim() !== "")) {
+            // تعديل 2: إضافة قيم افتراضية لمنع الـ Validation Error
             const newCompany = new Company({
                 name: companyName || "New Company",
-                adminPassword: companyPassword || password || "123456" // تأمين: لو الباسورد ناقصة بياخد باسورد المستخدم
+                adminPassword: companyPassword || password || "123456" 
             });
             const savedCompany = await newCompany.save();
             companyId = savedCompany._id;
@@ -54,7 +63,6 @@ app.post("/api/auth/signup", async (req, res) => {
         res.status(201).json({ success: true, message: "User created successfully" });
     } catch (err) {
         console.error("Signup Error:", err);
-        // إرجاع رسالة الخطأ الحقيقية من المونجو عشان تعرف المشكلة فين بالظبط
         res.status(400).json({ error: "فشل في تسجيل البيانات: " + err.message });
     }
 });
@@ -62,7 +70,6 @@ app.post("/api/auth/signup", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
-        // استخدام populate للتأكد من جلب بيانات الشركة المربوطة
         const user = await User.findOne({ email }).populate('companyId');
 
         if (!user || user.password !== password) {
@@ -79,7 +86,6 @@ app.post("/api/auth/login", async (req, res) => {
             }
         });
     } catch (err) {
-        console.error("Login Error:", err);
         res.status(500).json({ error: "Login failed" });
     }
 });
@@ -92,7 +98,7 @@ app.post("/api/settings/dev-login", (req, res) => {
     res.status(401).json({ success: false, message: "Unauthorized" });
 });
 
-// --- [APIs الموظفين والرواتب - كاملة بدون حذف] ---
+// --- [APIs الموظفين والرواتب - النسخة الأصلية كاملة] ---
 
 app.post("/api/employees", async (req, res) => {
     try {
@@ -210,5 +216,5 @@ const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 app.get("*", (req, res) => { res.sendFile(path.join(publicPath, "index.html")); });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server LIVE on ${PORT} 🚀`));
+// تشغيل التطبيق بعد التأكد من قاعدة البيانات
+startApp();
