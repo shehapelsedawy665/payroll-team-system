@@ -14,23 +14,35 @@ connectDB();
 
 // 2. التعريفات (Schemas)
 const employeeSchema = new mongoose.Schema({
-    name: String, 
-    nationalId: String, 
-    hiringDate: String, 
+    name: { type: String, required: true }, // أضفت required للتأكد من البيانات
+    nationalId: { type: String, required: true }, 
+    hiringDate: { type: String, required: true }, 
     resignationDate: String, 
-    insSalary: Number, 
-    jobType: String
+    insSalary: { type: Number, default: 0 }, 
+    jobType: { type: String, default: "Full Time" }
 });
 const Employee = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);
 
 const payrollSchema = new mongoose.Schema({
     employeeId: mongoose.Schema.Types.ObjectId, 
     month: String, 
-    payload: Object // هنا بيتحفظ الـ additions والـ deductions بأساميهم وأنواعهم (exempted/non)
+    payload: Object 
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
 // --- [APIs] ---
+
+// إضافة موظف جديد - تم التعديل هنا لضمان الحفظ والرد على الـ UI
+app.post("/api/employees", async (req, res) => {
+    try {
+        const newEmp = new Employee(req.body);
+        const savedEmp = await newEmp.save();
+        res.status(201).json(savedEmp); // إرسال حالة 201 نجاح
+    } catch (err) {
+        console.error("Save Employee Error:", err);
+        res.status(400).json({ error: "فشل في حفظ الموظف، تأكد من إدخال جميع البيانات" });
+    }
+});
 
 app.get("/api/employees", async (req, res) => {
     try {
@@ -41,17 +53,11 @@ app.get("/api/employees", async (req, res) => {
     }
 });
 
-app.post("/api/employees", async (req, res) => {
-    const newEmp = new Employee(req.body);
-    res.json(await newEmp.save());
-});
-
 app.get("/api/employees/:id/details", async (req, res) => {
     try {
         const emp = await Employee.findById(req.params.id);
         const history = await Payroll.find({ employeeId: req.params.id }).sort({ month: 1 });
         
-        // حساب البيانات التراكمية (YTD) بدقة من الـ payload المحفوظ
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => { 
             pDays += (Number(r.payload.days) || 0); 
@@ -70,26 +76,22 @@ app.post("/api/payroll/calculate", async (req, res) => {
         const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
         const emp = await Employee.findById(empId);
 
-        // 1. تطبيق حدود التأمينات القانونية
         const MAX_INS = 16700;
         const MIN_INS = 5384.62;
         let effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
         
         const empForCalc = { ...emp.toObject(), insSalary: effectiveInsSalary };
 
-        // 2. تحديث تاريخ الاستقالة إذا وجد
         if (resignationDate) {
             await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
         }
 
-        // 3. تنفيذ الحسبة - الـ additions و الـ deductions دلوقتى واصلين بالـ Type بتاعهم
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
             prevData, 
             empForCalc
         );
 
-        // 4. حفظ السجل في قاعدة البيانات
         const record = await new Payroll({ 
             employeeId: empId, 
             month, 
@@ -103,7 +105,6 @@ app.post("/api/payroll/calculate", async (req, res) => {
     }
 });
 
-// [FIXED] Net to Gross - حساب الشامل من الصافي بمعادلات تكرارية
 app.post("/api/payroll/net-to-gross", async (req, res) => {
     try {
         const { targetNet } = req.body;
