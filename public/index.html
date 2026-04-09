@@ -12,19 +12,27 @@
         
         #sidebar { width: 60px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; white-space: nowrap; }
         @media (min-width: 1024px) { #sidebar:hover { width: 240px; } #sidebar:hover .nav-text { opacity: 1; display: inline; } }
+        
+        /* التعديل لضمان استجابة الموبايل ومنع تأكل الكلام */
         @media (max-width: 1023px) {
-            #sidebar { width: 100% !important; height: 60px !important; flex-direction: row !important; bottom: 0 !important; top: auto !important; right: 0 !important; justify-content: space-around; padding: 0 10px; }
+            #sidebar { width: 100% !important; height: 65px !important; flex-direction: row !important; bottom: 0 !important; top: auto !important; right: 0 !important; justify-content: space-around; padding: 0 5px; border-top: 1px solid #1e293b; }
             #sidebar .nav-text, #sidebar .border-b, #sidebar .border-t { display: none !important; }
-            #sidebar nav { flex-direction: row !important; display: flex; width: 100%; justify-content: space-around; }
-            #sidebar div { padding: 10px !important; margin: 0 !important; background: transparent !important; }
-            main { margin-right: 0 !important; padding-bottom: 80px !important; }
+            #sidebar nav { flex-direction: row !important; display: flex; width: 100%; justify-content: space-around; align-items: center; }
+            #sidebar div { padding: 12px !important; margin: 0 !important; background: transparent !important; }
+            main { margin-right: 0 !important; padding-bottom: 90px !important; padding-left: 10px !important; padding-right: 10px !important; }
+            .table-container { border-radius: 1rem !important; }
         }
+
         .nav-text { opacity: 0; transition: opacity 0.3s; display: none; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* تحسين عرض الجداول في الموبايل */
         .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 1.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-        .table-container::-webkit-scrollbar { height: 6px; }
-        .table-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .table-container::-webkit-scrollbar { height: 4px; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        table { border-collapse: collapse; min-width: 800px; } /* يضمن عدم تداخل الكلام */
     </style>
 </head>
 <body class="bg-slate-100 flex min-h-screen">
@@ -108,7 +116,7 @@
 
             <div class="bg-white p-4 md:p-6 rounded-[2rem] shadow-sm border mb-6 grid grid-cols-2 md:grid-cols-5 gap-4 italic text-right">
                 <div class="col-span-2 md:col-span-1"><label class="text-[9px] text-slate-400 block uppercase">Name</label><p id="p-name" class="font-black text-slate-800"></p></div>
-                <div><label class="text-[9px] text-indigo-600 block font-bold uppercase">Month</label><input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg font-black text-sm outline-none"></div>
+                <div><label class="text-[9px] text-indigo-600 block font-bold uppercase">Month</label><input type="month" id="c-month" class="w-full bg-indigo-50/50 p-2 rounded-lg font-black text-sm outline-none border border-indigo-200"></div>
                 <div><label class="text-[9px] text-slate-400 block uppercase">Hiring</label><input type="date" id="p-hdate" class="w-full bg-slate-50 p-2 rounded-lg font-bold text-sm outline-none" readonly></div>
                 <div><label class="text-[9px] text-orange-500 block font-bold uppercase">Resign</label><input type="date" id="c-resign" class="w-full bg-orange-50 p-2 rounded-lg font-bold text-sm outline-none"></div>
                 <div><label class="text-[9px] text-indigo-600 block font-bold uppercase">Days</label><input type="number" id="c-days" value="30" class="w-full bg-indigo-50 p-2 rounded-lg font-black text-sm outline-none"></div>
@@ -207,14 +215,22 @@
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
             
+            // --- تعديل حساب الشهر التالي وإغلاق الاختيار العشوائي ---
+            const monthInput = document.getElementById('c-month');
             let nextMonth;
             if (data.history && data.history.length > 0) {
                 const lastMonth = data.history[data.history.length - 1].month;
                 let [y, m] = lastMonth.split('-').map(Number);
                 m++; if(m > 12) { m = 1; y++; }
                 nextMonth = `${y}-${String(m).padStart(2, '0')}`;
-            } else { nextMonth = data.emp.hiringDate.substring(0, 7); }
-            document.getElementById('c-month').value = nextMonth;
+            } else { 
+                nextMonth = data.emp.hiringDate.substring(0, 7); 
+            }
+            monthInput.value = nextMonth;
+            monthInput.min = nextMonth; 
+            monthInput.max = nextMonth; // إجبار المستخدم على الشهر الحالي في السلسلة فقط
+            // -------------------------------------------------------
+
             document.getElementById('pD').value = data.prevData.pDays;
             document.getElementById('pTxbl').value = data.prevData.pTaxable;
             document.getElementById('pTx').value = data.prevData.pTaxes;
@@ -272,16 +288,13 @@
                 
                 if(res.ok) {
                     document.getElementById('modal').classList.add('hidden');
-                    // تفريغ الفورم
                     ['n-name', 'n-nid', 'n-hdate', 'n-ins'].forEach(id => document.getElementById(id).value = "");
-                    showHR(); // تحديث القائمة فوراً
+                    showHR();
                 } else {
                     const err = await res.json();
                     alert(err.error || "فشل الحفظ");
                 }
-            } catch (e) {
-                alert("تعذر الاتصال بالسيرفر");
-            }
+            } catch (e) { alert("تعذر الاتصال بالسيرفر"); }
         }
 
         async function runNetToGross() {
@@ -297,9 +310,7 @@
                     document.getElementById('result-gross').innerText = data.gross.toLocaleString();
                     document.getElementById('res-ins-ee').innerText = data.insEmployee.toLocaleString();
                     document.getElementById('res-tax').innerText = data.taxes.toLocaleString();
-                } else {
-                    alert("فشل الحساب، تأكد من المدخلات");
-                }
+                } else { alert("فشل الحساب"); }
             } catch (e) { alert("Error!"); } finally { btn.innerText = "Run Prediction ⚡"; btn.disabled = false; }
         }
 
@@ -333,9 +344,7 @@
                 document.getElementById('add-area').innerHTML = ''; 
                 document.getElementById('ded-area').innerHTML = ''; 
                 openProfile(body.empId); 
-            } else {
-                alert("خطأ في الحساب، يرجى مراجعة البيانات");
-            }
+            } else { alert("خطأ في الحساب"); }
         }
 
         async function delEmp() { if(confirm("حذف الموظف وسجلاته نهائياً؟")) { await fetch(`/api/employees/${document.getElementById('currId').value}`, {method:'DELETE'}); showHR(); } }
