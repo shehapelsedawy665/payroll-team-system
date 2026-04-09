@@ -1,13 +1,37 @@
 const mongoose = require("mongoose");
 
 const connectDB = async () => {
-    if (mongoose.connection.readyState >= 1) return;
+    // التحقق إذا كان هناك اتصال قائم بالفعل لتجنب التكرار في بيئة Serverless
+    if (mongoose.connection.readyState >= 1) {
+        return;
+    }
+
     try {
-        await mongoose.connect("mongodb://Sedawy:Shehapelsedawy%2366@ac-uso95cd-shard-00-00.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-01.a6bquen.mongodb.net:27017,ac-uso95cd-shard-00-02.a6bquen.mongodb.net:27017/payrollDB?ssl=true&replicaSet=atlas-129j51-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Egyptian-Payroll");
-        console.log("✅ MongoDB Ready");
+        // الرابط اللي إنت بعته (SRV) هو الأفضل والأسرع في الربط
+        const uri = process.env.MONGODB_URI || "mongodb+srv://Sedawy:FinalPass2026@egyptian-payroll.a6bquen.mongodb.net/payrollDB?retryWrites=true&w=majority";
+
+        await mongoose.connect(uri, {
+            // إعدادات لضمان استقرار الاتصال ومنع الـ Timeout
+            serverSelectionTimeoutMS: 5000, // يحاول يربط لمدة 5 ثواني كحد أقصى
+            socketTimeoutMS: 45000,         // يغلق الـ socket لو مفيش استجابة بعد 45 ثانية
+            family: 4                       // إجبار الاتصال باستخدام IPv4 (بيحل مشاكل كتير مع Vercel)
+        });
+
+        console.log("✅ MongoDB Ready & Connected");
     } catch (err) {
-        console.error("❌ Connection Error:", err);
+        console.error("❌ MongoDB Connection Error Details:");
+        console.error(err.message);
+        // في حالة الفشل، بنطبع الخطأ بوضوح عشان نعرف لو المشكلة IP Access
     }
 };
+
+// مراقبة أحداث الاتصال (مفيدة جداً في الـ Debugging)
+mongoose.connection.on("error", (err) => {
+    console.error("❌ Mongoose Runtime Error:", err);
+});
+
+mongoose.connection.on("disconnected", () => {
+    console.log("⚠️ Mongoose Disconnected");
+});
 
 module.exports = connectDB;
