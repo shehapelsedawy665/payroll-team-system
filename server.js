@@ -33,27 +33,36 @@ app.post("/api/auth/signup", async (req, res) => {
         }
 
         let companyId = null;
-        if (role === 'admin') {
+        // تعديل مهم: التأكد من إنشاء الشركة ببيانات كاملة لمنع فشل الحفظ
+        if (role === 'admin' || (companyName && companyName.trim() !== "")) {
             const newCompany = new Company({
                 name: companyName || "New Company",
-                adminPassword: companyPassword 
+                adminPassword: companyPassword || password || "123456" // تأمين: لو الباسورد ناقصة بياخد باسورد المستخدم
             });
             const savedCompany = await newCompany.save();
             companyId = savedCompany._id;
         }
 
-        const newUser = new User({ email, password, role, companyId });
+        const newUser = new User({ 
+            email, 
+            password, 
+            role: role || 'admin', 
+            companyId 
+        });
+        
         await newUser.save();
         res.status(201).json({ success: true, message: "User created successfully" });
     } catch (err) {
         console.error("Signup Error:", err);
-        res.status(400).json({ error: "بيانات غير مكتملة أو خطأ في الربط" });
+        // إرجاع رسالة الخطأ الحقيقية من المونجو عشان تعرف المشكلة فين بالظبط
+        res.status(400).json({ error: "فشل في تسجيل البيانات: " + err.message });
     }
 });
 
 app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
+        // استخدام populate للتأكد من جلب بيانات الشركة المربوطة
         const user = await User.findOne({ email }).populate('companyId');
 
         if (!user || user.password !== password) {
@@ -70,6 +79,7 @@ app.post("/api/auth/login", async (req, res) => {
             }
         });
     } catch (err) {
+        console.error("Login Error:", err);
         res.status(500).json({ error: "Login failed" });
     }
 });
@@ -133,8 +143,7 @@ app.post("/api/payroll/calculate", async (req, res) => {
     try {
         const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate, companyId } = req.body;
         const emp = await Employee.findById(empId);
-        const company = await Company.findById(companyId);
-
+        
         const MAX_INS = 16700;
         const MIN_INS = 5384.62;
         let effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
@@ -153,6 +162,7 @@ app.post("/api/payroll/calculate", async (req, res) => {
         const record = await new Payroll({ employeeId: empId, month, payload: result }).save();
         res.json(record);
     } catch (err) {
+        console.error("Calculation Error:", err);
         res.status(500).json({ error: "Calculation error occurred" });
     }
 });
