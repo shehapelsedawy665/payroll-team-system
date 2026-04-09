@@ -267,7 +267,6 @@
 
             if(!email || !password) return alert("اكتب الايميل والباسورد!");
 
-            // بناء الـ Payload بشكل ديناميكي لتجنب الـ 400 Bad Request
             const bodyData = { email, password, role };
             
             if (role === 'admin') {
@@ -403,11 +402,59 @@
             div.innerHTML = `
                 <input type="text" placeholder="Name" class="flex-1 bg-transparent text-[10px] text-white outline-none">
                 <input type="number" placeholder="0" class="w-16 bg-transparent text-emerald-400 font-black text-center outline-none">
-                <select class="bg-slate-800 text-[8px] text-white p-1 rounded"><option value="exempted">Exempted</option><option value="non-exempted">Taxed</option></select>
+                <select class="bg-slate-800 text-[8px] text-white p-1 rounded">
+                    <option value="taxed">Taxed</option>
+                    <option value="medical_exempted">Medical Exempted</option>
+                </select>
             `;
             document.getElementById(areaId).appendChild(div);
         }
 
+        // --- 4. الفانكشنز المضافة لحل المشاكل ---
+        async function runNetToGross() {
+            const targetNet = document.getElementById('target-net').value;
+            if (!targetNet) return alert("اكتب الصافي الأول عشان نحسب الشامل!");
+            
+            try {
+                const res = await fetch('/api/payroll/net-to-gross', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ net: Number(targetNet) })
+                });
+                
+                const data = await res.json();
+                if (res.ok && data.gross) {
+                    document.getElementById('calc-result').classList.remove('hidden');
+                    document.getElementById('result-gross').innerText = Number(data.gross).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                } else {
+                    alert("حصلت مشكلة في الحساب: " + (data.error || "تأكد من إتصال السيرفر"));
+                }
+            } catch (e) {
+                alert("Server Connection Error!");
+            }
+        }
+
+        async function delEmp() {
+            const empId = document.getElementById('currId').value;
+            if(!empId) return alert("مفيش موظف محدد!");
+            
+            if(confirm("متأكد إنك عايز تحذف الموظف ده؟")) {
+                try {
+                    const res = await fetch(`/api/employees/${empId}`, { method: 'DELETE' });
+                    if(res.ok) {
+                        alert("تم حذف الموظف بنجاح!");
+                        showHR(); 
+                    } else {
+                        const data = await res.json();
+                        alert("فشل الحذف: " + (data.error || ""));
+                    }
+                } catch(e) {
+                    alert("Server Connection Error!");
+                }
+            }
+        }
+
+        // --- 5. الـ Dev Mode Hotkeys ---
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
                 const handleSix = (event) => {
