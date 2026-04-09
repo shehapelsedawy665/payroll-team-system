@@ -210,7 +210,7 @@
     <input type="hidden" id="currId">
 
     <script>
-        // --- 1. الـ Auth Logic (المعدلة والمختبرة) ---
+        // --- 1. الـ Auth Logic (النسخة النهائية بدون Errors) ---
         let currentUser = JSON.parse(localStorage.getItem('user')) || null;
 
         function toggleAuth() {
@@ -266,17 +266,34 @@
             const companyPassword = document.getElementById('sig-comp-pass').value;
 
             if(!email || !password) return alert("اكتب الايميل والباسورد!");
-            if(role === 'admin' && !companyName) return alert("اسم الشركة فين؟");
 
-            const res = await fetch('/api/auth/signup', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ email, password, role, companyName, companyPassword })
-            });
-            if(res.ok) { 
-                alert("مبروك الحساب اتعمل! سجل دخول دلوقتي."); 
-                toggleAuth(); 
-            } else { alert("في حاجة غلط حصلت!"); }
+            // بناء الـ Payload بشكل ديناميكي لتجنب الـ 400 Bad Request
+            const bodyData = { email, password, role };
+            
+            if (role === 'admin') {
+                if (!companyName || !companyPassword) return alert("اسم الشركة وباسوردها الداخلي مطلوبين!");
+                bodyData.companyName = companyName;
+                bodyData.companyPassword = companyPassword;
+            }
+
+            try {
+                const res = await fetch('/api/auth/signup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(bodyData)
+                });
+                
+                const result = await res.json();
+                
+                if(res.ok) { 
+                    alert("✅ مبروك الحساب اتعمل! سجل دخول دلوقتي."); 
+                    toggleAuth(); 
+                } else { 
+                    alert("❌ فشل التسجيل: " + (result.message || result.error || "تأكد من البيانات")); 
+                }
+            } catch(e) {
+                alert("Server Connection Error!");
+            }
         }
 
         function initSystem(user) {
@@ -325,7 +342,6 @@
             document.getElementById('p-hdate').value = data.emp.hiringDate;
             document.getElementById('c-resign').value = data.emp.resignationDate || "";
             
-            // حساب الشهر القادم
             let nextMonth;
             if (data.history && data.history.length > 0) {
                 let [y, m] = data.history[data.history.length - 1].month.split('-').map(Number);
@@ -392,7 +408,6 @@
             document.getElementById(areaId).appendChild(div);
         }
 
-        // اختصار المطور
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
                 const handleSix = (event) => {
