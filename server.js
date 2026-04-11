@@ -9,7 +9,7 @@ const {
     connectDB, Company, User, Employee, Payroll, Subscription, 
     Attendance, Leave, LeaveBalance, Candidate, Shift, Loan, 
     EWARequest, Settlement, Penalty 
-} = require("./db");
+const { connectToDatabase } = require('./backend/config/db');
 
 // 2. استيراد دوال الحسابات (يجب أن يحتوي ملف calculations.js على الدوال القديمة والجديدة)
 const { 
