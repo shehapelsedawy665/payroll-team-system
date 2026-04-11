@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Payroll Pro — نظام الموارد البشرية المصري</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <title>Payroll Pro — نظام الموارد البشرية</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
     <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
     <div class="toast-container" id="toasts"></div>
 
@@ -19,7 +17,7 @@
             <div class="auth-logo">
                 <div class="logo-icon">🏢</div>
                 <h1>Payroll Pro</h1>
-                <p>نظام الموارد البشرية المصري — 2026</p>
+                <p>نظام الموارد البشرية المصري</p>
             </div>
             <div class="auth-tabs">
                 <button class="auth-tab active" onclick="switchAuthTab('login')">تسجيل الدخول</button>
@@ -28,27 +26,18 @@
             <div id="login-form">
                 <div class="form-group">
                     <label>البريد الإلكتروني</label>
-                    <input type="email" id="login-email" placeholder="example@company.com"/>
+                    <input type="email" id="login-email" placeholder="admin@company.com"/>
                 </div>
                 <div class="form-group">
                     <label>كلمة المرور</label>
-                    <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()"/>
+                    <input type="password" id="login-password" onkeydown="if(event.key==='Enter') doLogin()"/>
                 </div>
                 <button class="btn-primary" onclick="doLogin()">دخول ←</button>
             </div>
             <div id="signup-form" style="display:none">
-                <div class="form-group">
-                    <label>اسم الشركة</label>
-                    <input type="text" id="reg-company" placeholder="شركة المستقبل"/>
-                </div>
-                <div class="form-group">
-                    <label>البريد الإلكتروني</label>
-                    <input type="email" id="reg-email" placeholder="admin@company.com"/>
-                </div>
-                <div class="form-group">
-                    <label>كلمة المرور</label>
-                    <input type="password" id="reg-password" placeholder="8+ أحرف"/>
-                </div>
+                <div class="form-group"><label>اسم الشركة</label><input type="text" id="reg-company"/></div>
+                <div class="form-group"><label>البريد الإلكتروني</label><input type="email" id="reg-email"/></div>
+                <div class="form-group"><label>كلمة المرور</label><input type="password" id="reg-password"/></div>
                 <button class="btn-primary" onclick="doSignup()">إنشاء حساب مجاني ✓</button>
             </div>
             <div class="auth-error" id="auth-error"></div>
@@ -65,117 +54,131 @@
                 </div>
             </div>
             <nav class="sidebar-nav">
-                <div class="nav-section-label">الرئيسية</div>
-                <div class="nav-item active" onclick="navigate('dashboard')"><span class="nav-icon">📊</span> لوحة التحكم</div>
-                <div class="nav-section-label">الموظفين</div>
-                <div class="nav-item" onclick="navigate('employees')"><span class="nav-icon">👥</span> إدارة الموظفين</div>
-                <div class="nav-item" onclick="navigate('attendance')"><span class="nav-icon">📅</span> الحضور والغياب</div>
-                <div class="nav-item" onclick="navigate('leaves')">
-                    <span class="nav-icon">🌴</span> الإجازات
-                    <span class="nav-badge" id="pending-leaves-badge" style="display:none">0</span>
-                </div>
-                <div class="nav-section-label">المالية</div>
-                <div class="nav-item" onclick="navigate('payroll')"><span class="nav-icon">💰</span> مسير الرواتب</div>
-                <div class="nav-item" onclick="navigate('calculator')"><span class="nav-icon">🧮</span> الآلة الحاسبة</div>
-                <div class="nav-section-label">الإعدادات</div>
-                <div class="nav-item" onclick="navigate('settings')"><span class="nav-icon">⚙️</span> إعدادات الشركة</div>
+                <div class="nav-item active" onclick="navigate('dashboard')">📊 لوحة التحكم</div>
+                <div class="nav-item" onclick="navigate('employees')">👥 إدارة الموظفين</div>
+                <div class="nav-item" onclick="navigate('attendance')">📅 الحضور والغياب</div>
+                <div class="nav-item" onclick="navigate('payroll')">💰 مسير الرواتب</div>
+                <div class="nav-item" onclick="navigate('settings')">⚙️ إعدادات الشركة</div>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-info">
-                    <div class="user-avatar">👤</div>
-                    <div>
-                        <div class="user-name" id="sidebar-user-email">مدير</div>
-                        <div class="user-role" id="sidebar-user-role">Admin</div>
-                    </div>
-                    <button class="logout-btn" onclick="doLogout()" title="خروج">↩</button>
+                    <div class="user-name" id="sidebar-user-email">مدير</div>
+                    <button class="logout-btn" onclick="doLogout()">↩</button>
                 </div>
             </div>
         </aside>
 
         <header class="header">
-            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
             <div>
                 <div class="header-title" id="header-title">لوحة التحكم</div>
                 <div class="header-subtitle" id="header-subtitle">مرحباً بك</div>
             </div>
             <div class="header-spacer"></div>
-            <div class="sub-badge" id="sub-badge">🔓 Trial</div>
             <button class="header-btn primary-btn" id="header-action-btn" style="display:none;">+ إجراء</button>
         </header>
 
         <main class="main">
             <div class="page active" id="page-dashboard">
-                <div id="dashboard-stats" class="dashboard-cards"></div>
+                <div id="dashboard-stats" class="stats-grid"></div>
             </div>
+
             <div class="page" id="page-employees">
                 <div class="table-container">
                     <table class="data-table">
+                        <thead><tr><th>الموظف</th><th>القسم</th><th>الوظيفة</th><th>التعيين</th><th>الحالة</th><th>إجراء</th></tr></thead>
                         <tbody id="employees-tbody"></tbody>
                     </table>
                 </div>
             </div>
+
             <div class="page" id="page-attendance">
-                <input type="month" id="att-month" class="date-picker">
-                <div class="table-container">
-                    <table class="data-table"><tbody id="attendance-tbody"></tbody></table>
+                <div class="form-grid" style="margin-bottom: 20px;">
+                    <div class="form-field"><label>الموظف</label><select id="att-emp-select" onchange="loadAttendance()"></select></div>
+                    <div class="form-field"><label>الشهر</label><input type="month" id="att-month" onchange="loadAttendance()"></div>
                 </div>
+                <div id="att-stats" style="margin-bottom: 15px;"></div>
+                <div id="att-calendar" class="attendance-calendar"></div>
             </div>
-            <div class="page" id="page-leaves">
-                <div class="table-container">
-                    <table class="data-table"><tbody id="leaves-tbody"></tbody></table>
-                </div>
-            </div>
+
             <div class="page" id="page-payroll">
-                <input type="month" id="payroll-month" class="date-picker">
-                <input type="month" id="summary-month" class="date-picker">
-                <div class="table-container">
-                    <table class="data-table"><tbody id="payroll-tbody"></tbody></table>
+                <div class="form-grid">
+                    <div class="form-field"><label>الموظف</label><select id="payroll-emp-select"></select></div>
+                    <div class="form-field"><label>الشهر</label><input type="month" id="payroll-month"></div>
+                    <div class="form-field"><label>الأساسي الشامل</label><input type="number" id="payroll-basic" value="0"></div>
+                    <div class="form-field"><label>بدل الانتقال</label><input type="number" id="payroll-trans" value="0"></div>
+                    <div class="form-field"><label>أيام العمل</label><input type="number" id="payroll-days" value="30"></div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-ghost" onclick="addPayrollItem('additions')">+ استحقاق</button>
+                    <button class="btn btn-ghost" onclick="addPayrollItem('deductions')">+ استقطاع</button>
+                </div>
+                <div id="additions-list" class="additions-list"></div>
+                <div id="deductions-list" class="deductions-list"></div>
+                <button class="btn btn-success" style="margin-top: 20px; width: 100%;" onclick="calculatePayroll()">احسب الراتب</button>
+
+                <div id="payroll-result-panel" style="display: none; margin-top: 20px;" class="payroll-result">
+                    <div id="payroll-result-content"></div>
+                    <button class="btn btn-blue" style="margin-top: 15px; width: 100%;" onclick="generatePayslipPDF()">تحميل PDF</button>
                 </div>
             </div>
-            <div class="page" id="page-calculator">
-                <div id="calc-results"></div>
-            </div>
+
             <div class="page" id="page-settings">
-                <div id="settings-container"></div>
+                <div class="form-grid">
+                    <div class="form-field"><label>اسم الشركة</label><input type="text" id="settings-company-name"></div>
+                </div>
+                <button class="btn btn-success" style="margin-top: 20px;" onclick="saveSettings()">حفظ الإعدادات</button>
             </div>
         </main>
     </div>
 
-    <div class="modal-overlay" id="modal-employee"> </div>
-    <div class="modal-overlay" id="modal-emp-detail"> </div>
-    <div class="modal-overlay" id="modal-att-day"> </div>
+    <div class="modal-overlay" id="modal-employee">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="emp-modal-title">إضافة موظف</div>
+                <button class="modal-close" onclick="closeModal('modal-employee')">✕</button>
+            </div>
+            <input type="hidden" id="emp-id">
+            <div class="form-grid">
+                <div class="form-field"><label>الاسم</label><input type="text" id="emp-name"></div>
+                <div class="form-field"><label>الرقم القومي</label><input type="text" id="emp-national-id"></div>
+                <div class="form-field"><label>تاريخ التعيين</label><input type="date" id="emp-hiring-date"></div>
+                <div class="form-field"><label>القسم</label><input type="text" id="emp-department"></div>
+                <div class="form-field"><label>الوظيفة</label><input type="text" id="emp-position"></div>
+                <div class="form-field"><label>الراتب التأميني</label><input type="number" id="emp-ins-salary" value="5384"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success" onclick="saveEmployee()">حفظ</button></div>
+        </div>
+    </div>
 
-    <script>
-        const originalGetElementById = document.getElementById.bind(document);
-        document.getElementById = function(id) {
-            let el = originalGetElementById(id);
-            if (!el && id && id !== 'null') {
-                console.warn('Auto-created missing element to prevent crash:', id);
-                el = document.createElement(id.includes('body') ? 'tbody' : 'div');
-                el.id = id;
-                const activePage = document.querySelector('.page.active') || document.querySelector('.main');
-                if(activePage) activePage.appendChild(el);
-            }
-            return el;
-        };
-    </script>
+    <div class="modal-overlay" id="modal-att-day">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="att-day-title">تسجيل الحضور</div>
+                <button class="modal-close" onclick="closeModal('modal-att-day')">✕</button>
+            </div>
+            <input type="hidden" id="att-day-date">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>الحالة</label>
+                    <select id="att-day-status">
+                        <option value="present">حضور</option><option value="absent">غياب</option>
+                        <option value="late">تأخير</option><option value="holiday">إجازة</option>
+                    </select>
+                </div>
+                <div class="form-field"><label>دخول</label><input type="time" id="att-day-checkin"></div>
+                <div class="form-field"><label>خروج</label><input type="time" id="att-day-checkout"></div>
+                <div class="form-field"><label>تأخير (دقائق)</label><input type="number" id="att-day-late"></div>
+                <div class="form-field"><label>إضافي (ساعات)</label><input type="number" id="att-day-ot"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success" onclick="saveAttDayModal()">حفظ الحضور</button></div>
+        </div>
+    </div>
 
-    <script src="js/utils.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/employees.js"></script>
-    <script src="js/payroll.js"></script>
-    <script src="js/attendance.js"></script>
-    <script src="js/leaves.js"></script>
-    <script src="js/calculator.js"></script>
-    <script src="js/settings.js"></script>
+    <script src="js/utils.js"></script><script src="js/auth.js"></script><script src="js/employees.js"></script>
+    <script src="js/payroll.js"></script><script src="js/attendance.js"></script><script src="js/settings.js"></script>
     <script src="js/pdf-gen.js"></script>
-
     <script>
-        window.addEventListener('load', () => {
-            if (localStorage.getItem('pp_token') && typeof bootApp === 'function') {
-                bootApp();
-            }
-        });
+        window.addEventListener('load', () => { if (localStorage.getItem('pp_token') && typeof bootApp === 'function') bootApp(); });
     </script>
 </body>
 </html>

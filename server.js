@@ -5,7 +5,6 @@ const bcrypt  = require("bcryptjs");
 const jwt     = require("jsonwebtoken");
 
 // 1. استيراد قاعدة البيانات وكل النماذج من ملف db.js المجمع
-// ده هيحل مشكلة OverwriteModelError لأننا بننادي الـ Models من مكان واحد بس
 const {
     connectDB, Company, User, Employee, Payroll, Subscription,
     Attendance, Leave, LeaveBalance, Candidate, Shift, Loan,
@@ -102,7 +101,7 @@ app.post("/api/auth/login", async (req, res) => {
             role: user.role,
             companyId: user.companyId?._id || null,
             companyName: user.companyId?.name || "System",
-            employeeId: user.employeeId || null // إضافة لدعم تطبيق الخدمة الذاتية للموظف
+            employeeId: user.employeeId || null 
         };
 
         const accessToken  = jwt.sign(payload, JWT_SECRET,         { expiresIn: "24h" });
@@ -284,7 +283,7 @@ app.post("/api/employees", authMiddleware, async (req, res) => {
         const emp = await new Employee({
             name: req.body.name, nationalId: req.body.nationalId,
             hiringDate: req.body.hiringDate, insSalary: Number(req.body.insSalary) || 0,
-            basicSalary: Number(req.body.basicSalary) || 0, // أضيف لدعم المحرك الجديد
+            basicSalary: Number(req.body.basicSalary) || 0, 
             jobType: req.body.jobType || "Full Time", resignationDate: req.body.resignationDate || "",
             department: req.body.department || "", position: req.body.position || "",
             phone: req.body.phone || "", companyId: req.body.companyId || req.user.companyId
@@ -307,42 +306,47 @@ app.get("/api/employees", authMiddleware, async (req, res) => {
     }
 });
 
-app.get("/api/employees/:id/details", authMiddleware, async (req, res) => {
+app.get(["/api/employees/:id/details", "/api/employees/details"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
-        const emp = await Employee.findById(req.params.id);
-        const history = await Payroll.find({ employeeId: req.params.id }).sort({ month: 1 });
+        const id = req.params.id || req.query.id;
+        const emp = await Employee.findById(id);
+        const history = await Payroll.find({ employeeId: id }).sort({ month: 1 });
         let pDays = 0, pTaxable = 0, pTaxes = 0;
         history.forEach(r => {
             pDays    += (Number(r.payload.days) || 0);
             pTaxable += (Number(r.payload.currentTaxable) || 0);
             pTaxes   += (Number(r.payload.monthlyTax) || 0);
         });
-        const leaveBalance = await LeaveBalance.findOne({ employeeId: req.params.id, year: new Date().getFullYear() });
+        const leaveBalance = await LeaveBalance.findOne({ employeeId: id, year: new Date().getFullYear() });
         res.json({ emp, history, prevData: { pDays, pTaxable, pTaxes }, leaveBalance });
     } catch (err) {
         res.status(404).json({ error: "Employee not found" });
     }
 });
 
-app.put("/api/employees/:id", authMiddleware, async (req, res) => {
+// تم دعم الـ id من الـ query عشان الفرونت إند يشتغل
+app.put(["/api/employees/:id", "/api/employees"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
-        const emp = await Employee.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const id = req.params.id || req.query.id;
+        const emp = await Employee.findByIdAndUpdate(id, req.body, { new: true });
         res.json(emp);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
 });
 
-app.delete("/api/employees/:id", authMiddleware, adminOnly, async (req, res) => {
+// تم دعم الـ id من الـ query
+app.delete(["/api/employees/:id", "/api/employees"], authMiddleware, adminOnly, async (req, res) => {
     try {
         await connectDB();
-        await Employee.findByIdAndDelete(req.params.id);
-        await Payroll.deleteMany({ employeeId: req.params.id });
-        await Attendance.deleteMany({ employeeId: req.params.id });
-        await Leave.deleteMany({ employeeId: req.params.id });
-        await LeaveBalance.deleteMany({ employeeId: req.params.id });
+        const id = req.params.id || req.query.id;
+        await Employee.findByIdAndDelete(id);
+        await Payroll.deleteMany({ employeeId: id });
+        await Attendance.deleteMany({ employeeId: id });
+        await Leave.deleteMany({ employeeId: id });
+        await LeaveBalance.deleteMany({ employeeId: id });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: "Delete failed" });
@@ -351,10 +355,14 @@ app.delete("/api/employees/:id", authMiddleware, adminOnly, async (req, res) => 
 
 // ==================== PAYROLL ====================
 
-app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
+// تم دمج مسار /api/payroll مع /calculate ليعمل مع الفرونت إند الحالي
+app.post(["/api/payroll/calculate", "/api/payroll"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
-        const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
+        // دعم لـ empId أو employeeId
+        const empId = req.body.empId || req.body.employeeId;
+        const { month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
+        
         const emp = await Employee.findById(empId);
         const MAX_INS = 16700, MIN_INS = 5384.62;
         const effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
@@ -364,7 +372,7 @@ app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
 
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate },
-            prevData,
+            prevData || { pDays: 0, pTaxable: 0, pTaxes: 0 },
             empForCalc
         );
 
@@ -373,7 +381,9 @@ app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
             { employeeId: empId, companyId: req.user.companyId, month, payload: result, createdAt: new Date() },
             { upsert: true, new: true }
         );
-        res.json(record);
+        
+        // تعديل بسيط ليتوافق شكل الرد مع توقعات الفرونت إند
+        res.json({ success: true, data: { payload: result, record } });
     } catch (err) {
         console.error("Calculation Error:", err);
         res.status(500).json({ error: "Calculation error: " + err.message });
@@ -561,10 +571,13 @@ app.post('/api/attendance/webhook/biometric', async (req, res) => {
     }
 });
 
-app.get("/api/attendance/:employeeId/:month", authMiddleware, async (req, res) => {
+// تم دعم req.query لتعمل مع الفرونت إند
+app.get(["/api/attendance/:employeeId/:month", "/api/attendance"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
-        const records = await Attendance.find({ employeeId: req.params.employeeId, month: req.params.month }).sort({ date: 1 });
+        const employeeId = req.params.employeeId || req.query.employeeId;
+        const month = req.params.month || req.query.month;
+        const records = await Attendance.find({ employeeId, month }).sort({ date: 1 });
         res.json(records);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -651,19 +664,22 @@ app.post('/api/employee/ewa-request', authMiddleware, async (req, res) => {
     }
 });
 
-app.get("/api/leaves/:employeeId", authMiddleware, async (req, res) => {
+// تم دعم req.query لتعمل مع الفرونت إند
+app.get(["/api/leaves/:employeeId", "/api/leaves/employee"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
+        const employeeId = req.params.employeeId || req.query.id;
         const year = req.query.year || new Date().getFullYear();
-        const leaves = await Leave.find({ employeeId: req.params.employeeId, year }).sort({ startDate: -1 });
-        const balance = await LeaveBalance.findOne({ employeeId: req.params.employeeId, year });
+        const leaves = await Leave.find({ employeeId, year }).sort({ startDate: -1 });
+        const balance = await LeaveBalance.findOne({ employeeId, year });
         res.json({ leaves, balance });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.get("/api/leaves/company/pending", authMiddleware, async (req, res) => {
+// تم إضافة المسار البديل ليتوافق مع الفرونت إند
+app.get(["/api/leaves/company/pending", "/api/leaves/pending"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
         const leaves = await Leave.find({ companyId: req.user.companyId, status: 'pending' })
@@ -674,11 +690,13 @@ app.get("/api/leaves/company/pending", authMiddleware, async (req, res) => {
     }
 });
 
-app.put("/api/leaves/:id/approve", authMiddleware, adminOnly, async (req, res) => {
+// تم دعم req.query للـ ID
+app.put(["/api/leaves/:id/approve", "/api/leaves/approve"], authMiddleware, adminOnly, async (req, res) => {
     try {
         await connectDB();
+        const id = req.params.id || req.query.id;
         const { status } = req.body; 
-        const leave = await Leave.findByIdAndUpdate(req.params.id, { status, approvedBy: req.user.id }, { new: true });
+        const leave = await Leave.findByIdAndUpdate(id, { status, approvedBy: req.user.id }, { new: true });
 
         if (status === 'approved' && ['annual', 'sick', 'emergency'].includes(leave.type)) {
             const usedKey = leave.type + 'Used';
