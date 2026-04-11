@@ -10,4 +10,5 @@ const UserSchema = new mongoose.Schema({
     status: { type: String, default: 'active' }
 }, { timestamps: true });
 
-module.exports = mongoose.model('User', UserSchema);
+// التعديل الذكي لمنع التكرار
+module.exports = mongoose.models.User || mongoose.model('User', UserSchema);

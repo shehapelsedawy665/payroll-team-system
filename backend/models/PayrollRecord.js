@@ -18,4 +18,4 @@ const PayrollRecordSchema = new mongoose.Schema({
     status: { type: String, default: 'draft' } // draft, approved, paid
 }, { timestamps: true });
 
-module.exports = mongoose.model('PayrollRecord', PayrollRecordSchema);
+module.exports = mongoose.models.Payroll || mongoose.model('Payroll', PayrollSchema);
