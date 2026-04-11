@@ -4,16 +4,15 @@ const path    = require("path");
 const bcrypt  = require("bcryptjs");
 const jwt     = require("jsonwebtoken");
 
-// 1. استيراد قاعدة البيانات (السطر 12 اللي كان عامل أزمة)
-const { connectToDatabase } = require('./backend/config/db');
+// 1. استيراد قاعدة البيانات وكل النماذج من ملف db.js المجمع
+// ده هيحل مشكلة OverwriteModelError لأننا بننادي الـ Models من مكان واحد بس
+const {
+    connectDB, Company, User, Employee, Payroll, Subscription,
+    Attendance, Leave, LeaveBalance, Candidate, Shift, Loan,
+    EWARequest, Settlement, Penalty
+} = require('./backend/config/db');
 
-// 2. استيراد النماذج (Models) - بنادي اللي موجودين فعلاً في الفولدر عندك
-const User = require('./backend/models/User');
-const PayrollRecord = require('./backend/models/PayrollRecord');
-// لو عندك ملفات تانية جوه فولدر models ناديهم بنفس الطريقة هنا
-
-// 3. استيراد دوال الحسابات (لو ملف calculations.js موجود في الـ Root)
-// لو مش موجود أو مكانه اتغير، يفضل تمسح الجزء ده مؤقتاً عشان ميعملش Crash
+// 2. استيراد دوال الحسابات
 let calculations = {};
 try {
     calculations = require("./backend/logic/payrollEngine"); 
@@ -23,7 +22,13 @@ try {
 
 const { 
     runPayrollLogic, 
-    calculateEgyptianTax 
+    calculateEgyptianTax,
+    calculateGrossToNet,
+    calculateNetToGross,
+    generateUnifiedTaxRow,
+    analyzePayrollAnomaly,
+    calculateSettlement,
+    EGY_CONSTANTS
 } = calculations;
 
 const app = express();
@@ -346,7 +351,6 @@ app.delete("/api/employees/:id", authMiddleware, adminOnly, async (req, res) => 
 
 // ==================== PAYROLL ====================
 
-// Endpointك الأصلي (بقي كما هو لضمان عدم توقف النظام)
 app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -376,7 +380,6 @@ app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
     }
 });
 
-// Endpointك الأصلي لمحاكي الصافي للإجمالي
 app.post("/api/payroll/net-to-gross", authMiddleware, async (req, res) => {
     try {
         const { targetNet } = req.body;
@@ -406,11 +409,10 @@ app.post("/api/payroll/net-to-gross", authMiddleware, async (req, res) => {
     }
 });
 
-// (NEW) محرك الرواتب الذكي - AI Payroll Auditor (بإصلاح استعلام التواريخ)
 app.post('/api/payroll/run', authMiddleware, async (req, res) => {
     try {
         await connectDB();
-        const { month } = req.body; // format: "YYYY-MM"
+        const { month } = req.body; 
         const company = await Company.findById(req.user.companyId);
         const employees = await Employee.find({ companyId: req.user.companyId, resignationDate: null });
         
@@ -421,7 +423,6 @@ app.post('/api/payroll/run', authMiddleware, async (req, res) => {
         for (const emp of employees) {
             const absentDays = await Attendance.countDocuments({ employeeId: emp._id, month, status: 'absent' });
             
-            // الاستعلام الصحيح لتجنب الـ CastError
             const penaltyDocs = await Penalty.find({ 
                 employeeId: emp._id, 
                 date: { $gte: startOfMonth, $lte: endOfMonth } 
@@ -469,7 +470,6 @@ app.post('/api/payroll/run', authMiddleware, async (req, res) => {
     }
 });
 
-// (NEW) توليد شيت توحيد الضرائب
 app.get('/api/payroll/export-unified-tax/:month', authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -481,7 +481,6 @@ app.get('/api/payroll/export-unified-tax/:month', authMiddleware, async (req, re
     }
 });
 
-// Company payroll summary
 app.get("/api/payroll/summary/:month", authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -536,7 +535,6 @@ app.post("/api/attendance/bulk", authMiddleware, async (req, res) => {
     }
 });
 
-// (NEW) Webhook لأجهزة البصمة
 app.post('/api/attendance/webhook/biometric', async (req, res) => {
     try {
         await connectDB();
@@ -627,7 +625,6 @@ app.post("/api/leaves", authMiddleware, async (req, res) => {
     }
 });
 
-// (NEW) الوصول المبكر للراتب - السلف
 app.post('/api/employee/ewa-request', authMiddleware, async (req, res) => {
     try {
         await connectDB();
