@@ -1,16 +1,38 @@
 const mongoose = require("mongoose");
 
+// منع التحذيرات في النسخ الجديدة من Mongoose
+mongoose.set('strictQuery', false);
+
 let cachedConnection = null;
 
 const connectDB = async () => {
-    if (mongoose.connection.readyState >= 1) return;
-    if (cachedConnection) { await cachedConnection; return; }
+    // 1. لو فيه اتصال شغال فعلاً، ارجع فوراً
+    if (mongoose.connection.readyState >= 1) {
+        return mongoose.connection;
+    }
+
+    // 2. لو فيه محاولة اتصال قيد التنفيذ، استناها
+    if (cachedConnection) {
+        return await cachedConnection;
+    }
+
     try {
         const uri = process.env.MONGODB_URI || "mongodb+srv://Sedawy:FinalPass2026@egyptian-payroll.a6bquen.mongodb.net/payrollDB?retryWrites=true&w=majority";
-        const options = { serverSelectionTimeoutMS: 30000, socketTimeoutMS: 45000, family: 4, bufferCommands: false, heartbeatFrequencyMS: 10000 };
+        
+        // إعدادات محسنة لبيئة Vercel (Serverless)
+        const options = {
+            serverSelectionTimeoutMS: 5000, // تقليل وقت الانتظار عشان الـ Function متفصلش
+            socketTimeoutMS: 45000,
+            family: 4,
+            bufferCommands: false, // تعطيل التخزين المؤقت عشان الأخطاء تظهر فوراً
+        };
+
+        console.log("⏳ Connecting to MongoDB...");
         cachedConnection = mongoose.connect(uri, options);
-        await cachedConnection;
+        
+        const conn = await cachedConnection;
         console.log("✅ MongoDB Ready & Connected (HR-ERP Advanced)");
+        return conn;
     } catch (err) {
         cachedConnection = null;
         console.error("❌ MongoDB Connection Error:", err.message);
@@ -18,7 +40,9 @@ const connectDB = async () => {
     }
 };
 
-// 1. Company Schema (Enhanced with Smart Policies & Localization)
+// ==================== SCHEMAS ====================
+
+// 1. Company
 const companySchema = new mongoose.Schema({
     name: { type: String, required: true },
     adminPassword: { type: String, required: true },
@@ -27,32 +51,32 @@ const companySchema = new mongoose.Schema({
         overtimeRate: { type: Number, default: 1.5 },
         overtimeHolRate: { type: Number, default: 2.0 },
         medicalLimit: { type: Number, default: 10000 },
-        taxExemptionLimit: { type: Number, default: 40000 }, // Updated for 2024/2026 brackets
-        personalExemption: { type: Number, default: 20000 }, // Updated
+        taxExemptionLimit: { type: Number, default: 40000 },
+        personalExemption: { type: Number, default: 20000 },
         workDaysPerWeek: { type: Number, default: 5 },
         dailyWorkHours: { type: Number, default: 8 },
-        lateThreshold: { type: Number, default: 120 }, // minutes
-        monthCalcType: { type: String, default: "30" }, // 30 fixed or actual days
+        lateThreshold: { type: Number, default: 120 },
+        monthCalcType: { type: String, default: "30" },
         enableGamification: { type: Boolean, default: true },
-        attendanceBonusPoints: { type: Number, default: 100 }, // Points for perfect attendance
+        attendanceBonusPoints: { type: Number, default: 100 },
         penaltyMatrixEnabled: { type: Boolean, default: true }
     },
     createdAt: { type: Date, default: Date.now }
 });
 
-// 2. User Schema (Enhanced for ESS & Blue-Collar access)
+// 2. User
 const userSchema = new mongoose.Schema({
-    email: { type: String, required: false, sparse: true }, // Optional for blue-collar
-    phone: { type: String, required: false, sparse: true }, // Login for blue-collar
+    email: { type: String, required: false, sparse: true },
+    phone: { type: String, required: false, sparse: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'hr', 'employee', 'blue_collar'], default: 'employee' },
+    role: { type: String, enum: ['admin', 'hr', 'employee', 'blue_collar', 'dev'], default: 'employee' },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', default: null },
     refreshToken: { type: String, default: null },
     createdAt: { type: Date, default: Date.now }
 });
 
-// 3. Employee Schema (Enhanced with AI flags, Shift, and Financial Details)
+// 3. Employee
 const employeeSchema = new mongoose.Schema({
     name: { type: String, required: true },
     nationalId: { type: String, required: true, unique: true },
@@ -62,33 +86,28 @@ const employeeSchema = new mongoose.Schema({
     department: { type: String, default: "" },
     position: { type: String, default: "" },
     phone: { type: String, default: "" },
-    
-    // Financial & Egyptian Law specifics
     basicSalary: { type: Number, required: true, default: 0 },
     variableSalary: { type: Number, default: 0 },
-    insSalary: { type: Number, default: 0 }, // الأجر التأميني
-    isTaxExempted: { type: Boolean, default: false }, // ذوي الهمم أو إعفاءات خاصة
-    
-    // Smart HR Features
+    insSalary: { type: Number, default: 0 },
+    isTaxExempted: { type: Boolean, default: false },
     shiftId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shift', default: null },
     gamificationPoints: { type: Number, default: 0 },
-    flightRiskScore: { type: Number, default: 0 }, // 0 to 100 (AI updated)
-    
+    flightRiskScore: { type: Number, default: 0 },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true }
 });
 
-// 4. Shift Schema (New - For varied & night shifts)
+// 4. Shift
 const shiftSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
-    name: { type: String, required: true }, // e.g., "Night Shift", "Morning Shift"
-    startTime: { type: String, required: true }, // e.g., "22:00"
-    endTime: { type: String, required: true }, // e.g., "06:00"
-    allowancePerShift: { type: Number, default: 0 }, // بدل وردية
+    name: { type: String, required: true },
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+    allowancePerShift: { type: Number, default: 0 },
     isNightShift: { type: Boolean, default: false },
-    gracePeriod: { type: Number, default: 15 } // Minutes
+    gracePeriod: { type: Number, default: 15 }
 });
 
-// 5. Candidate Schema (New - ATS Module)
+// 5. Candidate
 const candidateSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     name: { type: String, required: true },
@@ -101,7 +120,7 @@ const candidateSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// 6. Loan Schema (New - Dynamic Advances)
+// 6. Loan
 const loanSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -111,10 +130,10 @@ const loanSchema = new mongoose.Schema({
     remainingAmount: { type: Number, required: true },
     status: { type: String, enum: ['active', 'paused', 'settled'], default: 'active' },
     requestDate: { type: Date, default: Date.now },
-    startMonth: { type: String, required: true } // format: "YYYY-MM"
+    startMonth: { type: String, required: true }
 });
 
-// 7. Earned Wage Access (EWA) Schema (New)
+// 7. EWA Request
 const ewaRequestSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -126,11 +145,11 @@ const ewaRequestSchema = new mongoose.Schema({
     requestDate: { type: Date, default: Date.now }
 });
 
-// 8. Custody Schema (New - Equipment tracking)
+// 8. Custody (العهد)
 const custodySchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
-    itemName: { type: String, required: true }, // e.g., "Laptop", "Car"
+    itemName: { type: String, required: true },
     serialNumber: { type: String, default: "" },
     estimatedValue: { type: Number, required: true },
     receiveDate: { type: Date, required: true },
@@ -138,18 +157,18 @@ const custodySchema = new mongoose.Schema({
     status: { type: String, enum: ['with_employee', 'returned', 'lost'], default: 'with_employee' }
 });
 
-// 9. Penalty Matrix Schema (New - Smart Penalties)
+// 9. Penalty
 const penaltySchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
-    violationType: { type: String, required: true }, // e.g., "Late", "Absence without permission"
+    violationType: { type: String, required: true },
     actionTaken: { type: String, enum: ['warning', 'deduction'], required: true },
-    deductionDays: { type: Number, default: 0 }, // 0.25, 0.5, 1, etc.
+    deductionDays: { type: Number, default: 0 },
     date: { type: Date, default: Date.now },
     isSystemGenerated: { type: Boolean, default: false }
 });
 
-// 10. Appraisal & KPI Schema (New)
+// 10. Appraisal (التقييم)
 const appraisalSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -160,7 +179,7 @@ const appraisalSchema = new mongoose.Schema({
     status: { type: String, enum: ['draft', 'approved'], default: 'draft' }
 });
 
-// 11. Settlement Schema (New - Offboarding/One-click settlement)
+// 11. Settlement (تصفية الحساب)
 const settlementSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -169,28 +188,27 @@ const settlementSchema = new mongoose.Schema({
     unpaidSalaries: { type: Number, default: 0 },
     unsettledLoans: { type: Number, default: 0 },
     lostCustodyValue: { type: Number, default: 0 },
-    endOfServiceBonus: { type: Number, default: 0 }, // مكافأة نهاية الخدمة
+    endOfServiceBonus: { type: Number, default: 0 },
     netPayable: { type: Number, required: true },
     status: { type: String, enum: ['draft', 'finalized', 'paid'], default: 'draft' },
     createdAt: { type: Date, default: Date.now }
 });
 
-// 12. Payroll Schema (Updated to support detailed payload & anomaly flags)
+// 12. Payroll
 const payrollSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
     month: { type: String, required: true },
-    payload: { type: Object, required: true }, // Will contain full gross-to-net breakdown
+    payload: { type: Object, required: true },
     netSalary: { type: Number, required: true },
-    hasAnomaly: { type: Boolean, default: false }, // AI Auditor flag
+    hasAnomaly: { type: Boolean, default: false },
     anomalyReason: { type: String, default: "" },
     status: { type: String, enum: ['draft', 'approved', 'paid'], default: 'draft' },
     createdAt: { type: Date, default: Date.now }
 });
 payrollSchema.index({ employeeId: 1, month: 1 }, { unique: true });
-payrollSchema.index({ companyId: 1, month: 1 });
 
-// Remaining existing schemas (Attendance, Leave, LeaveBalance, Subscription)...
+// 13. Attendance
 const attendanceSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -201,12 +219,12 @@ const attendanceSchema = new mongoose.Schema({
     checkOut: { type: String, default: "" },
     lateMinutes: { type: Number, default: 0 },
     overtimeHours: { type: Number, default: 0 },
-    source: { type: String, enum: ['manual', 'biometric', 'whatsapp'], default: 'manual' }, // Device integration prep
     notes: { type: String, default: "" },
     createdAt: { type: Date, default: Date.now }
 });
 attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
 
+// 14. Leave
 const leaveSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -214,14 +232,12 @@ const leaveSchema = new mongoose.Schema({
     startDate: { type: String, required: true },
     endDate: { type: String, required: true },
     days: { type: Number, required: true },
-    reason: { type: String, default: "" },
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
-    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    source: { type: String, enum: ['portal', 'whatsapp', 'admin'], default: 'portal' },
     year: { type: Number, default: () => new Date().getFullYear() },
     createdAt: { type: Date, default: Date.now }
 });
 
+// 15. Leave Balance
 const leaveBalanceSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -235,27 +251,18 @@ const leaveBalanceSchema = new mongoose.Schema({
 });
 leaveBalanceSchema.index({ employeeId: 1, year: 1 }, { unique: true });
 
+// 16. Subscription
 const subscriptionSchema = new mongoose.Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true, unique: true },
     plan: { type: String, enum: ['trial', 'starter', 'growth', 'enterprise'], default: 'trial' },
-    billingCycle: { type: String, enum: ['monthly', 'halfyear', 'yearly'], default: 'monthly' },
-    maxEmployees: { type: Number, default: 999999 },
-    startDate: { type: Date, default: Date.now },
-    endDate: { type: Date, default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
     status: { type: String, enum: ['active', 'expired', 'cancelled'], default: 'active' },
-    features: {
-        attendance: { type: Boolean, default: true },
-        leaves: { type: Boolean, default: true },
-        pdfExport: { type: Boolean, default: true },
-        analytics: { type: Boolean, default: true },
-        apiAccess: { type: Boolean, default: false },
-        whatsappBot: { type: Boolean, default: false } // SaaS tier feature
-    },
-    paymentRef: { type: String, default: "" },
+    endDate: { type: Date },
     createdAt: { type: Date, default: Date.now }
 });
 
-// Model Initialization
+// ==================== MODEL INITIALIZATION ====================
+// تأكدنا إننا بنستخدم النمط الآمن لمنع OverwriteModelError
+
 const Company      = mongoose.models.Company      || mongoose.model("Company",      companySchema);
 const User         = mongoose.models.User         || mongoose.model("User",         userSchema);
 const Employee     = mongoose.models.Employee     || mongoose.model("Employee",     employeeSchema);
@@ -272,9 +279,6 @@ const Subscription = mongoose.models.Subscription || mongoose.model("Subscriptio
 const Attendance   = mongoose.models.Attendance   || mongoose.model("Attendance",   attendanceSchema);
 const Leave        = mongoose.models.Leave        || mongoose.model("Leave",        leaveSchema);
 const LeaveBalance = mongoose.models.LeaveBalance || mongoose.model("LeaveBalance", leaveBalanceSchema);
-
-mongoose.connection.on("error", (err) => console.error("❌ Mongoose Runtime Error:", err));
-mongoose.connection.on("disconnected", () => console.log("⚠️ Mongoose Disconnected"));
 
 module.exports = { 
     connectDB, Company, User, Employee, Shift, Candidate, Loan, EWARequest, 
