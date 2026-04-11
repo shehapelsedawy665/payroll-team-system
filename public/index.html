@@ -2281,19 +2281,27 @@ async function loadPayrollSummary() {
 function calcG2NLive() {
   const basic = Number(document.getElementById('calc-basic').value)||0;
   const trans = Number(document.getElementById('calc-trans').value)||0;
-  const ins   = Number(document.getElementById('calc-ins').value)||5384;
+  const ins   = Number(document.getElementById('calc-ins').value)||5384.62;
   const exemp = Number(document.getElementById('calc-exemption').value)||20000;
   const div   = document.getElementById('g2n-result');
+  
   if (!basic) { div.innerHTML = ''; return; }
+  
   const gross = basic + trans;
-  const actualIns = Math.max(2000, Math.min(ins, 12600));
+  
+  // 🔥 التعديل السحري هنا: الحد الأقصى 16700 والأدنى 5384.62
+  const actualIns = Math.max(5384.62, Math.min(ins, 16700));
+  
   const insEmp    = actualIns * 0.11;
   const insComp   = actualIns * 0.1875;
   const monthExemp = insEmp + (exemp / 12);
   const annualTaxable = Math.max(0, (gross - monthExemp) * 12);
-  const annualTax = calculateAnnualTax(annualTaxable);
+  
+  // التأكد من استدعاء دالة الضرائب (سواء كانت calculateAnnualTax أو calculateAnnualTaxLocal)
+  const annualTax = calculateAnnualTax(annualTaxable); 
   const monthTax  = annualTax / 12;
   const net       = gross - insEmp - monthTax;
+  
   div.innerHTML = `
     <div class="result-row add"><span class="label">الإجمالي</span><span class="value">${fmt(gross)} ج</span></div>
     <div class="result-row deduct"><span class="label">تأمين الموظف (11%)</span><span class="value">${fmt(insEmp)} ج</span></div>
