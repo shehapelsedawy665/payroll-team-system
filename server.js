@@ -57,88 +57,11 @@ const adminOnly = (req, res, next) => {
 };
 
 // ==================== AUTH ====================
-
-// ==================== AUTH ====================
+// ربط الملف المتقسم الخاص بالدخول والتسجيل
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// سيب باقي المسارات زي (refresh و logout) موجودة زي ما هي تحت السطرين دول مؤقتاً
-    try {
-        await connectDB();
-        const { email, password, role, companyName, companyPassword } = req.body;
-        if (!email || !password) return res.status(400).json({ error: "البيانات ناقصة" });
-
-        const existing = await User.findOne({ email });
-        if (existing) return res.status(400).json({ error: "الإيميل مسجل بالفعل" });
-
-        const hashedPass = await bcrypt.hash(password, 10);
-        let companyId = null;
-
-        if (role === 'admin' || companyName) {
-            const hashedCompPass = await bcrypt.hash(companyPassword || password, 10);
-            const company = await new Company({ name: companyName || "New Company", adminPassword: hashedCompPass }).save();
-            companyId = company._id;
-            // Create trial subscription
-            await new Subscription({ companyId: company._id, plan: 'trial', status: 'active' }).save();
-        }
-
-        const user = await new User({ email, password: hashedPass, role: role || 'admin', companyId }).save();
-        res.status(201).json({ success: true, message: "تم إنشاء الحساب بنجاح" });
-    } catch (err) {
-        res.status(400).json({ error: "فشل التسجيل: " + err.message });
-    }
-});
-
-// ==================== AUTH ====================
-const authRoutes = require('./routes/auth');
-app.use('/api/auth', authRoutes);
-
-// سيب باقي المسارات زي (refresh و logout) موجودة زي ما هي تحت السطرين دول مؤقتاً
-    try {
-        await connectDB();
-        const { email, password } = req.body;
-        const user = await User.findOne({ email }).populate('companyId');
-        if (!user) return res.status(401).json({ error: "بيانات غير صحيحة" });
-
-        const valid = await bcrypt.compare(password, user.password);
-        if (!valid) return res.status(401).json({ error: "بيانات غير صحيحة" });
-
-        const payload = {
-            id: user._id,
-            email: user.email,
-            role: user.role,
-            companyId: user.companyId?._id || null,
-            companyName: user.companyId?.name || "System",
-            employeeId: user.employeeId || null 
-        };
-
-        const accessToken  = jwt.sign(payload, JWT_SECRET,         { expiresIn: "24h" });
-        const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET,  { expiresIn: "7d" });
-
-        await User.findByIdAndUpdate(user._id, { refreshToken });
-
-        let sub = null;
-        if (user.companyId) {
-            sub = await Subscription.findOne({ companyId: user.companyId._id });
-        }
-
-        res.json({
-            success: true,
-            accessToken,
-            refreshToken,
-            user: payload,
-            subscription: sub ? {
-                plan: sub.plan,
-                status: sub.status,
-                endDate: sub.endDate,
-                features: sub.features
-            } : null
-        });
-    } catch (err) {
-        res.status(500).json({ error: "Login failed: " + err.message });
-    }
-});
-
+// باقي مسارات الـ Auth اللي لسه متقسمتش
 app.post("/api/auth/refresh", async (req, res) => {
     try {
         await connectDB();
@@ -333,7 +256,6 @@ app.get(["/api/employees/:id/details", "/api/employees/details"], authMiddleware
     }
 });
 
-// تم دعم الـ id من الـ query عشان الفرونت إند يشتغل
 app.put(["/api/employees/:id", "/api/employees"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -345,7 +267,6 @@ app.put(["/api/employees/:id", "/api/employees"], authMiddleware, async (req, re
     }
 });
 
-// تم دعم الـ id من الـ query
 app.delete(["/api/employees/:id", "/api/employees"], authMiddleware, adminOnly, async (req, res) => {
     try {
         await connectDB();
@@ -363,11 +284,9 @@ app.delete(["/api/employees/:id", "/api/employees"], authMiddleware, adminOnly, 
 
 // ==================== PAYROLL ====================
 
-// تم دمج مسار /api/payroll مع /calculate ليعمل مع الفرونت إند الحالي
 app.post(["/api/payroll/calculate", "/api/payroll"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
-        // دعم لـ empId أو employeeId
         const empId = req.body.empId || req.body.employeeId;
         const { month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
         
@@ -390,7 +309,6 @@ app.post(["/api/payroll/calculate", "/api/payroll"], authMiddleware, async (req,
             { upsert: true, new: true }
         );
         
-        // تعديل بسيط ليتوافق شكل الرد مع توقعات الفرونت إند
         res.json({ success: true, data: { payload: result, record } });
     } catch (err) {
         console.error("Calculation Error:", err);
@@ -579,7 +497,6 @@ app.post('/api/attendance/webhook/biometric', async (req, res) => {
     }
 });
 
-// تم دعم req.query لتعمل مع الفرونت إند
 app.get(["/api/attendance/:employeeId/:month", "/api/attendance"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -672,7 +589,6 @@ app.post('/api/employee/ewa-request', authMiddleware, async (req, res) => {
     }
 });
 
-// تم دعم req.query لتعمل مع الفرونت إند
 app.get(["/api/leaves/:employeeId", "/api/leaves/employee"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -686,7 +602,6 @@ app.get(["/api/leaves/:employeeId", "/api/leaves/employee"], authMiddleware, asy
     }
 });
 
-// تم إضافة المسار البديل ليتوافق مع الفرونت إند
 app.get(["/api/leaves/company/pending", "/api/leaves/pending"], authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -698,7 +613,6 @@ app.get(["/api/leaves/company/pending", "/api/leaves/pending"], authMiddleware, 
     }
 });
 
-// تم دعم req.query للـ ID
 app.put(["/api/leaves/:id/approve", "/api/leaves/approve"], authMiddleware, adminOnly, async (req, res) => {
     try {
         await connectDB();
