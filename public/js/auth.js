@@ -19,12 +19,13 @@ async function doLogin() {
 
     showLoading();
     try {
-        // بنبعت البيانات للسيرفر (api/auth.js اللي عملناه في الباك إند)
-        const data = await api('POST', '/api/auth', { action: 'login', email, password });
+        // تم تعديل المسار لـ /api/auth/login ليتوافق مع السيرفر
+        const data = await api('POST', '/api/auth/login', { email, password });
 
-        if (data.success) {
-            // حفظ البيانات في المتصفح
-            AUTH_TOKEN = 'dummy_token'; // ممكن تستخدم JWT مستقبلاً
+        // السيرفر بيرجع { success: true, accessToken, user }
+        if (data && data.success) {
+            // سحبنا التوكن الحقيقي من السيرفر بدل الـ dummy_token
+            AUTH_TOKEN = data.accessToken; 
             CURRENT_USER = data.user;
             
             localStorage.setItem('pp_token', AUTH_TOKEN);
@@ -32,9 +33,11 @@ async function doLogin() {
 
             toast('مرحباً بك مجدداً يا ' + (CURRENT_USER.email.split('@')[0]), 'success');
             bootApp(); // تشغيل التطبيق
+        } else {
+            showAuthError(data.error || 'بيانات الدخول غير صحيحة');
         }
     } catch (e) {
-        showAuthError(e.message);
+        showAuthError(e.message || 'حدث خطأ في الاتصال بالسيرفر');
     } finally {
         hideLoading();
     }
@@ -50,16 +53,21 @@ async function doSignup() {
 
     showLoading();
     try {
-        await api('POST', '/api/auth', { 
-            action: 'register', // السيرفر هيرفض ده لو أنت مفعّل حماية الـ Master Key
+        // تم تعديل المسار لـ /api/auth/signup ليتوافق مع السيرفر
+        const data = await api('POST', '/api/auth/signup', { 
             email, 
             password, 
             companyName 
         });
-        toast('تم إنشاء الحساب بنجاح! يمكنك الدخول الآن', 'success');
-        switchAuthTab('login');
+        
+        if (data && data.success) {
+            toast('تم إنشاء الحساب بنجاح! يمكنك الدخول الآن', 'success');
+            switchAuthTab('login');
+        } else {
+            showAuthError(data.error || 'حدث خطأ أثناء إنشاء الحساب');
+        }
     } catch (e) {
-        showAuthError(e.message);
+        showAuthError(e.message || 'حدث خطأ في الاتصال بالسيرفر');
     } finally {
         hideLoading();
     }
@@ -89,7 +97,7 @@ function bootApp() {
 
     // تعبئة بيانات الشركة واليوزر في السايد بار
     if (CURRENT_USER) {
-        document.getElementById('company-name-sidebar').textContent = CURRENT_USER.companyId?.name || 'شركة السداوي';
+        document.getElementById('company-name-sidebar').textContent = CURRENT_USER.companyName || 'شركة السداوي';
         document.getElementById('sidebar-user-email').textContent = CURRENT_USER.email.split('@')[0];
         document.getElementById('sidebar-user-role').textContent = CURRENT_USER.role === 'admin' ? 'مدير النظام' : 'HR';
     }
@@ -101,5 +109,8 @@ function bootApp() {
         if (el) el.value = now;
     });
 
-    navigate('dashboard'); // ابدأ بصفحة لوحة التحكم
+    // لو عندك دالة navigate، هتبدأ تفتح الداشبورد
+    if (typeof navigate === 'function') {
+        navigate('dashboard'); 
+    }
 }
