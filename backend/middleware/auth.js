@@ -4,12 +4,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "payroll-pro-secret-2026-egypt";
 const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "غير مصرح" });
-    try {
-        req.user = jwt.verify(token, JWT_SECRET);
-        next();
-    } catch {
-        return res.status(401).json({ error: "الجلسة انتهت" });
-    }
+    try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+    catch { return res.status(401).json({ error: "الجلسة انتهت، سجل دخول مجدداً" }); }
 };
 
 const adminOnly = (req, res, next) => {
