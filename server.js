@@ -4,8 +4,23 @@ const path    = require("path");
 const bcrypt  = require("bcryptjs");
 const jwt     = require("jsonwebtoken");
 
-const { connectDB, Company, User, Employee, Payroll, Subscription, Attendance, Leave, LeaveBalance } = require("./db");
-const { runPayrollLogic } = require("./calculations");
+// 1. استيراد كافة النماذج (القديمة الخاصة بك + الجديدة للـ SaaS)
+const { 
+    connectDB, Company, User, Employee, Payroll, Subscription, 
+    Attendance, Leave, LeaveBalance, Candidate, Shift, Loan, 
+    EWARequest, Settlement, Penalty 
+} = require("./db");
+
+// 2. استيراد دوال الحسابات (يجب أن يحتوي ملف calculations.js على الدوال القديمة والجديدة)
+const { 
+    runPayrollLogic, 
+    calculateGrossToNet, 
+    calculateNetToGross, 
+    generateUnifiedTaxRow, 
+    analyzePayrollAnomaly, 
+    calculateSettlement, 
+    EGY_CONSTANTS 
+} = require("./calculations");
 
 const app = express();
 app.use(cors());
@@ -77,7 +92,8 @@ app.post("/api/auth/login", async (req, res) => {
             email: user.email,
             role: user.role,
             companyId: user.companyId?._id || null,
-            companyName: user.companyId?.name || "System"
+            companyName: user.companyId?.name || "System",
+            employeeId: user.employeeId || null // إضافة لدعم تطبيق الخدمة الذاتية للموظف
         };
 
         const accessToken  = jwt.sign(payload, JWT_SECRET,         { expiresIn: "24h" });
@@ -85,7 +101,6 @@ app.post("/api/auth/login", async (req, res) => {
 
         await User.findByIdAndUpdate(user._id, { refreshToken });
 
-        // Get subscription info
         let sub = null;
         if (user.companyId) {
             sub = await Subscription.findOne({ companyId: user.companyId._id });
@@ -95,12 +110,7 @@ app.post("/api/auth/login", async (req, res) => {
             success: true,
             accessToken,
             refreshToken,
-            user: {
-                email: user.email,
-                role: user.role,
-                companyId: user.companyId?._id || null,
-                companyName: user.companyId?.name || "System"
-            },
+            user: payload,
             subscription: sub ? {
                 plan: sub.plan,
                 status: sub.status,
@@ -122,7 +132,7 @@ app.post("/api/auth/refresh", async (req, res) => {
         const user = await User.findById(decoded.id).populate('companyId');
         if (!user || user.refreshToken !== refreshToken) return res.status(401).json({ error: "Invalid token" });
 
-        const payload = { id: user._id, email: user.email, role: user.role, companyId: user.companyId?._id, companyName: user.companyId?.name };
+        const payload = { id: user._id, email: user.email, role: user.role, companyId: user.companyId?._id, companyName: user.companyId?.name, employeeId: user.employeeId };
         const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
         res.json({ accessToken });
     } catch {
@@ -183,6 +193,80 @@ app.post("/api/subscription/upgrade", authMiddleware, adminOnly, async (req, res
     }
 });
 
+// ==================== HR & ATS (NEW) ====================
+
+app.post('/api/hr/candidates', authMiddleware, async (req, res) => {
+    try {
+        await connectDB();
+        const candidate = new Candidate({ ...req.body, companyId: req.user.companyId });
+        await candidate.save();
+        res.status(201).json({ message: "تم إضافة المرشح بنجاح", candidate });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.post('/api/hr/hire-candidate/:id', authMiddleware, adminOnly, async (req, res) => {
+    try {
+        await connectDB();
+        const candidate = await Candidate.findById(req.params.id);
+        if (!candidate) return res.status(404).json({ error: "المرشح غير موجود" });
+
+        const newEmployee = new Employee({
+            name: candidate.name,
+            nationalId: req.body.nationalId, 
+            hiringDate: new Date(),
+            basicSalary: req.body.basicSalary,
+            insSalary: req.body.insSalary || 0,
+            jobType: req.body.jobType || "Full Time",
+            position: candidate.appliedPosition,
+            phone: candidate.phone,
+            companyId: req.user.companyId
+        });
+        
+        await newEmployee.save();
+        candidate.status = 'hired';
+        await candidate.save();
+
+        res.json({ message: "تم تحويل المرشح إلى موظف بنجاح", employee: newEmployee });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/hr/settlement/:employeeId', authMiddleware, adminOnly, async (req, res) => {
+    try {
+        await connectDB();
+        const employee = await Employee.findById(req.params.employeeId);
+        const company = await Company.findById(req.user.companyId);
+        
+        const currentYear = new Date().getFullYear();
+        const leaveBalance = await LeaveBalance.findOne({ employeeId: employee._id, year: currentYear });
+        const remainingLeaves = leaveBalance ? (leaveBalance.annual - leaveBalance.annualUsed) : 0;
+
+        const unpaidSalaries = 0; 
+        const activeLoans = await Loan.find({ employeeId: employee._id, status: 'active' });
+        const unsettledLoans = activeLoans.reduce((sum, loan) => sum + loan.remainingAmount, 0);
+
+        const settlementData = calculateSettlement(employee, remainingLeaves, unpaidSalaries, unsettledLoans, company.settings);
+
+        const settlement = new Settlement({
+            employeeId: employee._id,
+            companyId: req.user.companyId,
+            resignationDate: new Date(),
+            ...settlementData
+        });
+
+        await settlement.save();
+        employee.resignationDate = new Date();
+        await employee.save();
+
+        res.json({ message: "تم إصدار كشف تصفية الحساب", settlement });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== EMPLOYEES ====================
 
 app.post("/api/employees", authMiddleware, async (req, res) => {
@@ -191,11 +275,11 @@ app.post("/api/employees", authMiddleware, async (req, res) => {
         const emp = await new Employee({
             name: req.body.name, nationalId: req.body.nationalId,
             hiringDate: req.body.hiringDate, insSalary: Number(req.body.insSalary) || 0,
+            basicSalary: Number(req.body.basicSalary) || 0, // أضيف لدعم المحرك الجديد
             jobType: req.body.jobType || "Full Time", resignationDate: req.body.resignationDate || "",
             department: req.body.department || "", position: req.body.position || "",
             phone: req.body.phone || "", companyId: req.body.companyId || req.user.companyId
         }).save();
-        // Init leave balance for current year
         await new LeaveBalance({ employeeId: emp._id, companyId: emp.companyId, year: new Date().getFullYear() }).save();
         res.status(201).json(emp);
     } catch (err) {
@@ -258,6 +342,7 @@ app.delete("/api/employees/:id", authMiddleware, adminOnly, async (req, res) => 
 
 // ==================== PAYROLL ====================
 
+// Endpointك الأصلي (بقي كما هو لضمان عدم توقف النظام)
 app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
     try {
         await connectDB();
@@ -275,7 +360,6 @@ app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
             empForCalc
         );
 
-        // Upsert payroll record (allow recalculation of same month)
         const record = await Payroll.findOneAndUpdate(
             { employeeId: empId, month },
             { employeeId: empId, companyId: req.user.companyId, month, payload: result, createdAt: new Date() },
@@ -288,6 +372,7 @@ app.post("/api/payroll/calculate", authMiddleware, async (req, res) => {
     }
 });
 
+// Endpointك الأصلي لمحاكي الصافي للإجمالي
 app.post("/api/payroll/net-to-gross", authMiddleware, async (req, res) => {
     try {
         const { targetNet } = req.body;
@@ -317,6 +402,81 @@ app.post("/api/payroll/net-to-gross", authMiddleware, async (req, res) => {
     }
 });
 
+// (NEW) محرك الرواتب الذكي - AI Payroll Auditor (بإصلاح استعلام التواريخ)
+app.post('/api/payroll/run', authMiddleware, async (req, res) => {
+    try {
+        await connectDB();
+        const { month } = req.body; // format: "YYYY-MM"
+        const company = await Company.findById(req.user.companyId);
+        const employees = await Employee.find({ companyId: req.user.companyId, resignationDate: null });
+        
+        const payrollResults = [];
+        const startOfMonth = new Date(`${month}-01T00:00:00.000Z`);
+        const endOfMonth = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        for (const emp of employees) {
+            const absentDays = await Attendance.countDocuments({ employeeId: emp._id, month, status: 'absent' });
+            
+            // الاستعلام الصحيح لتجنب الـ CastError
+            const penaltyDocs = await Penalty.find({ 
+                employeeId: emp._id, 
+                date: { $gte: startOfMonth, $lte: endOfMonth } 
+            });
+            const penaltyDays = penaltyDocs.reduce((sum, p) => sum + p.deductionDays, 0);
+            
+            const payload = calculateGrossToNet({
+                basicSalary: emp.basicSalary || emp.insSalary,
+                variableSalary: emp.variableSalary || 0,
+                allowances: 0, 
+                insSalary: emp.insSalary,
+                absentDays,
+                penaltyDays,
+                overtimeHours: 0, 
+                loanDeduction: 0, 
+                isTaxExempted: emp.isTaxExempted,
+                companySettings: company.settings
+            });
+
+            const prevMonthDate = new Date(startOfMonth);
+            prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
+            const lastMonthString = prevMonthDate.toISOString().substring(0, 7);
+            const previousPayroll = await Payroll.findOne({ employeeId: emp._id, month: lastMonthString });
+            
+            const anomalyData = analyzePayrollAnomaly(payload, previousPayroll ? previousPayroll.payload : null);
+
+            const payrollRecord = await Payroll.findOneAndUpdate(
+                { employeeId: emp._id, month },
+                { 
+                    companyId: req.user.companyId, 
+                    payload, 
+                    netSalary: payload.netSalary,
+                    hasAnomaly: anomalyData.hasAnomaly,
+                    anomalyReason: anomalyData.warnings,
+                    status: 'draft'
+                },
+                { upsert: true, new: true }
+            );
+            payrollResults.push(payrollRecord);
+        }
+
+        res.json({ message: "تم إصدار الرواتب بنجاح", count: payrollResults.length, data: payrollResults });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// (NEW) توليد شيت توحيد الضرائب
+app.get('/api/payroll/export-unified-tax/:month', authMiddleware, async (req, res) => {
+    try {
+        await connectDB();
+        const payrolls = await Payroll.find({ companyId: req.user.companyId, month: req.params.month }).populate('employeeId');
+        const exportData = payrolls.map(pr => generateUnifiedTaxRow(pr.employeeId, pr));
+        res.json({ month: req.params.month, data: exportData });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Company payroll summary
 app.get("/api/payroll/summary/:month", authMiddleware, async (req, res) => {
     try {
@@ -336,7 +496,7 @@ app.get("/api/payroll/summary/:month", authMiddleware, async (req, res) => {
     }
 });
 
-// ==================== ATTENDANCE ====================
+// ==================== ATTENDANCE & WEBHOOKS ====================
 
 app.post("/api/attendance", authMiddleware, async (req, res) => {
     try {
@@ -357,7 +517,7 @@ app.post("/api/attendance", authMiddleware, async (req, res) => {
 app.post("/api/attendance/bulk", authMiddleware, async (req, res) => {
     try {
         await connectDB();
-        const { records } = req.body; // Array of attendance records
+        const { records } = req.body; 
         const ops = records.map(r => ({
             updateOne: {
                 filter: { employeeId: r.employeeId, date: r.date },
@@ -369,6 +529,33 @@ app.post("/api/attendance/bulk", authMiddleware, async (req, res) => {
         res.json({ success: true, count: records.length });
     } catch (err) {
         res.status(400).json({ error: err.message });
+    }
+});
+
+// (NEW) Webhook لأجهزة البصمة
+app.post('/api/attendance/webhook/biometric', async (req, res) => {
+    try {
+        await connectDB();
+        const { nationalId, deviceId, timestamp, type } = req.body; 
+        const employee = await Employee.findOne({ nationalId });
+        if (!employee) return res.status(404).json({ error: "الموظف غير مسجل" });
+
+        const date = new Date(timestamp).toISOString().split('T')[0];
+        const time = new Date(timestamp).toISOString().split('T')[1].substring(0, 5);
+        const month = date.substring(0, 7);
+
+        let attendance = await Attendance.findOne({ employeeId: employee._id, date });
+        if (!attendance) {
+            attendance = new Attendance({ employeeId: employee._id, companyId: employee.companyId, date, month });
+        }
+
+        if (type === 'check-in') attendance.checkIn = time;
+        if (type === 'check-out') attendance.checkOut = time;
+        
+        await attendance.save();
+        res.json({ status: "success" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -412,7 +599,7 @@ app.get("/api/attendance/stats/:employeeId/:month", authMiddleware, async (req, 
     }
 });
 
-// ==================== LEAVES ====================
+// ==================== LEAVES & EWA ====================
 
 app.post("/api/leaves", authMiddleware, async (req, res) => {
     try {
@@ -420,7 +607,6 @@ app.post("/api/leaves", authMiddleware, async (req, res) => {
         const { employeeId, type, startDate, endDate, days, reason } = req.body;
         const year = new Date(startDate).getFullYear();
 
-        // Check balance
         if (['annual', 'sick', 'emergency'].includes(type)) {
             let balance = await LeaveBalance.findOne({ employeeId, year });
             if (!balance) balance = await new LeaveBalance({ employeeId, companyId: req.user.companyId, year }).save();
@@ -434,6 +620,33 @@ app.post("/api/leaves", authMiddleware, async (req, res) => {
         res.status(201).json(leave);
     } catch (err) {
         res.status(400).json({ error: err.message });
+    }
+});
+
+// (NEW) الوصول المبكر للراتب - السلف
+app.post('/api/employee/ewa-request', authMiddleware, async (req, res) => {
+    try {
+        await connectDB();
+        const { requestedAmount, walletNumber } = req.body;
+        if (!req.user.employeeId) return res.status(403).json({ error: "هذه الخاصية للموظفين فقط" });
+        
+        const employee = await Employee.findById(req.user.employeeId);
+        if (requestedAmount > (employee.basicSalary * 0.5)) {
+            return res.status(400).json({ error: "لا يمكن سحب أكثر من 50% من الراتب الأساسي مقدماً" });
+        }
+
+        const ewa = new EWARequest({
+            employeeId: req.user.employeeId,
+            companyId: req.user.companyId,
+            requestedAmount,
+            walletNumber,
+            month: new Date().toISOString().substring(0, 7)
+        });
+
+        await ewa.save();
+        res.status(201).json({ message: "تم إرسال طلب السلفة", ewa });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -463,7 +676,7 @@ app.get("/api/leaves/company/pending", authMiddleware, async (req, res) => {
 app.put("/api/leaves/:id/approve", authMiddleware, adminOnly, async (req, res) => {
     try {
         await connectDB();
-        const { status } = req.body; // 'approved' or 'rejected'
+        const { status } = req.body; 
         const leave = await Leave.findByIdAndUpdate(req.params.id, { status, approvedBy: req.user.id }, { new: true });
 
         if (status === 'approved' && ['annual', 'sick', 'emergency'].includes(leave.type)) {
@@ -539,7 +752,6 @@ app.get("/api/analytics/dashboard", authMiddleware, async (req, res) => {
             ins: acc.ins + (r.payload.insuranceEmployee || 0)
         }), { gross: 0, net: 0, tax: 0, ins: 0 });
 
-        // Last 6 months payroll trend
         const trend = [];
         for (let i = 5; i >= 0; i--) {
             const d = new Date(); d.setMonth(d.getMonth() - i);
