@@ -4,23 +4,27 @@ const path    = require("path");
 const bcrypt  = require("bcryptjs");
 const jwt     = require("jsonwebtoken");
 
-// 1. استيراد كافة النماذج (القديمة الخاصة بك + الجديدة للـ SaaS)
-const { 
-    connectDB, Company, User, Employee, Payroll, Subscription, 
-    Attendance, Leave, LeaveBalance, Candidate, Shift, Loan, 
-    EWARequest, Settlement, Penalty 
+// 1. استيراد قاعدة البيانات (السطر 12 اللي كان عامل أزمة)
 const { connectToDatabase } = require('./backend/config/db');
 
-// 2. استيراد دوال الحسابات (يجب أن يحتوي ملف calculations.js على الدوال القديمة والجديدة)
+// 2. استيراد النماذج (Models) - بنادي اللي موجودين فعلاً في الفولدر عندك
+const User = require('./backend/models/User');
+const PayrollRecord = require('./backend/models/PayrollRecord');
+// لو عندك ملفات تانية جوه فولدر models ناديهم بنفس الطريقة هنا
+
+// 3. استيراد دوال الحسابات (لو ملف calculations.js موجود في الـ Root)
+// لو مش موجود أو مكانه اتغير، يفضل تمسح الجزء ده مؤقتاً عشان ميعملش Crash
+let calculations = {};
+try {
+    calculations = require("./backend/logic/payrollEngine"); 
+} catch (e) {
+    console.log("Calculations file not found yet, skipping...");
+}
+
 const { 
     runPayrollLogic, 
-    calculateGrossToNet, 
-    calculateNetToGross, 
-    generateUnifiedTaxRow, 
-    analyzePayrollAnomaly, 
-    calculateSettlement, 
-    EGY_CONSTANTS 
-} = require("./calculations");
+    calculateEgyptianTax 
+} = calculations;
 
 const app = express();
 app.use(cors());
