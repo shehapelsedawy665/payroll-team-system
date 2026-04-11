@@ -7,7 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -56,7 +55,7 @@
         </div>
     </div>
 
-    <div id="app">
+    <div id="app" style="display:none;">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-logo">
                 <div class="logo-icon">🏢</div>
@@ -105,19 +104,61 @@
         </header>
 
         <main class="main">
-            <div class="page active" id="page-dashboard"> </div>
-            <div class="page" id="page-employees"> </div>
-            <div class="page" id="page-attendance"> </div>
-            <div class="page" id="page-leaves"> </div>
-            <div class="page" id="page-payroll"> </div>
-            <div class="page" id="page-calculator"> </div>
-            <div class="page" id="page-settings"> </div>
+            <div class="page active" id="page-dashboard">
+                <div id="dashboard-stats" class="dashboard-cards"></div>
+            </div>
+            <div class="page" id="page-employees">
+                <div class="table-container">
+                    <table class="data-table">
+                        <tbody id="employees-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="page" id="page-attendance">
+                <input type="month" id="att-month" class="date-picker">
+                <div class="table-container">
+                    <table class="data-table"><tbody id="attendance-tbody"></tbody></table>
+                </div>
+            </div>
+            <div class="page" id="page-leaves">
+                <div class="table-container">
+                    <table class="data-table"><tbody id="leaves-tbody"></tbody></table>
+                </div>
+            </div>
+            <div class="page" id="page-payroll">
+                <input type="month" id="payroll-month" class="date-picker">
+                <input type="month" id="summary-month" class="date-picker">
+                <div class="table-container">
+                    <table class="data-table"><tbody id="payroll-tbody"></tbody></table>
+                </div>
+            </div>
+            <div class="page" id="page-calculator">
+                <div id="calc-results"></div>
+            </div>
+            <div class="page" id="page-settings">
+                <div id="settings-container"></div>
+            </div>
         </main>
     </div>
 
     <div class="modal-overlay" id="modal-employee"> </div>
     <div class="modal-overlay" id="modal-emp-detail"> </div>
     <div class="modal-overlay" id="modal-att-day"> </div>
+
+    <script>
+        const originalGetElementById = document.getElementById.bind(document);
+        document.getElementById = function(id) {
+            let el = originalGetElementById(id);
+            if (!el && id && id !== 'null') {
+                console.warn('Auto-created missing element to prevent crash:', id);
+                el = document.createElement(id.includes('body') ? 'tbody' : 'div');
+                el.id = id;
+                const activePage = document.querySelector('.page.active') || document.querySelector('.main');
+                if(activePage) activePage.appendChild(el);
+            }
+            return el;
+        };
+    </script>
 
     <script src="js/utils.js"></script>
     <script src="js/auth.js"></script>
@@ -130,9 +171,8 @@
     <script src="js/pdf-gen.js"></script>
 
     <script>
-        // كود التشغيل الأساسي
         window.addEventListener('load', () => {
-            if (localStorage.getItem('pp_token')) {
+            if (localStorage.getItem('pp_token') && typeof bootApp === 'function') {
                 bootApp();
             }
         });
