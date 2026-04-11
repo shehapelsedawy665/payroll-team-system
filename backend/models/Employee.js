@@ -16,4 +16,4 @@ const EmployeeSchema = new mongoose.Schema({
     status: { type: String, default: 'active' }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Employee', EmployeeSchema);
+module.exports = mongoose.models.Employee || mongoose.model('Employee', EmployeeSchema);
