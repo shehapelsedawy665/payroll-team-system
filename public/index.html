@@ -1723,7 +1723,7 @@ function renderEmployees(list) {
       <td style="display:flex;gap:6px;">
         <button class="action-btn view" onclick="viewEmployee('${e._id}')" title="عرض التفاصيل">👁</button>
         <button class="action-btn edit" onclick="editEmployee('${e._id}')" title="تعديل">✏️</button>
-        <button class="action-btn delete" onclick="deleteEmployee('${e._id}','${e.name.replace(/'/g,"\\'")'}" title="حذف">🗑</button>
+        <button class="action-btn delete" onclick="deleteEmployee('${e._id}','${e.name.replace(/'/g,"\\\\'")}')" title="حذف">🗑</button>
       </td>
     </tr>
   `).join('');
