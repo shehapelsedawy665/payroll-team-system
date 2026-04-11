@@ -1,18 +1,26 @@
 // public/js/calculator.js
 
-// --- 1. محرك الضرائب الداخلي (نفس منطق الباك إند بس للآلة الحاسبة السريعة) ---
+// --- 1. محرك الضرائب الداخلي المحدث 2026 ---
 function calculateAnnualTaxLocal(annualTaxableIncome) {
-    let income = annualTaxableIncome;
     let tax = 0;
+    let income = annualTaxableIncome;
 
-    // الشرائح المصرية 2024/2026
+    // تطبيق قانون خصم الشريحة المعفاة للرواتب العليا
+    let tierShift = 0;
+    if (income > 1200000) tierShift = 4;
+    else if (income > 1000000) tierShift = 3;
+    else if (income > 900000) tierShift = 2;
+    else if (income > 800000) tierShift = 1;
+    else if (income > 600000) tierShift = 0.5;
+
     const brackets = [
-        { limit: 40000, rate: 0.00 },
-        { limit: 15000, rate: 0.10 },
-        { limit: 15000, rate: 0.15 },
-        { limit: 130000, rate: 0.20 },
-        { limit: 200000, rate: 0.225 },
-        { limit: 800000, rate: 0.25 },
+        { limit: 40000, rate: tierShift >= 0.5 ? 0.10 : 0.00 },
+        { limit: 15000, rate: tierShift >= 1 ? 0.15 : 0.10 },
+        { limit: 15000, rate: tierShift >= 2 ? 0.20 : 0.15 },
+        { limit: 130000, rate: tierShift >= 3 ? 0.225 : 0.20 },
+        { limit: 200000, rate: tierShift >= 4 ? 0.25 : 0.225 },
+        { limit: 100000, rate: 0.25 },
+        { limit: 700000, rate: 0.275 },
         { limit: Infinity, rate: 0.275 }
     ];
 
@@ -30,15 +38,19 @@ function calculateAnnualTaxLocal(annualTaxableIncome) {
 function calcG2NLive() {
     const basic = Number(document.getElementById('calc-basic').value) || 0;
     const trans = Number(document.getElementById('calc-trans').value) || 0;
-    const ins = Number(document.getElementById('calc-ins').value) || 5384; // الوعاء التأميني
-    const exemp = Number(document.getElementById('calc-exemption').value) || 20000; // الإعفاء الشخصي
+    const insInput = Number(document.getElementById('calc-ins').value) || 16700; 
+    const exemp = Number(document.getElementById('calc-exemption').value) || 20000; 
 
     const div = document.getElementById('g2n-result');
     if (!basic) { div.innerHTML = ''; return; }
 
     const gross = basic + trans;
-    const actualIns = Math.max(2000, Math.min(ins, 12600)); // حدود التأمينات
-    const insEmp = Math.round(actualIns * 0.11 * 100) / 100; // حصة الموظف
+    
+    // التعديل هنا: الحد الأقصى 16700 والأدنى 5384.62
+    const actualIns = Math.max(5384.62, Math.min(insInput, 16700)); 
+    
+    const insEmp = Math.round(actualIns * 0.11 * 100) / 100; 
+    const insComp = Math.round(actualIns * 0.1875 * 100) / 100; 
     
     const monthlyExemptions = insEmp + (exemp / 12);
     const annualTaxable = Math.max(0, (gross - monthlyExemptions) * 12);
@@ -48,39 +60,55 @@ function calcG2NLive() {
     const net = Math.round((gross - insEmp - monthTax) * 100) / 100;
 
     div.innerHTML = `
-        <div class="result-row add"><span class="label">الإجمالي</span><span class="value">${fmt(gross)} ج</span></div>
-        <div class="result-row deduct"><span class="label">تأمين الموظف (11%)</span><span class="value">${fmt(insEmp)} ج</span></div>
-        <div class="result-row deduct"><span class="label">ضريبة الدخل الشهرية</span><span class="value">${fmt(monthTax)} ج</span></div>
-        <div class="result-row total"><span class="label">💰 الصافي المتوقع</span><span class="value">${fmt(net)} ج</span></div>
+        <div class="result-row add" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span class="label">الإجمالي</span><span class="value" style="color:var(--green)">${fmt(gross)} ج</span>
+        </div>
+        <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red)">${fmt(insEmp)} ج</span>
+        </div>
+        <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span class="label">تأمين الشركة (18.75%)</span><span class="value" style="color:var(--red)">${fmt(insComp)} ج</span>
+        </div>
+        <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span class="label">الوعاء الضريبي السنوي</span><span class="value" style="color:var(--text)">${fmt(annualTaxable)} ج</span>
+        </div>
+        <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span class="label">ضريبة الدخل الشهرية</span><span class="value" style="color:var(--red)">${fmt(monthTax)} ج</span>
+        </div>
+        <div class="result-row total" style="display:flex; justify-content:space-between; padding:12px 0; margin-top:10px; font-weight:bold; font-size:16px;">
+            <span class="label">💰 الصافي</span><span class="value" style="color:var(--gold)">${fmt(net)} ج</span>
+        </div>
     `;
 }
 
 // --- 3. حسبة من الصافي للإجمالي (الخوارزمية التكرارية 100 دورة) ---
 function calcN2GLive() {
     const targetNet = Number(document.getElementById('calc-target-net').value) || 0;
-    const ins = Number(document.getElementById('calc-n2g-ins').value) || 5384;
+    const insInput = Number(document.getElementById('calc-n2g-ins').value) || 16700;
     const div = document.getElementById('n2g-result');
 
     if (!targetNet) { div.innerHTML = ''; return; }
 
-    // الخوارزمية التكرارية للوصول لأدق رقم إجمالي
     let minG = targetNet;
-    let maxG = targetNet * 2; 
+    let maxG = targetNet * 2.5; 
     let bestGross = targetNet;
-    let finalResult = null;
+    let finalInsEmp = 0;
+    let finalMonthTax = 0;
 
     for (let i = 0; i < 100; i++) {
         let testGross = (minG + maxG) / 2;
         
-        // حساب الصافي من الإجمالي التجريبي
-        const actualIns = Math.max(2000, Math.min(ins, 12600));
-        const insEmp = testGross * 0.11; // تبسيط للتأمينات داخل الحلقة
+        // التعديل هنا لـ 16700
+        const actualIns = Math.max(5384.62, Math.min(insInput, 16700));
+        const insEmp = actualIns * 0.11; 
         const annualTaxable = Math.max(0, (testGross - insEmp - (20000/12)) * 12);
         const monthTax = calculateAnnualTaxLocal(annualTaxable) / 12;
         const currentNet = testGross - insEmp - monthTax;
 
         if (Math.abs(currentNet - targetNet) < 0.01) {
             bestGross = testGross;
+            finalInsEmp = insEmp;
+            finalMonthTax = monthTax;
             break;
         }
 
@@ -88,15 +116,26 @@ function calcN2GLive() {
         else minG = testGross;
         
         bestGross = testGross;
+        finalInsEmp = insEmp;
+        finalMonthTax = monthTax;
     }
 
     div.innerHTML = `
-        <div class="result-row add" style="background: var(--primary-dim); padding: 10px; border-radius: 8px;">
+        <div class="result-row add" style="background: var(--primary-dim); padding: 10px; border-radius: 8px; display:flex; justify-content:space-between;">
             <span class="label" style="color: var(--primary);">الإجمالي المطلوب:</span>
-            <span class="value" style="font-size: 18px; color: var(--primary);">${fmt(bestGross)} ج</span>
+            <span class="value" style="font-size: 18px; font-weight:bold; color: var(--primary);">${fmt(bestGross)} ج</span>
         </div>
-        <p style="font-size: 10px; color: var(--text3); margin-top: 8px; text-align: center;">
-            * تم الحساب بناءً على وعاء تأميني ${fmt(ins)} ج وإعفاء شخصي 20,000 ج سنويًا.
-        </p>
+        <div class="result-row deduct" style="display:flex; justify-content:space-between; margin-top:15px;">
+            <span class="label">التأمينات (11%)</span>
+            <span class="value" style="color:var(--red);">${fmt(finalInsEmp)} ج</span>
+        </div>
+        <div class="result-row deduct" style="display:flex; justify-content:space-between; margin-top:10px;">
+            <span class="label">ضريبة الدخل</span>
+            <span class="value" style="color:var(--red);">${fmt(finalMonthTax)} ج</span>
+        </div>
+        <div class="result-row add" style="display:flex; justify-content:space-between; margin-top:10px;">
+            <span class="label">✅ الصافي الفعلي</span>
+            <span class="value" style="color:var(--green); font-weight:bold;">${fmt(bestGross - finalInsEmp - finalMonthTax)} ج</span>
+        </div>
     `;
 }
