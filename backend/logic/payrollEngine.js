@@ -1,12 +1,121 @@
-// backend/logic/payrollEngine.js
-const { calculateEgyptianTax, R } = require('./taxEngine');
-const EGY = require('../config/constants'); // << السر هنا: استدعاء أرقامك الصح
+/**
+ * @file backend/logic/payrollEngine.js
+ * @description Advanced Egyptian Payroll Engine - (Restored from Original 2026 Logic with Part-Time Support)
+ */
 
-// 1. الدالة المساعدة لحساب الرواتب البسيطة
+// 1. الثوابت الأصلية بتاعتك + تحديث البارت تايم
+const EGY_CONSTANTS = {
+    PERSONAL_EXEMPTION_2024: 20000,     
+    SOCIAL_INSURANCE_EMP_RATE: 0.11,    
+    SOCIAL_INSURANCE_COMP_RATE: 0.1875, 
+    MIN_INSURANCE_SALARY_2024: 5384.62, // الحد الأدنى للدوام الكامل
+    MIN_INSURANCE_SALARY_PART_TIME: 2700, // الحد الأدنى للدوام الجزئي
+    MAX_INSURANCE_SALARY_2024: 16700,   
+    MONTHS_IN_YEAR: 12
+};
+
+// 2. محرك الضرائب الأصلي بتاعك
+const calculateAnnualTax = (annualTaxableIncome) => {
+    let tax = 0;
+    let income = annualTaxableIncome;
+
+    let tierShift = 0;
+    if (income > 1200000) tierShift = 4;
+    else if (income > 1000000) tierShift = 3;
+    else if (income > 900000) tierShift = 2;
+    else if (income > 800000) tierShift = 1;
+    else if (income > 600000) tierShift = 0.5;
+
+    const brackets = [
+        { limit: 40000, rate: tierShift >= 0.5 ? 0.10 : 0.00 },
+        { limit: 15000, rate: tierShift >= 1 ? 0.15 : 0.10 },
+        { limit: 15000, rate: tierShift >= 2 ? 0.20 : 0.15 },
+        { limit: 130000, rate: tierShift >= 3 ? 0.225 : 0.20 },
+        { limit: 200000, rate: tierShift >= 4 ? 0.25 : 0.225 },
+        { limit: 100000, rate: 0.25 },
+        { limit: 700000, rate: 0.275 },
+        { limit: Infinity, rate: 0.275 }
+    ];
+
+    let remainingIncome = income;
+    for (let i = 0; i < brackets.length; i++) {
+        if (remainingIncome <= 0) break;
+        let taxableAtThisBracket = Math.min(remainingIncome, brackets[i].limit);
+        tax += taxableAtThisBracket * brackets[i].rate;
+        remainingIncome -= taxableAtThisBracket;
+    }
+    return tax;
+};
+
+// 3. Gross to Net الأساسي الدقيق جداً
+const calculateGrossToNet = (params) => {
+    const { 
+        basicSalary, 
+        variableSalary = 0, 
+        allowances = 0, 
+        insSalary, 
+        absentDays = 0, 
+        penaltyDays = 0, 
+        overtimeHours = 0, 
+        loanDeduction = 0, 
+        isTaxExempted = 0, 
+        companySettings = {},
+        jobType = "Full Time" // استقبال نوع الوظيفة
+    } = params;
+
+    const grossSalary = basicSalary + variableSalary + allowances;
+
+    // 🔥 اللوجيك الجديد: تحديد الحد الأدنى للتأمينات بناءً على نوع الوظيفة
+    const minInsSalary = (jobType === "Part Time" || jobType === "مؤقت") ? EGY_CONSTANTS.MIN_INSURANCE_SALARY_PART_TIME : EGY_CONSTANTS.MIN_INSURANCE_SALARY_2024;
+
+    // تطبيق الحد الأقصى والأدنى الصح بتاع 2026
+    let actualInsSalary = Math.max(minInsSalary, Math.min(insSalary || 0, EGY_CONSTANTS.MAX_INSURANCE_SALARY_2024));
+    
+    const socialInsuranceEmpShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_EMP_RATE;
+    const socialInsuranceCompShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_COMP_RATE;
+
+    const dayRate = grossSalary / Number(companySettings.monthCalcType || 30);
+    const hourRate = dayRate / Number(companySettings.dailyWorkHours || 8);
+    const absenceDeduction = absentDays * dayRate * (companySettings.absentDayRate || 1);
+    const penaltyDeduction = penaltyDays * dayRate;
+    
+    const overtimeAddition = overtimeHours * hourRate * (companySettings.overtimeRate || 1.5);
+
+    const monthlyGrossForTax = grossSalary + overtimeAddition - absenceDeduction - penaltyDeduction;
+    const monthlyExemptions = socialInsuranceEmpShare + (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / EGY_CONSTANTS.MONTHS_IN_YEAR);
+    
+    let monthlyTax = 0;
+    if (!isTaxExempted) {
+        const annualTaxableIncome = (monthlyGrossForTax - monthlyExemptions) * EGY_CONSTANTS.MONTHS_IN_YEAR;
+        if (annualTaxableIncome > 0) {
+            const annualTax = calculateAnnualTax(annualTaxableIncome);
+            monthlyTax = annualTax / EGY_CONSTANTS.MONTHS_IN_YEAR;
+        }
+    }
+
+    const totalDeductions = socialInsuranceEmpShare + monthlyTax + absenceDeduction + penaltyDeduction + loanDeduction;
+    const netSalary = (grossSalary + overtimeAddition) - totalDeductions;
+    const costToCompany = grossSalary + overtimeAddition + socialInsuranceCompShare;
+
+    return {
+        grossSalary: Number(grossSalary.toFixed(2)),
+        overtimeAddition: Number(overtimeAddition.toFixed(2)),
+        socialInsuranceEmpShare: Number(socialInsuranceEmpShare.toFixed(2)),
+        socialInsuranceCompShare: Number(socialInsuranceCompShare.toFixed(2)),
+        absenceDeduction: Number(absenceDeduction.toFixed(2)),
+        penaltyDeduction: Number(penaltyDeduction.toFixed(2)),
+        monthlyTax: Number(monthlyTax.toFixed(2)),
+        loanDeduction: Number(loanDeduction.toFixed(2)),
+        totalDeductions: Number(totalDeductions.toFixed(2)),
+        netSalary: Number(netSalary.toFixed(2)),
+        costToCompany: Number(costToCompany.toFixed(2))
+    };
+};
+
+// 4. المحول للواجهة الأمامية
 const runPayrollLogic = (input, prev, emp) => {
     let totalAdditions = 0;
     let totalDeductions = 0;
-    
     if (input.additions && Array.isArray(input.additions)) {
         totalAdditions = input.additions.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
     }
@@ -17,142 +126,55 @@ const runPayrollLogic = (input, prev, emp) => {
     const targetDays = Number(input.days) || 30;
     const basicProp = (Number(input.fullBasic) || 0) * (targetDays / 30);
     const transProp = (Number(input.fullTrans) || 0) * (targetDays / 30);
-    
-    const grossSalary = basicProp + totalAdditions + transProp;
-    
-    // التأمينات بتقرأ من ملفك مش أرقام ثابته
-    const minIns = EGY.MIN_INSURANCE_SALARY_2024 || EGY.MIN_INSURANCE_SALARY || 2000;
-    const maxIns = EGY.MAX_INSURANCE_SALARY_2024 || EGY.MAX_INSURANCE_SALARY || 16700;
-    const empRate = EGY.SOCIAL_INSURANCE_EMP_RATE || 0.11;
-    
-    let actualInsSalary = Math.max(minIns, Math.min(Number(emp.insSalary) || 0, maxIns));
-    const socialInsuranceEmpShare = actualInsSalary * empRate;
-    
-    const exemption = EGY.PERSONAL_EXEMPTION_2024 || EGY.PERSONAL_EXEMPTION || 20000;
-    const currentTaxable = grossSalary - socialInsuranceEmpShare - (exemption / 12);
-    
-    let monthlyTax = 0;
-    
-    if (!emp.isTaxExempted && currentTaxable > 0) {
-        const ai = currentTaxable * 12; 
-        const af = 360;                 
-        const annualTax = calculateEgyptianTax(ai, af);
-        monthlyTax = annualTax / 12;
-    }
 
-    const net = grossSalary - socialInsuranceEmpShare - monthlyTax - totalDeductions;
+    const payload = calculateGrossToNet({
+        basicSalary: basicProp,
+        variableSalary: totalAdditions,
+        allowances: transProp,
+        insSalary: Number(emp.insSalary) || 0,
+        loanDeduction: totalDeductions,
+        isTaxExempted: emp.isTaxExempted || 0,
+        companySettings: emp.companySettings || {},
+        jobType: emp.jobType || "Full Time" // 🔥 تمرير نوع الوظيفة من الموظف
+    });
 
     return {
         days: targetDays,
-        gross: R(grossSalary),
-        grossSalary: R(grossSalary),
-        insuranceEmployee: R(socialInsuranceEmpShare),
-        socialInsuranceEmpShare: R(socialInsuranceEmpShare),
-        currentTaxable: R(currentTaxable),
-        monthlyTax: R(monthlyTax),
-        net: R(net),
-        netSalary: R(net),
-        totalDeductions: R(totalDeductions)
+        gross: payload.grossSalary,
+        insuranceEmployee: payload.socialInsuranceEmpShare,
+        currentTaxable: payload.grossSalary - payload.socialInsuranceEmpShare - (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12),
+        monthlyTax: payload.monthlyTax,
+        net: payload.netSalary,
+        ...payload
     };
 };
 
-// 2. المحرك المعقد والكامل (زي ما كان في مشروع Test بالظبط)
-const calculateGrossToNet = (params) => {
-    const {
-        basicSalary,
-        variableSalary = 0,
-        allowances = 0,
-        insSalary, 
-        absentDays = 0,
-        penaltyDays = 0,
-        overtimeHours = 0,
-        loanDeduction = 0,
-        isTaxExempted = 0,
-        companySettings = {}
-    } = params;
-
-    const grossSalary = basicSalary + variableSalary + allowances;
-
-    const minIns = EGY.MIN_INSURANCE_SALARY_2024 || EGY.MIN_INSURANCE_SALARY || 2000;
-    const maxIns = EGY.MAX_INSURANCE_SALARY_2024 || EGY.MAX_INSURANCE_SALARY || 16700;
-    const empRate = EGY.SOCIAL_INSURANCE_EMP_RATE || 0.11;
-    const compRate = EGY.SOCIAL_INSURANCE_COMP_RATE || 0.1875;
-
-    let actualInsSalary = Math.max(minIns, Math.min(insSalary || 0, maxIns));
-    const socialInsuranceEmpShare = actualInsSalary * empRate;
-    const socialInsuranceCompShare = actualInsSalary * compRate;
-
-    const dayRate = grossSalary / Number(companySettings.monthCalcType || 30);
-    const hourRate = dayRate / Number(companySettings.dailyWorkHours || 8);
-    const absenceDeduction = absentDays * dayRate * (companySettings.absentDayRate || 1);
-    const penaltyDeduction = penaltyDays * dayRate;
-    const overtimeAddition = overtimeHours * hourRate * (companySettings.overtimeRate || 1.5);
-
-    const monthlyGrossForTax = grossSalary + overtimeAddition - absenceDeduction - penaltyDeduction;
-    const exemption = EGY.PERSONAL_EXEMPTION_2024 || EGY.PERSONAL_EXEMPTION || 20000;
-    const monthlyExemptions = socialInsuranceEmpShare + (exemption / 12);
-    
-    let monthlyTax = 0;
-    if (!isTaxExempted && (monthlyGrossForTax - monthlyExemptions) > 0) {
-        const ai = (monthlyGrossForTax - monthlyExemptions) * 12;
-        const af = 360;
-        const annualTax = calculateEgyptianTax(ai, af);
-        monthlyTax = annualTax / 12;
-    }
-
-    const totalDeductions = socialInsuranceEmpShare + monthlyTax + absenceDeduction + penaltyDeduction + loanDeduction;
-    const netSalary = (grossSalary + overtimeAddition) - totalDeductions;
-    const costToCompany = grossSalary + overtimeAddition + socialInsuranceCompShare;
-
-    return {
-        grossSalary: R(grossSalary),
-        overtimeAddition: R(overtimeAddition),
-        socialInsuranceEmpShare: R(socialInsuranceEmpShare),
-        socialInsuranceCompShare: R(socialInsuranceCompShare),
-        absenceDeduction: R(absenceDeduction),
-        penaltyDeduction: R(penaltyDeduction),
-        monthlyTax: R(monthlyTax),
-        loanDeduction: R(loanDeduction),
-        totalDeductions: R(totalDeductions),
-        netSalary: R(netSalary),
-        costToCompany: R(costToCompany)
-    };
-};
-
-const calculateNetToGross = (targetNet, insSalary, companySettings, isTaxExempted = false) => {
+// 5. Net To Gross
+const calculateNetToGross = (targetNet, insSalary, companySettings, isTaxExempted = false, jobType = "Full Time") => {
     let minGross = targetNet;
     let maxGross = targetNet * 2.5; 
     let currentGross = (minGross + maxGross) / 2;
     let bestMatch = null;
-
     for (let i = 0; i < 100; i++) {
-        const payload = calculateGrossToNet({
-            basicSalary: currentGross,
-            insSalary: insSalary,
-            companySettings: companySettings,
-            isTaxExempted: isTaxExempted
+        const payload = calculateGrossToNet({ 
+            basicSalary: currentGross, 
+            insSalary: insSalary, 
+            companySettings: companySettings, 
+            isTaxExempted: isTaxExempted,
+            jobType: jobType // 🔥 تمرير نوع الوظيفة للوب
         });
-
-        if (Math.abs(payload.netSalary - targetNet) < 0.01) {
-            bestMatch = payload;
-            break;
-        }
-
-        if (payload.netSalary > targetNet) {
-            maxGross = currentGross;
-        } else {
-            minGross = currentGross;
-        }
+        if (Math.abs(payload.netSalary - targetNet) < 0.01) { bestMatch = payload; break; }
+        if (payload.netSalary > targetNet) maxGross = currentGross;
+        else minGross = currentGross;
         currentGross = (minGross + maxGross) / 2;
         bestMatch = payload; 
     }
-
     return bestMatch;
 };
 
+// 6. تقرير الضرائب الموحدة
 const generateUnifiedTaxRow = (employee, payrollRecord) => {
     const p = payrollRecord.payload;
-    const exemption = EGY.PERSONAL_EXEMPTION_2024 || EGY.PERSONAL_EXEMPTION || 20000;
     return {
         "كود الموظف": employee.nationalId,
         "اسم الموظف": employee.name,
@@ -162,9 +184,9 @@ const generateUnifiedTaxRow = (employee, payrollRecord) => {
         "العلاوات المعفاة": 0, 
         "البدلات الخاضعة": 0,
         "إجمالي الاستحقاقات": p.grossSalary + (p.overtimeAddition || 0),
-        "الإعفاء الشخصي": R(exemption / 12),
+        "الإعفاء الشخصي": Number((EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12).toFixed(2)),
         "حصة الموظف في التأمينات": p.socialInsuranceEmpShare,
-        "صافي الوعاء الخاضع": Math.max(0, (p.grossSalary + (p.overtimeAddition || 0)) - (p.socialInsuranceEmpShare + (exemption / 12))),
+        "صافي الوعاء الخاضع": Math.max(0, (p.grossSalary + (p.overtimeAddition || 0)) - (p.socialInsuranceEmpShare + (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12))),
         "الضريبة المستقطعة": p.monthlyTax,
         "صافي المرتب": p.netSalary || p.net
     };
@@ -173,34 +195,12 @@ const generateUnifiedTaxRow = (employee, payrollRecord) => {
 const analyzePayrollAnomaly = (currentPayrollPayload, previousPayrollPayload) => {
     const warnings = [];
     let hasAnomaly = false;
-
     if (!previousPayrollPayload) return { hasAnomaly, warnings };
-
-    const currentNet = currentPayrollPayload.netSalary || currentPayrollPayload.net || 0;
-    const prevNet = previousPayrollPayload.netSalary || previousPayrollPayload.net || 0;
-
-    const netDiff = currentNet - prevNet;
-    const netDiffPercentage = prevNet > 0 ? (netDiff / prevNet) * 100 : 0;
-
-    if (netDiffPercentage <= -25) {
-        hasAnomaly = true;
-        warnings.push(`انخفاض حاد في الصافي بنسبة ${Math.abs(netDiffPercentage).toFixed(1)}% مقارنة بالشهر السابق.`);
-    }
-
-    const currentPenalty = currentPayrollPayload.penaltyDeduction || 0;
-    const currentGross = currentPayrollPayload.grossSalary || currentPayrollPayload.gross || 0;
-    if (currentPenalty > (currentGross * 0.15)) {
-        hasAnomaly = true;
-        warnings.push("تجاوزت الجزاءات 15% من الراتب الأساسي.");
-    }
-
-    const currentTax = currentPayrollPayload.monthlyTax || 0;
-    const prevTax = previousPayrollPayload.monthlyTax || 0;
-    if (currentTax > prevTax * 1.5 && prevTax > 0) {
-        hasAnomaly = true;
-        warnings.push("قفزة في الشريحة الضريبية بسبب الأوفرتايم أو البدلات.");
-    }
-
+    const netDiff = (currentPayrollPayload.netSalary || currentPayrollPayload.net) - (previousPayrollPayload.netSalary || previousPayrollPayload.net);
+    const netDiffPercentage = (netDiff / (previousPayrollPayload.netSalary || previousPayrollPayload.net)) * 100;
+    if (netDiffPercentage <= -25) { hasAnomaly = true; warnings.push(`انخفاض بنسبة ${Math.abs(netDiffPercentage).toFixed(1)}%`); }
+    if (currentPayrollPayload.penaltyDeduction > (currentPayrollPayload.grossSalary * 0.15)) { hasAnomaly = true; warnings.push("تجاوزت الجزاءات 15%"); }
+    if (currentPayrollPayload.monthlyTax > previousPayrollPayload.monthlyTax * 1.5) { hasAnomaly = true; warnings.push("قفزة ضريبية"); }
     return { hasAnomaly, warnings: warnings.join(" | ") };
 };
 
@@ -215,21 +215,15 @@ const calculateSettlement = (employee, remainingLeaves, unpaidSalaries, unsettle
         endOfServiceBonus = (first5Years * 15 * dayRate) + (remainingYears * 30 * dayRate);
     }
     const netPayable = (leavesValue + unpaidSalaries + endOfServiceBonus) - unsettledLoans;
-
-    return {
-        leavesValue: R(leavesValue),
-        unpaidSalaries: R(unpaidSalaries),
-        endOfServiceBonus: R(endOfServiceBonus),
-        unsettledLoans: R(unsettledLoans),
-        netPayable: R(netPayable)
-    };
+    return { leavesValue: Number(leavesValue.toFixed(2)), unpaidSalaries: Number(unpaidSalaries.toFixed(2)), endOfServiceBonus: Number(endOfServiceBonus.toFixed(2)), unsettledLoans: Number(unsettledLoans.toFixed(2)), netPayable: Number(netPayable.toFixed(2)) };
 };
 
-module.exports = {
-    runPayrollLogic,
-    calculateGrossToNet,
-    calculateNetToGross,
-    generateUnifiedTaxRow,
-    analyzePayrollAnomaly,
-    calculateSettlement
+module.exports = { 
+    EGY_CONSTANTS, 
+    calculateGrossToNet, 
+    calculateNetToGross, 
+    generateUnifiedTaxRow, 
+    analyzePayrollAnomaly, 
+    calculateSettlement, 
+    runPayrollLogic 
 };
