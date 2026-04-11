@@ -35,9 +35,18 @@
                 <button class="btn-primary" onclick="doLogin()">دخول ←</button>
             </div>
             <div id="signup-form" style="display:none">
-                <div class="form-group"><label>اسم الشركة</label><input type="text" id="reg-company"/></div>
-                <div class="form-group"><label>البريد الإلكتروني</label><input type="email" id="reg-email"/></div>
-                <div class="form-group"><label>كلمة المرور</label><input type="password" id="reg-password"/></div>
+                <div class="form-group">
+                    <label>اسم الشركة</label>
+                    <input type="text" id="reg-company" placeholder="شركة المستقبل"/>
+                </div>
+                <div class="form-group">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" id="reg-email" placeholder="admin@company.com"/>
+                </div>
+                <div class="form-group">
+                    <label>كلمة المرور</label>
+                    <input type="password" id="reg-password" placeholder="8+ أحرف"/>
+                </div>
                 <button class="btn-primary" onclick="doSignup()">إنشاء حساب مجاني ✓</button>
             </div>
             <div class="auth-error" id="auth-error"></div>
@@ -78,14 +87,19 @@
         </header>
 
         <main class="main">
-            <div class="page active" id="page-dashboard">
-                <div id="dashboard-stats" class="stats-grid"></div>
-            </div>
-
             <div class="page" id="page-employees">
                 <div class="table-container">
                     <table class="data-table">
-                        <thead><tr><th>الموظف</th><th>القسم</th><th>الوظيفة</th><th>التعيين</th><th>الحالة</th><th>إجراء</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>الموظف</th>
+                                <th>القسم / الوظيفة</th>
+                                <th>تاريخ التعيين</th>
+                                <th>الراتب التأميني</th>
+                                <th>الحالة</th>
+                                <th>إجراء</th>
+                            </tr>
+                        </thead>
                         <tbody id="employees-tbody"></tbody>
                     </table>
                 </div>
@@ -93,40 +107,71 @@
 
             <div class="page" id="page-attendance">
                 <div class="form-grid" style="margin-bottom: 20px;">
-                    <div class="form-field"><label>الموظف</label><select id="att-emp-select" onchange="loadAttendance()"></select></div>
-                    <div class="form-field"><label>الشهر</label><input type="month" id="att-month" onchange="loadAttendance()"></div>
+                    <div class="form-field">
+                        <label>اختر الموظف</label>
+                        <select id="att-emp-select" onchange="loadAttendance()"></select>
+                    </div>
+                    <div class="form-field">
+                        <label>الشهر</label>
+                        <input type="month" id="att-month" onchange="loadAttendance()">
+                    </div>
                 </div>
-                <div id="att-stats" style="margin-bottom: 15px;"></div>
+                <div id="att-stats" class="stats-mini-grid"></div>
                 <div id="att-calendar" class="attendance-calendar"></div>
             </div>
 
             <div class="page" id="page-payroll">
-                <div class="form-grid">
-                    <div class="form-field"><label>الموظف</label><select id="payroll-emp-select"></select></div>
-                    <div class="form-field"><label>الشهر</label><input type="month" id="payroll-month"></div>
-                    <div class="form-field"><label>الأساسي الشامل</label><input type="number" id="payroll-basic" value="0"></div>
-                    <div class="form-field"><label>بدل الانتقال</label><input type="number" id="payroll-trans" value="0"></div>
-                    <div class="form-field"><label>أيام العمل</label><input type="number" id="payroll-days" value="30"></div>
+                <div class="payroll-config-card">
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label>الموظف</label>
+                            <select id="payroll-emp-select" onchange="loadEmployeePayrollData()"></select>
+                        </div>
+                        <div class="form-field">
+                            <label>شهر الاستحقاق</label>
+                            <input type="month" id="payroll-month">
+                        </div>
+                    </div>
+                    
+                    <div class="payroll-inputs-grid">
+                        <div class="input-section">
+                            <h3>💰 الثوابت</h3>
+                            <div class="form-field"><label>الأساسي الشامل</label><input type="number" id="payroll-basic"></div>
+                            <div class="form-field"><label>بدل انتقال</label><input type="number" id="payroll-trans"></div>
+                            <div class="form-field"><label>أيام العمل</label><input type="number" id="payroll-days" value="30"></div>
+                        </div>
+                        <div class="input-section">
+                            <h3>➕ الإضافات (استحقاق)</h3>
+                            <div id="additions-list"></div>
+                            <button class="btn-add-item" onclick="addPayrollItem('additions')">+ إضافة بند</button>
+                        </div>
+                        <div class="input-section">
+                            <h3>➖ الخصومات (استقطاع)</h3>
+                            <div id="deductions-list"></div>
+                            <button class="btn-add-item" onclick="addPayrollItem('deductions')">+ إضافة بند</button>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-primary" style="width: 100%; margin-top: 20px;" onclick="calculatePayroll()">
+                        🚀 احسب الراتب الآن (Gross to Net)
+                    </button>
                 </div>
-                <div style="margin-top: 15px;">
-                    <button class="btn btn-ghost" onclick="addPayrollItem('additions')">+ استحقاق</button>
-                    <button class="btn btn-ghost" onclick="addPayrollItem('deductions')">+ استقطاع</button>
-                </div>
-                <div id="additions-list" class="additions-list"></div>
-                <div id="deductions-list" class="deductions-list"></div>
-                <button class="btn btn-success" style="margin-top: 20px; width: 100%;" onclick="calculatePayroll()">احسب الراتب</button>
 
-                <div id="payroll-result-panel" style="display: none; margin-top: 20px;" class="payroll-result">
+                <div id="payroll-result-panel" class="result-card" style="display:none">
+                    <div class="result-header">
+                        <h3>تفاصيل مفردات المرتب</h3>
+                        <button class="btn-pdf" onclick="generatePayslipPDF()">📄 تحميل PDF</button>
+                    </div>
                     <div id="payroll-result-content"></div>
-                    <button class="btn btn-blue" style="margin-top: 15px; width: 100%;" onclick="generatePayslipPDF()">تحميل PDF</button>
                 </div>
             </div>
 
             <div class="page" id="page-settings">
-                <div class="form-grid">
-                    <div class="form-field"><label>اسم الشركة</label><input type="text" id="settings-company-name"></div>
+                <div class="settings-card">
+                    <h3>إعدادات الشركة والسياسات</h3>
+                    <div id="settings-container"></div>
+                    <button class="btn-primary" onclick="saveSettings()">حفظ التعديلات</button>
                 </div>
-                <button class="btn btn-success" style="margin-top: 20px;" onclick="saveSettings()">حفظ الإعدادات</button>
             </div>
         </main>
     </div>
@@ -134,51 +179,67 @@
     <div class="modal-overlay" id="modal-employee">
         <div class="modal">
             <div class="modal-header">
-                <div class="modal-title" id="emp-modal-title">إضافة موظف</div>
-                <button class="modal-close" onclick="closeModal('modal-employee')">✕</button>
+                <h3 id="emp-modal-title">إضافة موظف جديد</h3>
+                <button onclick="closeModal('modal-employee')">✕</button>
             </div>
-            <input type="hidden" id="emp-id">
-            <div class="form-grid">
-                <div class="form-field"><label>الاسم</label><input type="text" id="emp-name"></div>
-                <div class="form-field"><label>الرقم القومي</label><input type="text" id="emp-national-id"></div>
-                <div class="form-field"><label>تاريخ التعيين</label><input type="date" id="emp-hiring-date"></div>
-                <div class="form-field"><label>القسم</label><input type="text" id="emp-department"></div>
-                <div class="form-field"><label>الوظيفة</label><input type="text" id="emp-position"></div>
-                <div class="form-field"><label>الراتب التأميني</label><input type="number" id="emp-ins-salary" value="5384"></div>
+            <div class="modal-body">
+                <input type="hidden" id="emp-id">
+                <div class="form-grid">
+                    <div class="form-field"><label>الاسم بالكامل</label><input type="text" id="emp-name"></div>
+                    <div class="form-field"><label>الرقم القومي</label><input type="text" id="emp-national-id"></div>
+                    <div class="form-field"><label>تاريخ التعيين</label><input type="date" id="emp-hiring-date"></div>
+                    <div class="form-field"><label>القسم</label><input type="text" id="emp-department"></div>
+                    <div class="form-field"><label>الوظيفة</label><input type="text" id="emp-position"></div>
+                    <div class="form-field"><label>الراتب التأميني</label><input type="number" id="emp-ins-salary"></div>
+                </div>
             </div>
-            <div class="modal-footer"><button class="btn btn-success" onclick="saveEmployee()">حفظ</button></div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="saveEmployee()">حفظ البيانات</button>
+            </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="modal-att-day">
         <div class="modal">
             <div class="modal-header">
-                <div class="modal-title" id="att-day-title">تسجيل الحضور</div>
-                <button class="modal-close" onclick="closeModal('modal-att-day')">✕</button>
+                <h3 id="att-day-title">تعديل سجل اليوم</h3>
+                <button onclick="closeModal('modal-att-day')">✕</button>
             </div>
-            <input type="hidden" id="att-day-date">
-            <div class="form-grid">
-                <div class="form-field">
-                    <label>الحالة</label>
-                    <select id="att-day-status">
-                        <option value="present">حضور</option><option value="absent">غياب</option>
-                        <option value="late">تأخير</option><option value="holiday">إجازة</option>
-                    </select>
+            <div class="modal-body">
+                <input type="hidden" id="att-day-date">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>الحالة</label>
+                        <select id="att-day-status">
+                            <option value="present">حضور</option>
+                            <option value="absent">غياب</option>
+                            <option value="late">تأخير</option>
+                            <option value="holiday">إجازة رسمية</option>
+                        </select>
+                    </div>
+                    <div class="form-field"><label>وقت الدخول</label><input type="time" id="att-day-checkin"></div>
+                    <div class="form-field"><label>وقت الخروج</label><input type="time" id="att-day-checkout"></div>
+                    <div class="form-field"><label>دقائق التأخير</label><input type="number" id="att-day-late"></div>
                 </div>
-                <div class="form-field"><label>دخول</label><input type="time" id="att-day-checkin"></div>
-                <div class="form-field"><label>خروج</label><input type="time" id="att-day-checkout"></div>
-                <div class="form-field"><label>تأخير (دقائق)</label><input type="number" id="att-day-late"></div>
-                <div class="form-field"><label>إضافي (ساعات)</label><input type="number" id="att-day-ot"></div>
             </div>
-            <div class="modal-footer"><button class="btn btn-success" onclick="saveAttDayModal()">حفظ الحضور</button></div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="saveAttDayModal()">تحديث</button>
+            </div>
         </div>
     </div>
 
-    <script src="js/utils.js"></script><script src="js/auth.js"></script><script src="js/employees.js"></script>
-    <script src="js/payroll.js"></script><script src="js/attendance.js"></script><script src="js/settings.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/employees.js"></script>
+    <script src="js/payroll.js"></script>
+    <script src="js/attendance.js"></script>
+    <script src="js/settings.js"></script>
     <script src="js/pdf-gen.js"></script>
+
     <script>
-        window.addEventListener('load', () => { if (localStorage.getItem('pp_token') && typeof bootApp === 'function') bootApp(); });
+        window.addEventListener('load', () => {
+            if (localStorage.getItem('pp_token')) { bootApp(); }
+        });
     </script>
 </body>
 </html>
