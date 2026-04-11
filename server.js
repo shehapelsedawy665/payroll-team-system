@@ -58,7 +58,11 @@ const adminOnly = (req, res, next) => {
 
 // ==================== AUTH ====================
 
-app.post("/api/auth/signup", async (req, res) => {
+// ==================== AUTH ====================
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
+// سيب باقي المسارات زي (refresh و logout) موجودة زي ما هي تحت السطرين دول مؤقتاً
     try {
         await connectDB();
         const { email, password, role, companyName, companyPassword } = req.body;
@@ -85,7 +89,11 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+// ==================== AUTH ====================
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
+// سيب باقي المسارات زي (refresh و logout) موجودة زي ما هي تحت السطرين دول مؤقتاً
     try {
         await connectDB();
         const { email, password } = req.body;
