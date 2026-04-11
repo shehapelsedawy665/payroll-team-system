@@ -280,8 +280,11 @@ const Attendance   = mongoose.models.Attendance   || mongoose.model("Attendance"
 const Leave        = mongoose.models.Leave        || mongoose.model("Leave",        leaveSchema);
 const LeaveBalance = mongoose.models.LeaveBalance || mongoose.model("LeaveBalance", leaveBalanceSchema);
 
+// ==================== EXPORTS ====================
 module.exports = { 
-    connectDB, Company, User, Employee, Shift, Candidate, Loan, EWARequest, 
+    connectDB, 
+    connectToDatabase: connectDB, // <-- السر كله هنا يا هندسة!
+    Company, User, Employee, Shift, Candidate, Loan, EWARequest, 
     Custody, Penalty, Appraisal, Settlement, Payroll, Subscription, 
     Attendance, Leave, LeaveBalance 
 };
