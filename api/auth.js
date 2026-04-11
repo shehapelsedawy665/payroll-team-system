@@ -1,10 +1,10 @@
 // api/auth.js
-const { connectToDatabase } = require('../backend/config/db');
+const { connectDB } = require('../backend/config/db');
 const User = require('../backend/models/User');
 const Company = require('../backend/models/Company');
 
 module.exports = async (req, res) => {
-    await connectToDatabase();
+    await connectDB();
     const { method } = req;
 
     if (method === 'POST') {
