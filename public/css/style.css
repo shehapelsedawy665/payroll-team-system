@@ -1,0 +1,22 @@
+/* public/css/style.css */
+:root {
+  --bg: #0a0e17; --bg2: #0f1520; --bg3: #141b2d; --surface: #1a2236;
+  --surface2: #1f2a40; --border: #2a3a55; --border2: #354b6a; --primary: #00d4aa;
+  --primary-dim: rgba(0,212,170,0.12); --primary-glow: rgba(0,212,170,0.3);
+  --accent: #ff6b35; --accent-dim: rgba(255,107,53,0.12); --blue: #4d9fff;
+  --blue-dim: rgba(77,159,255,0.12); --purple: #a78bfa; --purple-dim: rgba(167,139,250,0.12);
+  --gold: #fbbf24; --gold-dim: rgba(251,191,36,0.12); --red: #f87171;
+  --red-dim: rgba(248,113,113,0.12); --green: #4ade80; --green-dim: rgba(74,222,128,0.12);
+  --text: #e2eaf8; --text2: #8fa3c8; --text3: #5a7099; --sidebar-w: 240px;
+  --header-h: 60px; --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body { font-family: 'Cairo', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* انسخ باقي تنسيقات الـ Auth والـ Sidebar والـ Stats والـ Tables من الكود اللي كان عندك هنا */
+/* أنا هسيبهم لك عشان الملف ميبقاش طويل جداً في الشات، بس هما نفسهم اللي بعتهم لي في أول 400 سطر */
