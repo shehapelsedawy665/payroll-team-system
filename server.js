@@ -56,12 +56,11 @@ const adminOnly = (req, res, next) => {
     next();
 };
 
-// ==================== AUTH ====================
-// ربط الملف المتقسم الخاص بالدخول والتسجيل
+// ==================== AUTH (MODULARIZED) ====================
+// ربط ملف الـ Auth اللي نقلنا فيه الـ Signup والـ Login
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// باقي مسارات الـ Auth اللي لسه متقسمتش
 app.post("/api/auth/refresh", async (req, res) => {
     try {
         await connectDB();
@@ -132,7 +131,7 @@ app.post("/api/subscription/upgrade", authMiddleware, adminOnly, async (req, res
     }
 });
 
-// ==================== HR & ATS (NEW) ====================
+// ==================== HR & ATS ====================
 
 app.post('/api/hr/candidates', authMiddleware, async (req, res) => {
     try {
