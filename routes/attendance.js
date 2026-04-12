@@ -34,6 +34,10 @@ router.post("/bulk", authMiddleware, async (req, res) => {
 });
 
 router.post('/webhook/biometric', async (req, res) => {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey !== process.env.BIOMETRIC_API_KEY) {
+        return res.status(401).json({ error: "Invalid API key" });
+    }
     try {
         await connectDB();
         const { nationalId, deviceId, timestamp, type } = req.body; 

@@ -11,10 +11,25 @@ async function api(method, path, body) {
     if (AUTH_TOKEN) opts.headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
     if (body) opts.body = JSON.stringify(body);
 
-    const r = await fetch(BASE + path, opts);
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || data.message || 'حدث خطأ في السيرفر');
-    return data;
+    try {
+        const r = await fetch(BASE + path, opts);
+        let data;
+        try {
+            data = await r.json();
+        } catch (e) {
+            throw new Error(`Server error: ${r.status} ${r.statusText}`);
+        }
+        
+        if (!r.ok) {
+            throw new Error(data.error || data.message || `Server error: ${r.status}`);
+        }
+        return data;
+    } catch (e) {
+        if (e instanceof TypeError) {
+            throw new Error('Network error - please check your connection');
+        }
+        throw e;
+    }
 }
 
 function showLoading() { document.getElementById('loading').classList.add('show'); }

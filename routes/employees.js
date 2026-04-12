@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { connectDB, Employee, LeaveBalance, Payroll, Attendance, Leave } = require('../backend/config/db');
 const { authMiddleware, adminOnly } = require('../backend/middleware/auth');
+const { validateEmployee } = require('../backend/middleware/validators');
 
 // 1. جلب كل الموظفين
 router.get("/", authMiddleware, async (req, res) => {
@@ -13,7 +14,7 @@ router.get("/", authMiddleware, async (req, res) => {
 });
 
 // 2. إضافة موظف جديد
-router.post("/", authMiddleware, async (req, res) => {
+router.post("/", authMiddleware, validateEmployee, async (req, res) => {
     try {
         await connectDB();
         const emp = await new Employee({

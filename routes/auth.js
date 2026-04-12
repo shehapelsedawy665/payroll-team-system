@@ -4,8 +4,9 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { connectDB, User, Company, Subscription } = require('../backend/config/db');
 
-const JWT_SECRET         = process.env.JWT_SECRET         || "payroll-pro-secret-2026-egypt";
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "payroll-pro-refresh-2026-egypt";
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+if (!JWT_SECRET || !JWT_REFRESH_SECRET) throw new Error("❌ JWT secrets not configured");
 
 // مسار التسجيل (/api/auth/signup)
 router.post('/signup', async (req, res) => {

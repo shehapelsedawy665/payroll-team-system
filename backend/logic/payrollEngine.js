@@ -3,9 +3,6 @@
  * @description Advanced Egyptian Payroll Engine - (Restored from Original 2026 Logic with Part-Time Support)
  */
 
-// دالة التقريب الدقيقة لحل مشكلة فرق القرش (Floating-point precision)
-const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
-
 // 1. الثوابت الأصلية بتاعتك + تحديث البارت تايم
 const EGY_CONSTANTS = {
     PERSONAL_EXEMPTION_2024: 20000,
@@ -21,7 +18,7 @@ const EGY_CONSTANTS = {
 // 2. محرك الضرائب الأصلي بتاعك
 const calculateAnnualTax = (annualTaxableIncome) => {
     let tax = 0;
-    let income = R(annualTaxableIncome);
+    let income = annualTaxableIncome;
 
     let tierShift = 0;
     if (income > 1200000) tierShift = 4;
@@ -44,9 +41,9 @@ const calculateAnnualTax = (annualTaxableIncome) => {
     let remainingIncome = income;
     for (let i = 0; i < brackets.length; i++) {
         if (remainingIncome <= 0) break;
-        let taxableAtThisBracket = R(Math.min(remainingIncome, brackets[i].limit));
-        tax = R(tax + R(taxableAtThisBracket * brackets[i].rate));
-        remainingIncome = R(remainingIncome - taxableAtThisBracket);
+        let taxableAtThisBracket = Math.min(remainingIncome, brackets[i].limit);
+        tax += taxableAtThisBracket * brackets[i].rate;
+        remainingIncome -= taxableAtThisBracket;
     }
     return tax;
 };
@@ -67,7 +64,7 @@ const calculateGrossToNet = (params) => {
         jobType = "Full Time" // استقبال نوع الوظيفة
     } = params;
 
-    const grossSalary = R(basicSalary + variableSalary + allowances);
+    const grossSalary = basicSalary + variableSalary + allowances;
 
     // 🔥 اللوجيك الجديد: تحديد الحد الأدنى للتأمينات بناءً على نوع الوظيفة
     const minInsSalary = (jobType === "Part Time" || jobType === "مؤقت") ? EGY_CONSTANTS.MIN_INSURANCE_SALARY_PART_TIME : EGY_CONSTANTS.MIN_INSURANCE_SALARY_2024;
@@ -75,32 +72,32 @@ const calculateGrossToNet = (params) => {
     // تطبيق الحد الأقصى والأدنى الصح بتاع 2026
     let actualInsSalary = Math.max(minInsSalary, Math.min(insSalary || 0, EGY_CONSTANTS.MAX_INSURANCE_SALARY_2024));
     
-    const socialInsuranceEmpShare = R(actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_EMP_RATE);
-    const socialInsuranceCompShare = R(actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_COMP_RATE);
+    const socialInsuranceEmpShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_EMP_RATE;
+    const socialInsuranceCompShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_COMP_RATE;
 
-    const dayRate = R(grossSalary / Number(companySettings.monthCalcType || 30));
-    const hourRate = R(dayRate / Number(companySettings.dailyWorkHours || 8));
-    const absenceDeduction = R(absentDays * dayRate * (companySettings.absentDayRate || 1));
-    const penaltyDeduction = R(penaltyDays * dayRate);
+    const dayRate = grossSalary / Number(companySettings.monthCalcType || 30);
+    const hourRate = dayRate / Number(companySettings.dailyWorkHours || 8);
+    const absenceDeduction = absentDays * dayRate * (companySettings.absentDayRate || 1);
+    const penaltyDeduction = penaltyDays * dayRate;
     
-    const overtimeAddition = R(overtimeHours * hourRate * (companySettings.overtimeRate || 1.5));
+    const overtimeAddition = overtimeHours * hourRate * (companySettings.overtimeRate || 1.5);
 
-    const monthlyGrossForTax = R(grossSalary + overtimeAddition - absenceDeduction - penaltyDeduction);
-    const monthlyExemptions = R(socialInsuranceEmpShare + (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / EGY_CONSTANTS.MONTHS_IN_YEAR));
+    const monthlyGrossForTax = grossSalary + overtimeAddition - absenceDeduction - penaltyDeduction;
+    const monthlyExemptions = socialInsuranceEmpShare + (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / EGY_CONSTANTS.MONTHS_IN_YEAR);
     
     let monthlyTax = 0;
     if (!isTaxExempted) {
-        const annualTaxableIncome = R((monthlyGrossForTax - monthlyExemptions) * EGY_CONSTANTS.MONTHS_IN_YEAR);
+        const annualTaxableIncome = (monthlyGrossForTax - monthlyExemptions) * EGY_CONSTANTS.MONTHS_IN_YEAR;
         if (annualTaxableIncome > 0) {
             const annualTax = calculateAnnualTax(annualTaxableIncome);
-            monthlyTax = R(annualTax / EGY_CONSTANTS.MONTHS_IN_YEAR);
+            monthlyTax = annualTax / EGY_CONSTANTS.MONTHS_IN_YEAR;
         }
     }
 
-    const totalDeductions = R(socialInsuranceEmpShare + monthlyTax + absenceDeduction + penaltyDeduction + loanDeduction);
-    const martyrsFund = R(grossSalary * EGY_CONSTANTS.MARTYRS_FUND_RATE); // صندوق الشهداء 0.05%
-    const netSalary = R(R(grossSalary + overtimeAddition) - totalDeductions - martyrsFund);
-    const costToCompany = R(grossSalary + overtimeAddition + socialInsuranceCompShare);
+    const totalDeductions = socialInsuranceEmpShare + monthlyTax + absenceDeduction + penaltyDeduction + loanDeduction;
+    const martyrsFund = Number((grossSalary * EGY_CONSTANTS.MARTYRS_FUND_RATE).toFixed(2)); // صندوق الشهداء 0.05%
+    const netSalary = (grossSalary + overtimeAddition) - totalDeductions - martyrsFund;
+    const costToCompany = grossSalary + overtimeAddition + socialInsuranceCompShare;
 
     return {
         grossSalary: Number(grossSalary.toFixed(2)),
@@ -110,7 +107,7 @@ const calculateGrossToNet = (params) => {
         absenceDeduction: Number(absenceDeduction.toFixed(2)),
         penaltyDeduction: Number(penaltyDeduction.toFixed(2)),
         monthlyTax: Number(monthlyTax.toFixed(2)),
-        martyrsFund: Number(martyrsFund.toFixed(2)),
+        martyrsFund,
         loanDeduction: Number(loanDeduction.toFixed(2)),
         totalDeductions: Number((totalDeductions + martyrsFund).toFixed(2)),
         netSalary: Number(netSalary.toFixed(2)),
@@ -153,7 +150,7 @@ const runPayrollLogic = (input, prev, emp) => {
         totalOtherDeductions: totalDeductions,
         insuranceEmployee: payload.socialInsuranceEmpShare,
         insuranceCompany: payload.socialInsuranceCompShare,
-        currentTaxable: R(payload.grossSalary - payload.socialInsuranceEmpShare - (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12)),
+        currentTaxable: payload.grossSalary - payload.socialInsuranceEmpShare - (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12),
         monthlyTax: payload.monthlyTax,
         martyrs: payload.martyrsFund,
         net: payload.netSalary,
@@ -197,10 +194,10 @@ const generateUnifiedTaxRow = (employee, payrollRecord) => {
         "المرتب الأساسي": p.grossSalary,
         "العلاوات المعفاة": 0,
         "البدلات الخاضعة": 0,
-        "إجمالي الاستحقاقات": R(p.grossSalary + (p.overtimeAddition || 0)),
+        "إجمالي الاستحقاقات": p.grossSalary + (p.overtimeAddition || 0),
         "الإعفاء الشخصي": Number((EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12).toFixed(2)),
         "حصة الموظف في التأمينات": p.socialInsuranceEmpShare,
-        "صافي الوعاء الخاضع": Math.max(0, R((p.grossSalary + (p.overtimeAddition || 0)) - (p.socialInsuranceEmpShare + (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12)))),
+        "صافي الوعاء الخاضع": Math.max(0, (p.grossSalary + (p.overtimeAddition || 0)) - (p.socialInsuranceEmpShare + (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 12))),
         "الضريبة المستقطعة": p.monthlyTax,
         "صندوق الشهداء": p.martyrsFund || 0,
         "صافي المرتب": p.netSalary || p.net
@@ -211,7 +208,7 @@ const analyzePayrollAnomaly = (currentPayrollPayload, previousPayrollPayload) =>
     const warnings = [];
     let hasAnomaly = false;
     if (!previousPayrollPayload) return { hasAnomaly, warnings };
-    const netDiff = R((currentPayrollPayload.netSalary || currentPayrollPayload.net) - (previousPayrollPayload.netSalary || previousPayrollPayload.net));
+    const netDiff = (currentPayrollPayload.netSalary || currentPayrollPayload.net) - (previousPayrollPayload.netSalary || previousPayrollPayload.net);
     const netDiffPercentage = (netDiff / (previousPayrollPayload.netSalary || previousPayrollPayload.net)) * 100;
     if (netDiffPercentage <= -25) { hasAnomaly = true; warnings.push(`انخفاض بنسبة ${Math.abs(netDiffPercentage).toFixed(1)}%`); }
     if (currentPayrollPayload.penaltyDeduction > (currentPayrollPayload.grossSalary * 0.15)) { hasAnomaly = true; warnings.push("تجاوزت الجزاءات 15%"); }
@@ -220,16 +217,16 @@ const analyzePayrollAnomaly = (currentPayrollPayload, previousPayrollPayload) =>
 };
 
 const calculateSettlement = (employee, remainingLeaves, unpaidSalaries, unsettledLoans, companySettings) => {
-    const dayRate = R(employee.basicSalary / Number(companySettings.monthCalcType || 30));
-    const leavesValue = R(remainingLeaves * dayRate);
+    const dayRate = employee.basicSalary / Number(companySettings.monthCalcType || 30);
+    const leavesValue = remainingLeaves * dayRate;
     const yearsOfService = (new Date() - new Date(employee.hiringDate)) / (1000 * 60 * 60 * 24 * 365.25);
     let endOfServiceBonus = 0;
     if (yearsOfService >= 1) {
         const first5Years = Math.min(yearsOfService, 5);
         const remainingYears = Math.max(0, yearsOfService - 5);
-        endOfServiceBonus = R((first5Years * 15 * dayRate) + (remainingYears * 30 * dayRate));
+        endOfServiceBonus = (first5Years * 15 * dayRate) + (remainingYears * 30 * dayRate);
     }
-    const netPayable = R((leavesValue + unpaidSalaries + endOfServiceBonus) - unsettledLoans);
+    const netPayable = (leavesValue + unpaidSalaries + endOfServiceBonus) - unsettledLoans;
     return { leavesValue: Number(leavesValue.toFixed(2)), unpaidSalaries: Number(unpaidSalaries.toFixed(2)), endOfServiceBonus: Number(endOfServiceBonus.toFixed(2)), unsettledLoans: Number(unsettledLoans.toFixed(2)), netPayable: Number(netPayable.toFixed(2)) };
 };
 

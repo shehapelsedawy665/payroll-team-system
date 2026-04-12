@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET || "payroll-pro-secret-2026-egypt";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error("❌ JWT_SECRET not configured");
 
 const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split(" ")[1];

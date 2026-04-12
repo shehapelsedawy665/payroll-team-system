@@ -4,18 +4,38 @@ const mongoose = require('mongoose');
 const PayrollRecordSchema = new mongoose.Schema({
     employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
-    month: { type: String, required: true }, // Format: "2026-04"
+    month: { type: String, required: true },
     payload: {
+        days: Number,
         gross: Number,
         net: Number,
-        tax: Number,
-        insurance: Number,
-        basic: Number,
+        proratedBasic: Number,
+        proratedTrans: Number,
+        totalAdditions: Number,
+        totalOtherDeductions: Number,
+        insuranceEmployee: Number,
+        insuranceCompany: Number,
+        currentTaxable: Number,
+        monthlyTax: Number,
+        martyrs: Number,
         additions: Array,
         deductions: Array,
-        days: Number
+        costToCompany: Number,
+        socialInsuranceEmpShare: Number,
+        socialInsuranceCompShare: Number,
+        absenceDeduction: Number,
+        penaltyDeduction: Number,
+        loanDeduction: Number,
+        totalDeductions: Number,
+        overtimeAddition: Number,
+        grossSalary: Number
     },
-    status: { type: String, default: 'draft' } // draft, approved, paid
+    netSalary: Number,
+    hasAnomaly: { type: Boolean, default: false },
+    anomalyReason: [String],
+    status: { type: String, enum: ['draft', 'approved', 'paid'], default: 'draft' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-module.exports = mongoose.models.Payroll || mongoose.model('Payroll', PayrollSchema);
+module.exports = mongoose.models.PayrollRecord || mongoose.model('PayrollRecord', PayrollRecordSchema);
