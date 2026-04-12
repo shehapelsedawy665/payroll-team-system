@@ -12,16 +12,6 @@
     "SMTP_USER": "@smtp_user",
     "SMTP_PASSWORD": "@smtp_password"
   },
-  "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "50mb",
-        "includeFiles": "backend/**"
-      }
-    }
-  ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/server.js", "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"] },
     { "src": "/public/(.*)", "status": 200 },
@@ -31,7 +21,7 @@
     "server.js": {
       "memory": 1024,
       "maxDuration": 120,
-      "runtime": "nodejs18.x"
+      "includeFiles": "backend/**"
     }
   },
   "buildCommand": "yarn install || npm install",
