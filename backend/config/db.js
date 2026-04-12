@@ -3,41 +3,48 @@ const mongoose = require("mongoose");
 // منع التحذيرات في النسخ الجديدة من Mongoose
 mongoose.set('strictQuery', false);
 
-let cachedConnection = null;
+// ==================== CONNECTION ====================
+// Vercel Serverless: كل request ممكن يجي في function instance جديدة
+// الحل: نحفظ الـ connection في global scope عشان يتشارك بين الـ invocations
+
+let connectionPromise = null;
 
 const connectDB = async () => {
-    // 1. لو فيه اتصال شغال فعلاً، ارجع فوراً
-    if (mongoose.connection.readyState >= 1) {
+    // 1. لو الـ connection موجود وشغال فعلاً، ارجع فوراً
+    if (mongoose.connection.readyState === 1) {
         return mongoose.connection;
     }
 
-    // 2. لو فيه محاولة اتصال قيد التنفيذ، استناها
-    if (cachedConnection) {
-        return await cachedConnection;
+    // 2. لو فيه محاولة connection قيد التنفيذ، استنى نفس الـ Promise
+    if (connectionPromise) {
+        return connectionPromise;
     }
 
-    try {
-        const uri = process.env.MONGODB_URI || "mongodb+srv://Sedawy:FinalPass2026@egyptian-payroll.a6bquen.mongodb.net/payrollDB?retryWrites=true&w=majority";
-        
-        // إعدادات محسنة لبيئة Vercel (Serverless)
-        const options = {
-            serverSelectionTimeoutMS: 5000, // تقليل وقت الانتظار عشان الـ Function متفصلش
-            socketTimeoutMS: 45000,
-            family: 4,
-            bufferCommands: false, // تعطيل التخزين المؤقت عشان الأخطاء تظهر فوراً
-        };
+    const uri = process.env.MONGODB_URI || "mongodb+srv://Sedawy:FinalPass2026@egyptian-payroll.a6bquen.mongodb.net/payrollDB?retryWrites=true&w=majority";
 
-        console.log("⏳ Connecting to MongoDB...");
-        cachedConnection = mongoose.connect(uri, options);
-        
-        const conn = await cachedConnection;
-        console.log("✅ MongoDB Ready & Connected (HR-ERP Advanced)");
-        return conn;
-    } catch (err) {
-        cachedConnection = null;
-        console.error("❌ MongoDB Connection Error:", err.message);
-        throw err;
-    }
+    const options = {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        family: 4,
+        // ⚠️ bufferCommands: true (default) — لازم يكون true عشان الـ queries
+        // تستنى الـ connection بدل ما ترجع error فوراً
+        // bufferCommands: false كان هو السبب في مشكلة "Cannot call before connection"
+    };
+
+    console.log("⏳ Connecting to MongoDB...");
+
+    connectionPromise = mongoose.connect(uri, options)
+        .then(conn => {
+            console.log("✅ MongoDB Connected Successfully");
+            return conn;
+        })
+        .catch(err => {
+            connectionPromise = null; // reset عشان نحاول تاني في الـ request الجاي
+            console.error("❌ MongoDB Connection Error:", err.message);
+            throw err;
+        });
+
+    return connectionPromise;
 };
 
 // ==================== SCHEMAS ====================

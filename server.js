@@ -17,15 +17,29 @@ const payrollSchema = new mongoose.Schema({
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
-// --- [تعديل: استدعاء قاعدة البيانات لبيئة Vercel Serverless] ---
-connectDB().catch(err => console.error("Critical: DB Connection Failed", err));
+// ==================== DB CONNECTION MIDDLEWARE ====================
+// في Vercel Serverless كل request لازم ينتظر الـ connection يكتمل
+// بدل ما نعمل connectDB() مرة وننسى، بنعملها في كل request
+app.use(async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (err) {
+        console.error("DB Middleware Error:", err.message);
+        res.status(503).json({ error: "قاعدة البيانات غير متاحة حالياً، حاول مرة أخرى" });
+    }
+});
 
-// --- [نظام الحماية والـ Authentication المعدل بأمان] ---
+// --- [نظام الحماية والـ Authentication] ---
 
 app.post("/api/auth/signup", async (req, res) => {
     try {
         const { email, password, role, companyName, companyPassword } = req.body;
         
+        if (!email || !password) {
+            return res.status(400).json({ error: "البريد الإلكتروني وكلمة المرور مطلوبان" });
+        }
+
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: "الإيميل مسجل بالفعل" });
@@ -49,7 +63,7 @@ app.post("/api/auth/signup", async (req, res) => {
         });
         
         await newUser.save();
-        res.status(201).json({ success: true, message: "User created successfully" });
+        res.status(201).json({ success: true, message: "تم إنشاء الحساب بنجاح" });
     } catch (err) {
         console.error("Signup Error:", err);
         res.status(400).json({ error: "فشل في تسجيل البيانات: " + err.message });
@@ -59,6 +73,11 @@ app.post("/api/auth/signup", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
     try {
         const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: "البريد الإلكتروني وكلمة المرور مطلوبان" });
+        }
+
         const user = await User.findOne({ email }).populate('companyId');
 
         if (!user || user.password !== password) {
@@ -67,15 +86,19 @@ app.post("/api/auth/login", async (req, res) => {
 
         res.json({
             success: true,
+            accessToken: "local-token-" + user._id, // token بسيط — يُحسَّن لاحقاً بـ JWT
             user: {
-                email: user.email,
-                role: user.role,
-                companyId: user.companyId ? user.companyId._id : null,
-                companyName: user.companyId ? user.companyId.name : "System"
-            }
+                id:          user._id,
+                email:       user.email,
+                role:        user.role,
+                companyId:   user.companyId ? user.companyId._id   : null,
+                companyName: user.companyId ? user.companyId.name  : "System"
+            },
+            subscription: null
         });
     } catch (err) {
-        res.status(500).json({ error: "Login failed" });
+        console.error("Login Error:", err);
+        res.status(500).json({ error: "فشل تسجيل الدخول: " + err.message });
     }
 });
 
