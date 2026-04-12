@@ -1,7 +1,9 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
+const jwt = require("jsonwebtoken");
 const { connectDB, Company, User, Employee } = require("./db"); 
 const { runPayrollLogic } = require("./calculations");
 
@@ -9,48 +11,48 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// تعريف نموذج الـ Payroll
+const JWT_SECRET = process.env.JWT_SECRET || "sedawy_super_secret_2026";
+
+// --- [Middleware: API Security & Authorization] ---
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "غير مصرح: توكن مفقود أو غير صالح" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    try {
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: "غير مصرح: انتهت صلاحية الجلسة" });
+    }
+};
+
 const payrollSchema = new mongoose.Schema({
-    employeeId: { type: mongoose.Schema.Types.ObjectId, required: true }, 
-    month: { type: String, required: true }, 
+    employeeId: mongoose.Schema.Types.ObjectId, 
+    month: String, 
     payload: Object 
 });
 const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
 
-// --- [تفعيل مسارات النظام الإضافية (Modular Routes) لتعمل مع الـ Frontend الفعلي] ---
-// الـ Try/Catch ده بيخلي Vercel يقرا فولدر الـ routes بتاعك بدون ما يعمل Crash لو ملف مش موجود
-try { app.use('/api/attendance', require('./routes/attendance')); } catch(e) { console.log('Attendance bypassed'); }
-try { app.use('/api/leaves', require('./routes/leaves')); } catch(e) { console.log('Leaves bypassed'); }
-try { app.use('/api/settings', require('./routes/settings')); } catch(e) { console.log('Settings bypassed'); }
-try { app.use('/api/hr', require('./routes/hr')); } catch(e) { console.log('HR bypassed'); }
-try { app.use('/api/employees', require('./routes/employees')); } catch(e) { console.log('Employees routes bypassed'); }
-try { app.use('/api/payroll', require('./routes/payroll')); } catch(e) { console.log('Payroll routes bypassed'); }
-
-// --- [ضمان الاتصال قبل أي طلب لبيئة Vercel] ---
 const startApp = async () => {
     try {
         await connectDB();
         console.log("Database Ready ✅");
-        
-        if (process.env.NODE_ENV !== 'production') {
-            const PORT = process.env.PORT || 3000;
-            app.listen(PORT, () => console.log(`Server LIVE on ${PORT} 🚀`));
-        }
+        const PORT = process.env.PORT || 3000;
+        app.listen(PORT, () => console.log(`Server LIVE on ${PORT} 🚀`));
     } catch (err) {
         console.error("Critical: DB Connection Failed", err);
     }
 };
 
-// --- [نظام الحماية والـ Authentication المعدل بأمان] ---
-
+// --- [Authentication APIs] ---
 app.post("/api/auth/signup", async (req, res) => {
     try {
         const { email, password, role, companyName, companyPassword } = req.body;
-        
         const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ error: "الإيميل مسجل بالفعل" });
-        }
+        if (existingUser) return res.status(400).json({ error: "الإيميل مسجل بالفعل" });
 
         let companyId = null;
         if (role === 'admin' || (companyName && companyName.trim() !== "")) {
@@ -62,17 +64,12 @@ app.post("/api/auth/signup", async (req, res) => {
             companyId = savedCompany._id;
         }
 
-        const newUser = new User({ 
-            email, 
-            password, 
-            role: role || 'admin', 
-            companyId 
-        });
-        
+        const newUser = new User({ email, password, role: role || 'admin', companyId });
         await newUser.save();
-        res.status(201).json({ success: true, message: "User created successfully" });
+        
+        const token = jwt.sign({ id: newUser._id, role: newUser.role, companyId }, JWT_SECRET, { expiresIn: '7d' });
+        res.status(201).json({ success: true, message: "User created", token, user: newUser });
     } catch (err) {
-        console.error("Signup Error:", err);
         res.status(400).json({ error: "فشل في تسجيل البيانات: " + err.message });
     }
 });
@@ -86,8 +83,11 @@ app.post("/api/auth/login", async (req, res) => {
             return res.status(401).json({ error: "الإيميل أو كلمة المرور غير صحيحة" });
         }
 
+        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId?._id }, JWT_SECRET, { expiresIn: '7d' });
+
         res.json({
             success: true,
+            token,
             user: {
                 email: user.email,
                 role: user.role,
@@ -102,15 +102,12 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.post("/api/settings/dev-login", (req, res) => {
     const { password } = req.body;
-    if (password === "CO.Sedawy.2026") {
-        return res.json({ success: true, token: "dev-session-valid-2026" });
-    }
+    if (password === "CO.Sedawy.2026") return res.json({ success: true, token: "dev-session-valid-2026" });
     res.status(401).json({ success: false, message: "Unauthorized" });
 });
 
-// --- [APIs الموظفين والرواتب - كمسارات احتياطية لو الفولدر الأساسي مش موجود] ---
-
-app.post("/api/employees/fallback", async (req, res) => {
+// --- [Protected Protected APIs (Requires JWT)] ---
+app.post("/api/employees", verifyToken, async (req, res) => {
     try {
         const employeeData = {
             name: req.body.name,
@@ -129,7 +126,7 @@ app.post("/api/employees/fallback", async (req, res) => {
     }
 });
 
-app.get("/api/employees/fallback", async (req, res) => {
+app.get("/api/employees", verifyToken, async (req, res) => {
     try {
         const filter = req.query.companyId ? { companyId: req.query.companyId } : {};
         const employees = await Employee.find(filter).sort({_id: -1});
@@ -139,11 +136,8 @@ app.get("/api/employees/fallback", async (req, res) => {
     }
 });
 
-app.get("/api/employees/:id/details", async (req, res) => {
+app.get("/api/employees/:id/details", verifyToken, async (req, res) => {
     try {
-        if (!req.params.id || !mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ error: "معرف الموظف غير صحيح" });
-        }
         const emp = await Employee.findById(req.params.id);
         const history = await Payroll.find({ employeeId: req.params.id }).sort({ month: 1 });
         let pDays = 0, pTaxable = 0, pTaxes = 0;
@@ -158,29 +152,17 @@ app.get("/api/employees/:id/details", async (req, res) => {
     }
 });
 
-app.post("/api/payroll/calculate", async (req, res) => {
+app.post("/api/payroll/calculate", verifyToken, async (req, res) => {
     try {
-        const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate, companyId } = req.body;
-        
-        // تعديل مهم: حماية من خطأ 500 لو الموظف متبعتش صح
-        if (!empId || !mongoose.Types.ObjectId.isValid(empId)) {
-            return res.status(400).json({ error: "Validation Error: Employee ID is missing or invalid" });
-        }
-        if (!month) {
-            return res.status(400).json({ error: "Validation Error: Month is required" });
-        }
-
+        const { empId, month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
         const emp = await Employee.findById(empId);
-        if (!emp) return res.status(404).json({ error: "Employee not found" });
         
         const MAX_INS = 16700;
         const MIN_INS = 5384.62;
         let effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
         const empForCalc = { ...emp.toObject(), insSalary: effectiveInsSalary };
 
-        if (resignationDate) {
-            await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
-        }
+        if (resignationDate) await Employee.findByIdAndUpdate(empId, { resignationDate: resignationDate });
 
         const result = runPayrollLogic(
             { fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, 
@@ -191,12 +173,11 @@ app.post("/api/payroll/calculate", async (req, res) => {
         const record = await new Payroll({ employeeId: empId, month, payload: result }).save();
         res.json(record);
     } catch (err) {
-        console.error("Calculation Error:", err);
         res.status(500).json({ error: "Calculation error occurred" });
     }
 });
 
-app.post("/api/payroll/net-to-gross", async (req, res) => {
+app.post("/api/payroll/net-to-gross", verifyToken, async (req, res) => {
     try {
         const { targetNet } = req.body;
         let estimateGross = Number(targetNet);
@@ -227,7 +208,7 @@ app.post("/api/payroll/net-to-gross", async (req, res) => {
     }
 });
 
-app.delete("/api/employees/:id", async (req, res) => {
+app.delete("/api/employees/:id", verifyToken, async (req, res) => {
     try {
         await Employee.findByIdAndDelete(req.params.id);
         await Payroll.deleteMany({ employeeId: req.params.id });
@@ -239,8 +220,4 @@ const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 app.get("*", (req, res) => { res.sendFile(path.join(publicPath, "index.html")); });
 
-// تصدير التطبيق عشان Vercel 
-module.exports = app;
-
-// تشغيل التطبيق محلياً لو مش على Vercel
 startApp();
