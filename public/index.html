@@ -2278,55 +2278,79 @@ async function loadPayrollSummary() {
 }
 
 // ==================== CLIENT-SIDE CALCULATOR ====================
+// --- دالة التقريب والـ Floor لضبط الضرايب بالقرش ---
+const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+function calculateAnnualTaxLocal(annualTaxableIncome) {
+    const floorAnnual = Math.floor(R(annualTaxableIncome) / 10) * 10;
+    const ai = floorAnnual;
+    const af = 360;
+    const L = (val) => af > 0 ? (val / 360) * af : 0;
+
+    let AJ = 0, AK = 0, AL = 0, AM = 0, AN = 0, AO = 0, AP = 0;
+    if (ai > 0 && af > 0) {
+        AJ = ai > L(600000) ? 0 : L(40000);
+        if (ai > L(600000) && ai <= L(700000)) AK = L(55000) * 0.1;
+        else if (ai > L(700000)) AK = 0;
+        else AK = Math.min(L(15000), Math.max(0, ai - AJ)) * 0.1;
+
+        if (ai > L(700000) && ai <= L(800000)) AL = L(70000) * 0.15;
+        else if (ai > L(800000)) AL = 0;
+        else AL = Math.min(L(15000), Math.max(0, ai - AJ - (AK / 0.1))) * 0.15;
+
+        if (ai > L(800000) && ai <= L(900000)) AM = L(200000) * 0.2;
+        else if (ai > L(900000)) AM = 0;
+        else AM = Math.min(L(130000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15))) * 0.2;
+
+        if (ai > L(900000) && ai <= L(1200000)) AN = L(400000) * 0.225;
+        else if (ai > L(1200000)) AN = 0;
+        else AN = Math.min(L(200000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2))) * 0.225;
+
+        if (ai > L(1200000)) AO = L(1200000) * 0.25;
+        else AO = Math.min(L(800000), Math.max(0, ai - AJ - (AK/0.1) - (AL/0.15) - (AM/0.2) - (AN/0.225))) * 0.25;
+
+        AP = ai > L(1200000) ? (ai - L(1200000)) * 0.275 : 0;
+    }
+    return R(AK + AL + AM + AN + AO + AP);
+}
+
 function calcG2NLive() {
     const basic = Number(document.getElementById('calc-basic').value) || 0;
     const trans = Number(document.getElementById('calc-trans').value) || 0;
     const insInput = Number(document.getElementById('calc-ins').value) || 16700;
     const exemp = Number(document.getElementById('calc-exemption').value) || 20000;
     const div = document.getElementById('g2n-result');
-
     if (!basic) { div.innerHTML = ''; return; }
 
-    const gross = basic + trans;
-    
-    // الحد الأقصى 16700 والأدنى 5384.62
+    const gross = R(basic + trans);
     const actualIns = Math.max(5384.62, Math.min(insInput, 16700));
-    
-    const insEmp = actualIns * 0.11;
-    const insComp = actualIns * 0.1875;
-    
+    const insEmp = R(actualIns * 0.11);
+    const insComp = R(actualIns * 0.1875);
     const monthlyExemptions = insEmp + (exemp / 12);
-    const annualTaxable = Math.max(0, (gross - monthlyExemptions) * 12);
-    const annualTax = calculateAnnualTax(annualTaxable); // تأكد إن اسم دالة الضرايب دي صح عندك
-    const monthTax = annualTax / 12;
-    
-    // 🔥 التعديل النهائي: حساب صندوق الشهداء
-    const martyrs = gross * 0.0005; 
-    
-    // إضافة صندوق الشهداء في الخصم
-    const net = gross - insEmp - monthTax - martyrs;
+    const annualTaxable = R(Math.max(0, (gross - monthlyExemptions) * 12));
+    const annualTax = calculateAnnualTaxLocal(annualTaxable);
+    const monthTax = R(annualTax / 12);
+    const martyrs = R(gross * 0.0005); 
+    const net = R(gross - insEmp - monthTax - martyrs);
 
     div.innerHTML = `
         <div class="result-row add" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">الإجمالي</span><span class="value" style="color:var(--green)">${fmt(gross)} ج</span>
+            <span class="label">الإجمالي</span><span class="value" style="color:var(--green)">${gross.toLocaleString()} ج</span>
         </div>
         <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red)">${fmt(insEmp)} ج</span>
+            <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red)">${insEmp.toLocaleString()} ج</span>
         </div>
         <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">تأمين الشركة (18.75%)</span><span class="value" style="color:var(--red)">${fmt(insComp)} ج</span>
+            <span class="label">تأمين الشركة (18.75%)</span><span class="value" style="color:var(--red)">${insComp.toLocaleString()} ج</span>
         </div>
         <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">الوعاء الضريبي السنوي</span><span class="value" style="color:var(--text)">${fmt(annualTaxable)} ج</span>
+            <span class="label">ضريبة الدخل الشهرية</span><span class="value" style="color:var(--red)">${monthTax.toLocaleString()} ج</span>
         </div>
         <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">ضريبة الدخل الشهرية</span><span class="value" style="color:var(--red)">${fmt(monthTax)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">صندوق الشهداء</span><span class="value" style="color:var(--red)">${fmt(martyrs)} ج</span>
+            <span class="label">صندوق الشهداء</span><span class="value" style="color:var(--red)">${martyrs.toLocaleString()} ج</span>
         </div>
         <div class="result-row total" style="display:flex; justify-content:space-between; padding:12px 0; margin-top:10px; font-weight:bold; font-size:16px;">
-            <span class="label">💰 الصافي</span><span class="value" style="color:var(--gold)">${fmt(net)} ج</span>
+            <span class="label">💰 الصافي</span><span class="value" style="color:var(--gold)">${net.toLocaleString()} ج</span>
         </div>
     `;
 }
@@ -2334,76 +2358,45 @@ function calcG2NLive() {
 function calcN2GLive() {
     const targetNet = Number(document.getElementById('calc-target-net').value) || 0;
     const insInput = Number(document.getElementById('calc-n2g-ins').value) || 16700;
-    const exemp = 20000;
     const div = document.getElementById('n2g-result');
-
     if (!targetNet) { div.innerHTML = ''; return; }
 
-    let minG = targetNet;
-    let maxG = targetNet * 2.5; 
-    let bestGross = targetNet;
-    let finalInsEmp = 0;
-    let finalMonthTax = 0;
-    let finalMartyrs = 0;
-    let finalNet = 0;
+    let minG = targetNet, maxG = targetNet * 2.5, bestGross = targetNet;
+    let finalInsEmp = 0, finalMonthTax = 0, finalMartyrs = 0, finalNet = 0;
 
     for (let i = 0; i < 100; i++) {
         let testGross = (minG + maxG) / 2;
-        
         let actualIns = Math.max(5384.62, Math.min(insInput, 16700));
-        let insEmp = actualIns * 0.11; 
-        
-        let monthExemp = insEmp + (exemp / 12);
-        let annualTaxable = Math.max(0, (testGross - monthExemp) * 12);
-        let monthTax = calculateAnnualTax(annualTaxable) / 12; 
-        
-        // 🔥 صندوق الشهداء في اللوب
-        let martyrs = testGross * 0.0005; 
-        
-        let currentNet = testGross - insEmp - monthTax - martyrs;
+        let insEmp = R(actualIns * 0.11); 
+        let monthTax = R(calculateAnnualTaxLocal(R(Math.max(0, (testGross - insEmp - (20000/12)) * 12))) / 12);
+        let martyrs = R(testGross * 0.0005); 
+        let currentNet = R(testGross - insEmp - monthTax - martyrs);
 
-        if (Math.abs(currentNet - targetNet) < 0.01) {
-            bestGross = testGross;
-            finalInsEmp = insEmp;
-            finalMonthTax = monthTax;
-            finalMartyrs = martyrs;
-            finalNet = currentNet;
-            break;
+        if (Math.abs(currentNet - targetNet) <= 0.01) {
+            bestGross = R(testGross); finalInsEmp = insEmp; finalMonthTax = monthTax; finalMartyrs = martyrs; finalNet = currentNet; break;
         }
-
-        if (currentNet > targetNet) maxG = testGross;
-        else minG = testGross;
-        
-        bestGross = testGross;
-        finalInsEmp = insEmp;
-        finalMonthTax = monthTax;
-        finalMartyrs = martyrs;
-        finalNet = currentNet;
+        currentNet > targetNet ? maxG = testGross : minG = testGross;
+        bestGross = R(testGross); finalInsEmp = insEmp; finalMonthTax = monthTax; finalMartyrs = martyrs; finalNet = currentNet;
     }
 
     div.innerHTML = `
         <div class="result-row add" style="background: var(--primary-dim); padding: 10px; border-radius: 8px; display:flex; justify-content:space-between;">
             <span class="label" style="color: var(--primary);">الإجمالي المطلوب:</span>
-            <span class="value" style="font-size: 18px; font-weight:bold; color: var(--primary);">${fmt(bestGross)} ج</span>
+            <span class="value" style="font-size: 18px; font-weight:bold; color: var(--primary);">${bestGross.toLocaleString()} ج</span>
         </div>
         <div class="result-row deduct" style="display:flex; justify-content:space-between; margin-top:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px;">
-            <span class="label">التأمينات (11%)</span>
-            <span class="value" style="color:var(--red);">${fmt(finalInsEmp)} ج</span>
+            <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red);">${finalInsEmp.toLocaleString()} ج</span>
         </div>
         <div class="result-row deduct" style="display:flex; justify-content:space-between; margin-top:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px;">
-            <span class="label">ضريبة الدخل</span>
-            <span class="value" style="color:var(--red);">${fmt(finalMonthTax)} ج</span>
+            <span class="label">ضريبة الدخل</span><span class="value" style="color:var(--red);">${finalMonthTax.toLocaleString()} ج</span>
         </div>
         <div class="result-row deduct" style="display:flex; justify-content:space-between; margin-top:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px;">
-            <span class="label">صندوق الشهداء</span>
-            <span class="value" style="color:var(--red);">${fmt(finalMartyrs)} ج</span>
+            <span class="label">صندوق الشهداء</span><span class="value" style="color:var(--red);">${finalMartyrs.toLocaleString()} ج</span>
         </div>
-        <div class="result-row add" style="display:flex; justify-content:space-between; margin-top:10px;">
-            <span class="label">✅ الصافي الفعلي</span>
-            <span class="value" style="color:var(--green); font-weight:bold;">${fmt(finalNet)} ج</span>
-        </div>
+        <div class="result-row add" style="display:flex; justify-content:space-between; margin-top:10px;"><span class="label">✅ الصافي الفعلي</span><span class="value" style="color:var(--green); font-weight:bold;">${finalNet.toLocaleString()} ج</span></div>
     `;
 }
+
 
 
 
