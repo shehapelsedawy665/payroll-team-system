@@ -5,28 +5,28 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
-    "test": "jest --forceExit --detectOpenHandles",
+    "dev": "NODE_ENV=development node server.js",
+    "test": "jest --forceExit --detectOpenHandles --runInBand",
     "test:watch": "jest --watch"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "mongoose": "^8.0.0",
+    "mongoose": "^8.0.3",
     "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.0",
+    "jsonwebtoken": "^9.1.2",
     "dotenv": "^16.3.1",
     "express-validator": "^7.0.0",
     "pdfkit": "^0.13.0",
     "exceljs": "^4.3.0",
-    "nodemailer": "^6.9.0"
+    "nodemailer": "^6.9.7"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "supertest": "^6.3.3",
-    "mongodb-memory-server": "^9.1.1"
+    "supertest": "^6.3.3"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }

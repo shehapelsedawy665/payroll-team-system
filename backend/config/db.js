@@ -1,44 +1,71 @@
 const mongoose = require("mongoose");
 
-// منع التحذيرات في النسخ الجديدة من Mongoose
 mongoose.set('strictQuery', false);
 
 let cachedConnection = null;
+let connectionPromise = null;
 
 const connectDB = async () => {
-    // 1. لو فيه اتصال شغال فعلاً، ارجع فوراً
-    if (mongoose.connection.readyState >= 1) {
+    // 1. Connection already active in this function invocation
+    if (mongoose.connection.readyState === 1) {
+        console.log("✅ Using existing active MongoDB connection");
         return mongoose.connection;
     }
 
-    // 2. لو فيه محاولة اتصال قيد التنفيذ، استناها
-    if (cachedConnection) {
-        return await cachedConnection;
+    // 2. Connection in progress - wait for it
+    if (connectionPromise) {
+        console.log("⏳ Waiting for in-progress MongoDB connection...");
+        return await connectionPromise;
     }
 
-    try {
-        const uri = process.env.MONGODB_URI;
-        if (!uri) throw new Error("❌ MONGODB_URI not set in environment variables");
-        
-        // إعدادات محسنة لبيئة Vercel (Serverless)
-        const options = {
-            serverSelectionTimeoutMS: 5000, // تقليل وقت الانتظار عشان الـ Function متفصلش
-            socketTimeoutMS: 45000,
-            family: 4,
-            bufferCommands: false, // تعطيل التخزين المؤقت عشان الأخطاء تظهر فوراً
-        };
+    // 3. Establish new connection
+    connectionPromise = (async () => {
+        try {
+            const uri = process.env.MONGODB_URI;
+            if (!uri) {
+                throw new Error("❌ CRITICAL: MONGODB_URI environment variable not set");
+            }
 
-        console.log("⏳ Connecting to MongoDB...");
-        cachedConnection = mongoose.connect(uri, options);
-        
-        const conn = await cachedConnection;
-        console.log("✅ MongoDB Ready & Connected (HR-ERP Advanced)");
-        return conn;
-    } catch (err) {
-        cachedConnection = null;
-        console.error("❌ MongoDB Connection Error:", err.message);
-        throw err;
-    }
+            // Optimized options for Vercel Serverless Functions
+            const options = {
+                // Connection Pool Settings
+                maxPoolSize: 5,
+                minPoolSize: 1,
+                
+                // Timeouts (balanced for serverless 120s max)
+                serverSelectionTimeoutMS: 15000,
+                socketTimeoutMS: 45000,
+                connectTimeoutMS: 15000,
+                
+                // Connection Behavior
+                family: 4,
+                bufferCommands: false,
+                
+                // Retry Strategy
+                retryWrites: true,
+                retryReads: true,
+                
+                // Additional Optimizations
+                useNewUrlParser: true,
+                useUnifiedTopology: true
+            };
+
+            console.log("⏳ Connecting to MongoDB Atlas...");
+            const connection = await mongoose.connect(uri, options);
+            
+            cachedConnection = connection;
+            console.log("✅ MongoDB Connected Successfully (Vercel Serverless Mode)");
+            
+            return connection;
+        } catch (error) {
+            console.error("❌ MongoDB Connection Failed:", error.message);
+            connectionPromise = null;
+            cachedConnection = null;
+            throw error;
+        }
+    })();
+
+    return await connectionPromise;
 };
 
 const User = require('../models/User');
