@@ -2,24 +2,27 @@ const mongoose = require("mongoose");
 
 mongoose.set('strictQuery', false);
 
-let cachedConnection = null;
-let connectionPromise = null;
+/**
+ * STRICT CACHED DATABASE CONNECTION PATTERN FOR VERCEL SERVERLESS
+ * Uses global.mongoose to cache connection across Lambda invocations
+ * Prevents FUNCTION_INVOCATION_FAILED errors from repeated connections
+ */
 
 const connectDB = async () => {
-    // 1. Connection already active in this function invocation
-    if (mongoose.connection.readyState === 1) {
-        console.log("✅ Using existing active MongoDB connection");
-        return mongoose.connection;
+    // 1. Check if cached connection exists and is active
+    if (global.mongoose && global.mongoose.connection.readyState === 1) {
+        console.log("✅ Using cached MongoDB connection from global scope");
+        return global.mongoose.connection;
     }
 
     // 2. Connection in progress - wait for it
-    if (connectionPromise) {
+    if (global.mongoosePromise) {
         console.log("⏳ Waiting for in-progress MongoDB connection...");
-        return await connectionPromise;
+        return await global.mongoosePromise;
     }
 
-    // 3. Establish new connection
-    connectionPromise = (async () => {
+    // 3. Establish new connection and cache in global scope
+    global.mongoosePromise = (async () => {
         try {
             const uri = process.env.MONGODB_URI;
             if (!uri) {
@@ -50,22 +53,23 @@ const connectDB = async () => {
                 useUnifiedTopology: true
             };
 
-            console.log("⏳ Connecting to MongoDB Atlas...");
+            console.log("⏳ Connecting to MongoDB Atlas (Vercel Serverless)...");
             const connection = await mongoose.connect(uri, options);
             
-            cachedConnection = connection;
-            console.log("✅ MongoDB Connected Successfully (Vercel Serverless Mode)");
+            // Cache connection in global scope for reuse
+            global.mongoose = mongoose;
+            console.log("✅ MongoDB Connected Successfully & Cached in Global Scope");
             
             return connection;
         } catch (error) {
             console.error("❌ MongoDB Connection Failed:", error.message);
-            connectionPromise = null;
-            cachedConnection = null;
+            global.mongoosePromise = null;
+            global.mongoose = null;
             throw error;
         }
     })();
 
-    return await connectionPromise;
+    return await global.mongoosePromise;
 };
 
 const User = require('../models/User');

@@ -3,7 +3,7 @@
  * @description Export appraisal data to PDF, Excel, and other formats
  */
 
-const pdf = require('pdf-kit');
+const pdf = require('pdfkit');
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
