@@ -2,7 +2,6 @@
   "version": 2,
   "buildCommand": "npm install",
   "outputDirectory": ".",
-  "public": "public",
   "env": {
     "MONGODB_URI": "@mongodb_uri",
     "JWT_SECRET": "@jwt_secret",
