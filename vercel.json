@@ -35,6 +35,5 @@
     }
   },
   "buildCommand": "yarn install || npm install",
-  "outputDirectory": ".",
-  "public": "public"
+  "outputDirectory": "."
 }
