@@ -3,9 +3,11 @@ const router = express.Router();
 const { connectDB, Candidate, Employee, LeaveBalance, Loan, Settlement, Company, EWARequest } = require('../backend/config/db');
 const { authMiddleware, adminOnly } = require('../backend/middleware/auth');
 
-let calculations = {};
-try { calculations = require("../backend/logic/payrollEngine"); } catch (e) {}
+let calculations = require("../backend/logic/payrollEngine");
 const { calculateSettlement } = calculations;
+if (!calculateSettlement) {
+    throw new Error("❌ CRITICAL: Settlement calculation function not loaded");
+}
 
 router.post('/candidates', authMiddleware, async (req, res) => {
     try {

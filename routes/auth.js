@@ -4,10 +4,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { connectDB, User, Company, Subscription } = require('../backend/config/db');
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
-if (!JWT_SECRET || !JWT_REFRESH_SECRET) throw new Error("❌ JWT secrets not configured");
-
 // مسار التسجيل (/api/auth/signup)
 router.post('/signup', async (req, res) => {
     try {
@@ -38,6 +34,13 @@ router.post('/signup', async (req, res) => {
 // مسار الدخول (/api/auth/login)
 router.post('/login', async (req, res) => {
     try {
+        const JWT_SECRET = process.env.JWT_SECRET;
+        const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+        
+        if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
+            return res.status(500).json({ error: "❌ JWT secrets not configured on server" });
+        }
+        
         await connectDB();
         const { email, password } = req.body;
         const user = await User.findOne({ email }).populate('companyId');

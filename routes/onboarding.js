@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const OnboardingChecklist = require('../models/OnboardingChecklist');
-const OnboardingTask = require('../models/OnboardingTask');
-const Employee = require('../models/Employee');
-const onboardingEngine = require('../logic/onboardingEngine');
-const auth = require('../middleware/auth');
+const OnboardingChecklist = require('../backend/models/OnboardingChecklist');
+const OnboardingTask = require('../backend/models/OnboardingTask');
+const Employee = require('../backend/models/Employee');
+const onboardingEngine = require('../backend/logic/onboardingEngine');
+const { authMiddleware } = require('../backend/middleware/auth');
 
 // Middleware to verify HR or Manager role
 const isHROrManager = (req, res, next) => {
@@ -20,7 +20,7 @@ const isHROrManager = (req, res, next) => {
  * POST /api/onboarding/tasks
  * Create onboarding task template
  */
-router.post('/tasks', auth, isHROrManager, async (req, res) => {
+router.post('/tasks', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const { name, description, category, priority, daysDueAfterJoining, department } = req.body;
     
@@ -56,7 +56,7 @@ router.post('/tasks', auth, isHROrManager, async (req, res) => {
  * GET /api/onboarding/tasks
  * Get all onboarding task templates
  */
-router.get('/tasks', auth, async (req, res) => {
+router.get('/tasks', authMiddleware, async (req, res) => {
   try {
     const { category, department } = req.query;
     const query = { companyId: req.user.companyId, isTemplate: true };
@@ -80,7 +80,7 @@ router.get('/tasks', auth, async (req, res) => {
  * PUT /api/onboarding/tasks/:id
  * Update onboarding task template
  */
-router.put('/tasks/:id', auth, isHROrManager, async (req, res) => {
+router.put('/tasks/:id', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const task = await OnboardingTask.findById(req.params.id);
     if (!task) {
@@ -104,7 +104,7 @@ router.put('/tasks/:id', auth, isHROrManager, async (req, res) => {
  * DELETE /api/onboarding/tasks/:id
  * Delete onboarding task template
  */
-router.delete('/tasks/:id', auth, isHROrManager, async (req, res) => {
+router.delete('/tasks/:id', authMiddleware, isHROrManager, async (req, res) => {
   try {
     await OnboardingTask.findByIdAndDelete(req.params.id);
     
@@ -123,7 +123,7 @@ router.delete('/tasks/:id', auth, isHROrManager, async (req, res) => {
  * POST /api/onboarding/checklists
  * Create onboarding checklist for new employee
  */
-router.post('/checklists', auth, isHROrManager, async (req, res) => {
+router.post('/checklists', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const { employeeId, joiningDate } = req.body;
     
@@ -156,7 +156,7 @@ router.post('/checklists', auth, isHROrManager, async (req, res) => {
  * GET /api/onboarding/checklists/:employeeId
  * Get onboarding checklist for employee
  */
-router.get('/checklists/:employeeId', auth, async (req, res) => {
+router.get('/checklists/:employeeId', authMiddleware, async (req, res) => {
   try {
     const checklist = await OnboardingChecklist.findOne({
       employeeId: req.params.employeeId
@@ -179,7 +179,7 @@ router.get('/checklists/:employeeId', auth, async (req, res) => {
  * GET /api/onboarding/progress/:employeeId
  * Get detailed onboarding progress for employee
  */
-router.get('/progress/:employeeId', auth, async (req, res) => {
+router.get('/progress/:employeeId', authMiddleware, async (req, res) => {
   try {
     const result = await onboardingEngine.getOnboardingProgress(req.params.employeeId);
     
@@ -197,7 +197,7 @@ router.get('/progress/:employeeId', auth, async (req, res) => {
  * PUT /api/onboarding/checklists/:checklistId/tasks/:taskId
  * Mark onboarding task as completed
  */
-router.put('/checklists/:checklistId/tasks/:taskId', auth, async (req, res) => {
+router.put('/checklists/:checklistId/tasks/:taskId', authMiddleware, async (req, res) => {
   try {
     const { comments } = req.body;
     
@@ -222,7 +222,7 @@ router.put('/checklists/:checklistId/tasks/:taskId', auth, async (req, res) => {
  * POST /api/onboarding/checklists/:checklistId/custom-task
  * Add custom task to onboarding checklist
  */
-router.post('/checklists/:checklistId/custom-task', auth, isHROrManager, async (req, res) => {
+router.post('/checklists/:checklistId/custom-task', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const { taskName, category, priority, daysDue, assignedTo } = req.body;
     
@@ -253,7 +253,7 @@ router.post('/checklists/:checklistId/custom-task', auth, isHROrManager, async (
  * GET /api/onboarding/pending-tasks
  * Get all pending onboarding tasks by category
  */
-router.get('/pending-tasks', auth, isHROrManager, async (req, res) => {
+router.get('/pending-tasks', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const result = await onboardingEngine.getPendingTasksByCategory(req.user.companyId);
     res.json(result);
@@ -266,7 +266,7 @@ router.get('/pending-tasks', auth, isHROrManager, async (req, res) => {
  * GET /api/onboarding/completion-rate
  * Get onboarding completion statistics
  */
-router.get('/completion-rate', auth, isHROrManager, async (req, res) => {
+router.get('/completion-rate', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const { months } = req.query;
     const result = await onboardingEngine.getOnboardingCompletionRate(
@@ -288,7 +288,7 @@ router.get('/completion-rate', auth, isHROrManager, async (req, res) => {
  * GET /api/onboarding/summary
  * Get onboarding summary for HR dashboard
  */
-router.get('/summary', auth, isHROrManager, async (req, res) => {
+router.get('/summary', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const result = await onboardingEngine.getOnboardingSummary(req.user.companyId);
     res.json(result);
@@ -301,7 +301,7 @@ router.get('/summary', auth, isHROrManager, async (req, res) => {
  * POST /api/onboarding/checklists/:checklistId/complete
  * Mark entire checklist as completed
  */
-router.post('/checklists/:checklistId/complete', auth, isHROrManager, async (req, res) => {
+router.post('/checklists/:checklistId/complete', authMiddleware, isHROrManager, async (req, res) => {
   try {
     const { feedback } = req.body;
     

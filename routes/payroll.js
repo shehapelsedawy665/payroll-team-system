@@ -3,9 +3,11 @@ const router = express.Router();
 const { connectDB, Employee, Payroll, Attendance, Penalty, Company } = require('../backend/config/db');
 const { authMiddleware } = require('../backend/middleware/auth');
 
-let calculations = {};
-try { calculations = require("../backend/logic/payrollEngine"); } catch (e) {}
+let calculations = require("../backend/logic/payrollEngine");
 const { runPayrollLogic, calculateGrossToNet, analyzePayrollAnomaly, generateUnifiedTaxRow } = calculations;
+if (!runPayrollLogic || !calculateGrossToNet || !analyzePayrollAnomaly || !generateUnifiedTaxRow) {
+    throw new Error("❌ CRITICAL: Payroll engine functions not loaded properly");
+}
 
 router.post(["/calculate", "/"], authMiddleware, async (req, res) => {
     try {

@@ -10,10 +10,7 @@ const Shift = require('../backend/models/Shift');
 const Employee = require('../backend/models/Employee');
 const { calculateAttendance, getMonthlyAttendanceSummary, isWithinGeofence } = require('../backend/modules/attendance/attendanceEngine');
 const auth = require('../backend/middleware/auth');
-const connectDB = require('../backend/config/db');
-
-// Ensure DB is connected
-connectDB();
+const { connectDB } = require('../backend/config/db');
 
 // ==================== MIDDLEWARE ====================
 router.use(auth); // All routes require authentication
@@ -52,7 +49,8 @@ router.post('/checkin', async (req, res) => {
 
         // Check geofence if device location provided
         if (longitude && latitude && deviceId && employee.shiftId.biometricDeviceId) {
-            const device = await require('../backend/models/BiometricDevice').findById(employee.shiftId.biometricDeviceId);
+            const BiometricDevice = require('../backend/models/BiometricDevice');
+            const device = await BiometricDevice.findById(employee.shiftId.biometricDeviceId);
             if (device && !isWithinGeofence(latitude, longitude, device.latitude, device.longitude, device.allowedRadius)) {
                 return res.status(403).json({ 
                     error: 'Check-in outside allowed location', 

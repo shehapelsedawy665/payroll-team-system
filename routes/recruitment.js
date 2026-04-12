@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const JobPosting = require('../models/JobPosting');
-const Candidate = require('../models/Candidate');
-const Offer = require('../models/Offer');
-const recruitmentEngine = require('../logic/recruitmentEngine');
-const auth = require('../middleware/auth');
+const JobPosting = require('../backend/models/JobPosting');
+const Candidate = require('../backend/models/Candidate');
+const Offer = require('../backend/models/Offer');
+const recruitmentEngine = require('../backend/logic/recruitmentEngine');
+const { authMiddleware } = require('../backend/middleware/auth');
 
 // Middleware to verify HR role
 const isHR = (req, res, next) => {
@@ -20,7 +20,7 @@ const isHR = (req, res, next) => {
  * POST /api/recruitment/job-postings
  * Create new job posting
  */
-router.post('/job-postings', auth, isHR, async (req, res) => {
+router.post('/job-postings', authMiddleware, isHR, async (req, res) => {
   try {
     const { jobTitle, department, description, requirements, skills, salaryRange, experience, jobType, location } = req.body;
     
@@ -60,7 +60,7 @@ router.post('/job-postings', auth, isHR, async (req, res) => {
  * GET /api/recruitment/job-postings
  * List all job postings
  */
-router.get('/job-postings', auth, async (req, res) => {
+router.get('/job-postings', authMiddleware, async (req, res) => {
   try {
     const { status, department } = req.query;
     const query = { companyId: req.user.companyId };
@@ -87,7 +87,7 @@ router.get('/job-postings', auth, async (req, res) => {
  * GET /api/recruitment/job-postings/:id
  * Get single job posting with candidates
  */
-router.get('/job-postings/:id', auth, async (req, res) => {
+router.get('/job-postings/:id', authMiddleware, async (req, res) => {
   try {
     const jobPosting = await JobPosting.findById(req.params.id)
       .populate('hiringManager', 'firstName lastName email')
@@ -114,7 +114,7 @@ router.get('/job-postings/:id', auth, async (req, res) => {
  * PUT /api/recruitment/job-postings/:id
  * Update job posting
  */
-router.put('/job-postings/:id', auth, isHR, async (req, res) => {
+router.put('/job-postings/:id', authMiddleware, isHR, async (req, res) => {
   try {
     const jobPosting = await JobPosting.findById(req.params.id);
     if (!jobPosting) {
@@ -140,7 +140,7 @@ router.put('/job-postings/:id', auth, isHR, async (req, res) => {
  * POST /api/recruitment/job-postings/:id/publish
  * Publish job posting
  */
-router.post('/job-postings/:id/publish', auth, isHR, async (req, res) => {
+router.post('/job-postings/:id/publish', authMiddleware, isHR, async (req, res) => {
   try {
     const jobPosting = await JobPosting.findById(req.params.id);
     if (!jobPosting) {
@@ -171,7 +171,7 @@ router.post('/job-postings/:id/publish', auth, isHR, async (req, res) => {
  * POST /api/recruitment/job-postings/:id/close
  * Close job posting
  */
-router.post('/job-postings/:id/close', auth, isHR, async (req, res) => {
+router.post('/job-postings/:id/close', authMiddleware, isHR, async (req, res) => {
   try {
     const jobPosting = await JobPosting.findById(req.params.id);
     if (!jobPosting) {
@@ -254,7 +254,7 @@ router.post('/candidates', async (req, res) => {
  * GET /api/recruitment/job-postings/:jobId/candidates
  * Get all candidates for a job
  */
-router.get('/job-postings/:jobId/candidates', auth, async (req, res) => {
+router.get('/job-postings/:jobId/candidates', authMiddleware, async (req, res) => {
   try {
     const candidates = await Candidate.find({ jobPostingId: req.params.jobId })
       .sort({ appliedDate: -1 });
@@ -273,7 +273,7 @@ router.get('/job-postings/:jobId/candidates', auth, async (req, res) => {
  * GET /api/recruitment/job-postings/:jobId/candidates/ranked
  * Get ranked candidates for a job
  */
-router.get('/job-postings/:jobId/candidates/ranked', auth, isHR, async (req, res) => {
+router.get('/job-postings/:jobId/candidates/ranked', authMiddleware, isHR, async (req, res) => {
   try {
     const result = await recruitmentEngine.rankCandidatesForJob(req.params.jobId);
     res.json(result);
@@ -286,7 +286,7 @@ router.get('/job-postings/:jobId/candidates/ranked', auth, isHR, async (req, res
  * GET /api/recruitment/candidates/:id
  * Get candidate details
  */
-router.get('/candidates/:id', auth, async (req, res) => {
+router.get('/candidates/:id', authMiddleware, async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id)
       .populate('jobPostingId', 'jobTitle department');
@@ -313,7 +313,7 @@ router.get('/candidates/:id', auth, async (req, res) => {
  * PUT /api/recruitment/candidates/:id/stage
  * Move candidate to next stage
  */
-router.put('/candidates/:id/stage', auth, isHR, async (req, res) => {
+router.put('/candidates/:id/stage', authMiddleware, isHR, async (req, res) => {
   try {
     const { stage, comments } = req.body;
     
@@ -338,7 +338,7 @@ router.put('/candidates/:id/stage', auth, isHR, async (req, res) => {
  * POST /api/recruitment/candidates/:id/rate
  * Rate candidate
  */
-router.post('/candidates/:id/rate', auth, isHR, async (req, res) => {
+router.post('/candidates/:id/rate', authMiddleware, isHR, async (req, res) => {
   try {
     const { skillsMatch, culturalFit, comments } = req.body;
     
@@ -373,7 +373,7 @@ router.post('/candidates/:id/rate', auth, isHR, async (req, res) => {
  * POST /api/recruitment/offers
  * Create job offer
  */
-router.post('/offers', auth, isHR, async (req, res) => {
+router.post('/offers', authMiddleware, isHR, async (req, res) => {
   try {
     const { candidateId, jobPostingId, compensation, joinDate } = req.body;
     
@@ -421,7 +421,7 @@ router.post('/offers', auth, isHR, async (req, res) => {
  * GET /api/recruitment/offers
  * Get all offers
  */
-router.get('/offers', auth, async (req, res) => {
+router.get('/offers', authMiddleware, async (req, res) => {
   try {
     const { status } = req.query;
     const query = { companyId: req.user.companyId };
@@ -446,7 +446,7 @@ router.get('/offers', auth, async (req, res) => {
  * PUT /api/recruitment/offers/:id/send
  * Send offer to candidate
  */
-router.put('/offers/:id/send', auth, isHR, async (req, res) => {
+router.put('/offers/:id/send', authMiddleware, isHR, async (req, res) => {
   try {
     const offer = await Offer.findById(req.params.id);
     if (!offer) {
@@ -543,7 +543,7 @@ router.put('/offers/:id/reject', async (req, res) => {
  * GET /api/recruitment/job-postings/:id/pipeline
  * Get hiring pipeline for a job
  */
-router.get('/job-postings/:id/pipeline', auth, isHR, async (req, res) => {
+router.get('/job-postings/:id/pipeline', authMiddleware, isHR, async (req, res) => {
   try {
     const pipeline = await recruitmentEngine.getHiringPipelineSummary(req.params.id);
     
@@ -564,7 +564,7 @@ router.get('/job-postings/:id/pipeline', auth, isHR, async (req, res) => {
  * GET /api/recruitment/job-postings/:id/top-candidates
  * Get top candidates for a job
  */
-router.get('/job-postings/:id/top-candidates', auth, isHR, async (req, res) => {
+router.get('/job-postings/:id/top-candidates', authMiddleware, isHR, async (req, res) => {
   try {
     const result = await recruitmentEngine.getTopCandidates(req.params.id);
     res.json(result);
@@ -577,7 +577,7 @@ router.get('/job-postings/:id/top-candidates', auth, isHR, async (req, res) => {
  * GET /api/recruitment/job-postings/:id/time-to-hire
  * Get time-to-hire metrics
  */
-router.get('/job-postings/:id/time-to-hire', auth, isHR, async (req, res) => {
+router.get('/job-postings/:id/time-to-hire', authMiddleware, isHR, async (req, res) => {
   try {
     const result = await recruitmentEngine.calculateTimeToHire(req.params.id);
     res.json(result);
