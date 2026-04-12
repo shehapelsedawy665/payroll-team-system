@@ -2279,7 +2279,6 @@ async function loadPayrollSummary() {
 
 // ==================== CLIENT-SIDE CALCULATOR ====================
 function calcG2NLive() {
-function calcG2NLive() {
     const basic = Number(document.getElementById('calc-basic').value) || 0;
     const trans = Number(document.getElementById('calc-trans').value) || 0;
     const insInput = Number(document.getElementById('calc-ins').value) || 16700;
@@ -2356,7 +2355,7 @@ function calcN2GLive() {
         
         let monthExemp = insEmp + (exemp / 12);
         let annualTaxable = Math.max(0, (testGross - monthExemp) * 12);
-        let monthTax = calculateAnnualTax(annualTaxable) / 12; // تأكد إن الدالة دي موجودة عندك
+        let monthTax = calculateAnnualTax(annualTaxable) / 12; 
         
         // 🔥 صندوق الشهداء في اللوب
         let martyrs = testGross * 0.0005; 
@@ -2405,6 +2404,8 @@ function calcN2GLive() {
         </div>
     `;
 }
+
+
 
 // ==================== SETTINGS ====================
 async function loadSettings() {
