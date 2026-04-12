@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "installCommand": "npm install --no-package-lock",
   "functions": {
     "server.js": {
       "memory": 1024,
