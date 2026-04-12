@@ -17,7 +17,7 @@
     "jsonwebtoken": "^9.0.0",
     "dotenv": "^16.3.1",
     "express-validator": "^7.0.0",
-    "pdf-kit": "^0.13.0",
+    "pdfkit": "^0.13.0",
     "exceljs": "^4.3.0",
     "nodemailer": "^6.9.0"
   },
