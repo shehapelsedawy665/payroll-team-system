@@ -1,17 +1,5 @@
 {
   "version": 2,
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "JWT_SECRET": "@jwt_secret",
-    "JWT_REFRESH_SECRET": "@jwt_refresh_secret",
-    "BIOMETRIC_API_KEY": "@biometric_api_key",
-    "ALLOWED_ORIGINS": "@allowed_origins",
-    "NODE_ENV": "production",
-    "SMTP_HOST": "@smtp_host",
-    "SMTP_PORT": "@smtp_port",
-    "SMTP_USER": "@smtp_user",
-    "SMTP_PASSWORD": "@smtp_password"
-  },
   "routes": [
     { "src": "/api/(.*)", "dest": "/server.js", "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"] },
     { "src": "/public/(.*)", "status": 200 },
