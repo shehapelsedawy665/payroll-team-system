@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام تقييم الأداء - Performance Appraisal System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/appraisal.css">
+    <style>
+        body {
+            background: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        
+        .navigation {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            background: none;
+            border: none;
+            font-size: 1em;
+            font-weight: 500;
+        }
+        
+        .nav-item:hover {
+            color: #667eea;
+        }
+        
+        .nav-item.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="appraisal-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>نظام تقييم الأداء الشامل</h1>
+            <p>إدارة دورات التقييم والنماذج والتقييمات</p>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation">
+            <button class="nav-item active" onclick="switchSection('cycles')">دورات التقييم</button>
+            <button class="nav-item" onclick="switchSection('appraisals')">التقييمات</button>
+            <button class="nav-item" onclick="switchSection('reports')">التقارير</button>
+            <button class="nav-item" onclick="switchSection('settings')">الإعدادات</button>
+        </div>
+
+        <!-- Cycles Section -->
+        <div id="cycles" class="section active">
+            <div class="cycles-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>دورات التقييم</h2>
+                    <button class="btn btn-primary" id="newCycleBtn">
+                        + إنشاء دورة جديدة
+                    </button>
+                </div>
+
+                <div id="cyclesContainer" class="cycles-list">
+                    <div class="spinner"></div>
+                </div>
+
+                <!-- Cycle Summary -->
+                <div id="cycleSummary" style="margin-top: 30px;"></div>
+
+                <!-- Appraisals for selected cycle -->
+                <div id="appraisalsContainer" style="margin-top: 30px;"></div>
+            </div>
+        </div>
+
+        <!-- Appraisals Section -->
+        <div id="appraisals" class="section">
+            <div class="appraisals-section">
+                <h2>التقييمات الخاصة بي</h2>
+                <div id="myAppraisalsContainer" class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div id="reports" class="section">
+            <div class="reports-section">
+                <h2>التقارير</h2>
+                <div style="background: white; padding: 30px; border-radius: 8px; text-align: center; color: #999;">
+                    <p>قارِن البيانات وشاهد الاتجاهات</p>
+                    <!-- Reports will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div id="settings" class="section">
+            <div class="settings-section">
+                <h2>الإعدادات</h2>
+                <div style="background: white; padding: 30px; border-radius: 8px;">
+                    <h3>نماذج التقييم</h3>
+                    <button class="btn btn-primary" onclick="showTemplateModal()">
+                        + إنشاء نموذج جديد
+                    </button>
+                    <div id="templatesContainer" style="margin-top: 20px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cycle Modal -->
+    <div id="cycleModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div id="cycleModalContent"></div>
+    </div>
+
+    <!-- Appraisal Form Modal -->
+    <div id="appraisalFormModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-container" style="width: 90%; max-width: 900px;">
+            <div id="appraisalForm"></div>
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="templateModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div id="templateModalContent"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Utility functions
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            
+            const container = document.querySelector('.appraisal-container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            setTimeout(() => alertDiv.remove(), 4000);
+        }
+
+        function switchSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Add active class to clicked nav item
+            event.target.classList.add('active');
+            
+            // Load section data if needed
+            if (sectionId === 'appraisals') {
+                // loadMyAppraisals();
+            } else if (sectionId === 'reports') {
+                // loadReports();
+            } else if (sectionId === 'settings') {
+                // loadSettings();
+            }
+        }
+
+        function showTemplateModal() {
+            document.getElementById('templateModal').style.display = 'flex';
+        }
+
+        // Close modals when clicking overlay
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                e.target.parentElement.style.display = 'none';
+            }
+        });
+
+        // Modal styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .modal {
+                display: flex !important;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 1000;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .modal-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+            }
+
+            .modal-container,
+            #cycleModalContent,
+            #templateModalContent {
+                position: relative;
+                z-index: 1001;
+                background: white;
+                border-radius: 8px;
+                width: 80%;
+                max-width: 500px;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+
+            .section {
+                display: none;
+            }
+
+            .section.active {
+                display: block;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+
+    <!-- Appraisal Manager Script -->
+    <script src="js/appraisal.js"></script>
+</body>
+</html>

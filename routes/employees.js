@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { connectDB, Employee, LeaveBalance, Payroll, Attendance, Leave } = require('../backend/config/db');
+const bcrypt = require('bcryptjs');
+const { connectDB, Employee, LeaveBalance, Payroll, Attendance, Leave, User, Company } = require('../backend/config/db');
 const { authMiddleware, adminOnly } = require('../backend/middleware/auth');
 const { validateEmployee } = require('../backend/middleware/validators');
 
@@ -13,14 +14,45 @@ router.get("/", authMiddleware, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. إضافة موظف جديد
+// 2. إضافة موظف جديد (مع إنشاء حساب تلقائي)
 router.post("/", authMiddleware, validateEmployee, async (req, res) => {
     try {
         await connectDB();
+        
+        // Create employee
         const emp = await new Employee({
             ...req.body,
             companyId: req.user.companyId
         }).save();
+        
+        // 🔥 AUTO-ACCOUNT GENERATION HOOK
+        // When employee is created, automatically generate a user account
+        // Username = Job ID (الرقم الوظيفي)
+        // Password = National ID (الرقم القومي) - hashed
+        if (req.body.jobId && req.body.nationalId) {
+            try {
+                const hashedPassword = await bcrypt.hash(req.body.nationalId, 10);
+                const company = await Company.findById(req.user.companyId);
+                
+                const autoUser = await new User({
+                    email: `${req.body.jobId}@${company.name.toLowerCase().replace(/\s+/g, '')}`,
+                    password: hashedPassword,
+                    role: 'employee',
+                    companyId: req.user.companyId,
+                    employeeId: emp._id
+                }).save();
+                
+                // Update employee with user link
+                emp.userId = autoUser._id;
+                await emp.save();
+                
+                console.log(`✅ Auto-account created for employee ${req.body.name}: Job ID: ${req.body.jobId}`);
+            } catch (autoErr) {
+                console.warn(`⚠️ Could not create auto-account for employee: ${autoErr.message}`);
+                // Don't fail the entire request if auto-account fails
+            }
+        }
+        
         await new LeaveBalance({ employeeId: emp._id, companyId: emp.companyId, year: new Date().getFullYear() }).save();
         res.status(201).json(emp);
     } catch (err) { res.status(400).json({ error: err.message }); }

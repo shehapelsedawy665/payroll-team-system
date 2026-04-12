@@ -6,14 +6,19 @@
     "JWT_REFRESH_SECRET": "@jwt_refresh_secret",
     "BIOMETRIC_API_KEY": "@biometric_api_key",
     "ALLOWED_ORIGINS": "@allowed_origins",
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "SMTP_HOST": "@smtp_host",
+    "SMTP_PORT": "@smtp_port",
+    "SMTP_USER": "@smtp_user",
+    "SMTP_PASSWORD": "@smtp_password"
   },
   "builds": [
     {
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "maxLambdaSize": "50mb"
+        "maxLambdaSize": "50mb",
+        "includeFiles": "backend/**"
       }
     }
   ],
@@ -25,8 +30,11 @@
   "functions": {
     "server.js": {
       "memory": 1024,
-      "maxDuration": 60,
+      "maxDuration": 120,
       "runtime": "nodejs18.x"
     }
-  }
+  },
+  "buildCommand": "yarn install || npm install",
+  "outputDirectory": ".",
+  "public": "public"
 }

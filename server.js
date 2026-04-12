@@ -30,17 +30,33 @@ const authRoutes = require('./routes/auth');
 const employeeRoutes = require('./routes/employees');
 const payrollRoutes = require('./routes/payroll');
 const attendanceRoutes = require('./routes/attendance');
+const attendanceAPIRoutes = require('./routes/attendanceAPI');
+const biometricRoutes = require('./routes/biometric');
+const leaveAPIRoutes = require('./routes/leaveAPI');
 const settingsRoutes = require('./routes/settings');
 const leaveRoutes = require('./routes/leaves');
 const hrRoutes = require('./routes/hr');
+const devRoutes = require('./routes/dev');
+const appraisalRoutes = require('./routes/appraisal');
+const hrIntegrationRoutes = require('./routes/hrIntegration');
+const recruitmentRoutes = require('./routes/recruitment');
+const onboardingRoutes = require('./routes/onboarding');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/attendance', attendanceAPIRoutes);
+app.use('/api/biometric', biometricRoutes);
+app.use('/api/leave', leaveAPIRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/hr', hrRoutes);
+app.use('/api/dev', devRoutes);
+app.use('/api/appraisal', appraisalRoutes);
+app.use('/api/hr-integration', hrIntegrationRoutes);
+app.use('/api/recruitment', recruitmentRoutes);
+app.use('/api/onboarding', onboardingRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

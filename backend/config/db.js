@@ -51,5 +51,13 @@ const Leave = require('../models/Leave');
 const LeaveBalance = require('../models/LeaveBalance');
 const Subscription = require('../models/Subscription');
 const Shift = require('../models/Shift');
+const AppraisalCycle = require('../models/AppraisalCycle');
+const AppraisalTemplate = require('../models/AppraisalTemplate');
+const Appraisal = require('../models/Appraisal');
+const JobPosting = require('../models/JobPosting');
+const Candidate = require('../models/Candidate');
+const Offer = require('../models/Offer');
+const OnboardingTask = require('../models/OnboardingTask');
+const OnboardingChecklist = require('../models/OnboardingChecklist');
 
-module.exports = { connectDB, User, Company, Employee, PayrollRecord, Attendance, Penalty, Leave, LeaveBalance, Subscription, Shift };
+module.exports = { connectDB, User, Company, Employee, PayrollRecord, Attendance, Penalty, Leave, LeaveBalance, Subscription, Shift, AppraisalCycle, AppraisalTemplate, Appraisal, JobPosting, Candidate, Offer, OnboardingTask, OnboardingChecklist };

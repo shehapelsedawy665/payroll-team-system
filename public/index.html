@@ -678,7 +678,6 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="switchAuthTab('login')">تسجيل الدخول</button>
-      <button class="auth-tab" onclick="switchAuthTab('signup')">إنشاء حساب</button>
     </div>
     <div id="login-form">
       <div class="form-group">
@@ -691,21 +690,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
       <button class="btn-primary" onclick="doLogin()">دخول ←</button>
     </div>
-    <div id="signup-form" style="display:none">
-      <div class="form-group">
-        <label>اسم الشركة</label>
-        <input type="text" id="reg-company" placeholder="شركة المستقبل"/>
-      </div>
-      <div class="form-group">
-        <label>البريد الإلكتروني</label>
-        <input type="email" id="reg-email" placeholder="admin@company.com"/>
-      </div>
-      <div class="form-group">
-        <label>كلمة المرور</label>
-        <input type="password" id="reg-password" placeholder="8+ أحرف"/>
-      </div>
-      <button class="btn-primary" onclick="doSignup()">إنشاء حساب مجاني ✓</button>
-    </div>
+    <!-- Public signup removed for enterprise security -->
     <div class="auth-error" id="auth-error"></div>
   </div>
 </div>
@@ -731,6 +716,9 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
       <div class="nav-item" onclick="navigate('attendance')">
         <span class="nav-icon">📅</span> الحضور والغياب
+      </div>
+      <div class="nav-item" onclick="navigate('biometric')">
+        <span class="nav-icon">📱</span> أجهزة البصمة
       </div>
       <div class="nav-item" onclick="navigate('leaves')">
         <span class="nav-icon">🌴</span> الإجازات
@@ -931,6 +919,11 @@ tbody tr:last-child td { border-bottom: none; }
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- BIOMETRIC -->
+    <div class="page" id="page-biometric">
+      <div id="tabContent"></div>
     </div>
 
     <!-- LEAVES -->
@@ -1420,6 +1413,74 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
     <input type="hidden" id="att-day-date"/>
   </div>
+
+  <!-- 🔐 HIDDEN DEVELOPER OPTIONS DASHBOARD (Secured) -->
+  <div id="dev-options-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:10000;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#1a1a2e;border:2px solid #f39c12;border-radius:12px;padding:24px;max-width:900px;width:90%;max-height:90vh;overflow-y:auto;color:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2 style="margin:0;color:#f39c12;">⚙️ Developer Options & Super Admin Panel</h2>
+        <button onclick="closeDevPanel()" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:bold;">X إغلاق</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <!-- Company Registration -->
+        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;">
+          <h3 style="color:#f39c12;margin-top:0;">🏢 تسجيل شركة جديدة</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <input type="text" id="dev-company-name" placeholder="اسم الشركة" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+            <input type="email" id="dev-company-email" placeholder="البريد الإلكتروني (Admin)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+            <input type="password" id="dev-company-pass" placeholder="كلمة المرور" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+            <button onclick="devRegisterCompany()" style="background:#27ae60;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;">✅ تسجيل الشركة</button>
+          </div>
+        </div>
+
+        <!-- User Management -->
+        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;">
+          <h3 style="color:#f39c12;margin-top:0;">👤 تسجيل مستخدم نظام</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <select id="dev-user-company" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;">
+              <option value="">-- اختر شركة --</option>
+            </select>
+            <input type="email" id="dev-user-email" placeholder="البريد الإلكتروني" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+            <input type="password" id="dev-user-pass" placeholder="كلمة المرور" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+            <select id="dev-user-role" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;">
+              <option value="admin">Admin (مدير)</option>
+              <option value="hr">HR (موارد بشرية)</option>
+              <option value="finance">Finance (مالية)</option>
+            </select>
+            <button onclick="devRegisterUser()" style="background:#3498db;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;">✅ تسجيل المستخدم</button>
+          </div>
+        </div>
+
+        <!-- Employee Quick Registration (for auto-account test) -->
+        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;grid-column:1/3;">
+          <h3 style="color:#f39c12;margin-top:0;">👨‍💼 اختبار إنشاء حساب موظف تلقائي (Employee Auto-Account)</h3>
+          <p style="color:#ecf0f1;font-size:12px;margin:8px 0;">عند إضافة موظف جديد، يتم إنشاء حساب تلقائي: Username = Job ID | Password = National ID (مشفر)</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+            <input type="text" id="dev-emp-jobid" placeholder="Job ID (الرقم الوظيفي)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
+            <input type="text" id="dev-emp-national" placeholder="National ID (14 رقم)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
+            <input type="text" id="dev-emp-name" placeholder="الاسم" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
+            <select id="dev-emp-company" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;">
+              <option value="">-- شركة --</option>
+            </select>
+          </div>
+          <button onclick="devTestEmpAutoAccount()" style="background:#9b59b6;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;width:100%;margin-top:10px;">🧪 اختبر الحساب التلقائي</button>
+        </div>
+
+        <!-- Dev Stats -->
+        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;grid-column:1/3;">
+          <h3 style="color:#f39c12;margin-top:0;">📊 إحصائيات النظام</h3>
+          <div id="dev-stats" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;font-size:12px;">
+            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الشركات</strong><br/><span id="stat-companies">0</span></div>
+            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">المستخدمين</strong><br/><span id="stat-users">0</span></div>
+            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الموظفين</strong><br/><span id="stat-employees">0</span></div>
+            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الحسابات المرتبطة</strong><br/><span id="stat-linked-accounts">0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -1625,6 +1686,7 @@ function navigate(page) {
     dashboard:  ['لوحة التحكم',    'نظرة عامة على الشركة'],
     employees:  ['إدارة الموظفين', 'كل الموظفين والبيانات'],
     attendance: ['الحضور والغياب', 'اضغط على أي يوم لتسجيل الحضور'],
+    biometric:  ['أجهزة البصمة',   'إدارة أجهزة البصمة والتسجيل'],
     leaves:     ['الإجازات',       'طلبات وأرصدة الإجازات'],
     payroll:    ['مسير الرواتب',   'احسب راتب أو اعرض الكشف الشهري'],
     calculator: ['الآلة الحاسبة',  'حسابات ضريبية فورية'],
@@ -1651,7 +1713,8 @@ function navigate(page) {
   if (page === 'dashboard')  loadDashboard();
   if (page === 'employees')  loadEmployees();
   if (page === 'attendance') { populateEmpSelects(); initAttendancePage(); }
-  if (page === 'leaves')     { populateEmpSelects(); loadPendingLeaves(); }
+  if (page === 'biometric')  { initBiometricTab(); }
+  if (page === 'leaves')     { initLeaveTab(); }
   if (page === 'payroll')    { populateEmpSelects(); }
   if (page === 'settings')   loadSettings();
 }
@@ -1685,16 +1748,8 @@ async function doLogin() {
 }
 
 async function doSignup() {
-  const email       = document.getElementById('reg-email').value.trim();
-  const password    = document.getElementById('reg-password').value;
-  const companyName = document.getElementById('reg-company').value.trim();
-  if (!email || !password || !companyName) return showAuthError('ادخل البيانات كاملة');
-  showLoading();
-  try {
-    await api('POST', '/api/auth/signup', { email, password, companyName, role:'admin' });
-    toast('تم إنشاء الحساب! سجل دخولك الآن', 'success');
-    switchAuthTab('login');
-    document.getElementById('login-email').value = email;
+  return showAuthError('❌ تم تعطيل التسجيل العام. للتسجيل، تواصل مع مسؤول النظام.');
+}
   } catch(e) { showAuthError(e.message); }
   finally { hideLoading(); }
 }
@@ -1735,6 +1790,170 @@ if (AUTH_TOKEN && CURRENT_USER) {
 } else {
   document.getElementById('auth-screen').style.display = 'flex';
 }
+
+// ==================== 🔐 TIGHTLY SECURED DEVELOPER OPTIONS ====================
+// Obfuscated password using base64 encoding
+// Ctrl+Alt+Z triggers password prompt
+// DO NOT MODIFY OR EXPOSE
+
+const DEV_PASSWORD_HASH = 'Q08uU2VkYXd5LjIwMjY='; // Base64-encoded "CO.Sedawy.2026"
+
+function decodeDevPassword(hash) {
+  return atob(hash); // Decode from base64
+}
+
+let devPanelAttempts = 0;
+
+// Global keyboard listener for Ctrl+Alt+Z
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.altKey && e.code === 'KeyZ') {
+    e.preventDefault();
+    showDevPasswordPrompt();
+  }
+});
+
+function showDevPasswordPrompt() {
+  const password = prompt('🔐 Developer Options Password:');
+  if (password === null) return; // User cancelled
+  
+  const correctPassword = decodeDevPassword(DEV_PASSWORD_HASH);
+  
+  if (password === correctPassword) {
+    devPanelAttempts = 0; // Reset attempts on success
+    openDevPanel();
+  } else {
+    devPanelAttempts++;
+    if (devPanelAttempts >= 3) {
+      alert('❌ تنبيه أمني: تم تجاوز محاولات الدخول المسموحة. سيتم إغلاق الجلسة.');
+      doLogout();
+      return;
+    }
+    alert(`❌ كلمة المرور غير صحيحة. محاولات متبقية: ${3 - devPanelAttempts}`);
+  }
+}
+
+function openDevPanel() {
+  const modal = document.getElementById('dev-options-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    loadDevStats();
+    loadDevCompanies();
+  }
+}
+
+function closeDevPanel() {
+  const modal = document.getElementById('dev-options-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadDevStats() {
+  try {
+    const data = await api('GET', '/api/dev/stats');
+    document.getElementById('stat-companies').textContent = data.companies || 0;
+    document.getElementById('stat-users').textContent = data.users || 0;
+    document.getElementById('stat-employees').textContent = data.employees || 0;
+    document.getElementById('stat-linked-accounts').textContent = data.linkedAccounts || 0;
+  } catch (e) {
+    console.error('Error loading dev stats:', e);
+  }
+}
+
+async function loadDevCompanies() {
+  try {
+    const companies = await api('GET', '/api/dev/companies');
+    const select = document.getElementById('dev-user-company');
+    select.innerHTML = '<option value="">-- اختر شركة --</option>';
+    companies.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c._id;
+      opt.textContent = c.name;
+      select.appendChild(opt);
+    });
+
+    const empSelect = document.getElementById('dev-emp-company');
+    empSelect.innerHTML = '<option value="">-- شركة --</option>';
+    companies.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c._id;
+      opt.textContent = c.name;
+      empSelect.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('Error loading companies:', e);
+  }
+}
+
+async function devRegisterCompany() {
+  const name = document.getElementById('dev-company-name').value.trim();
+  const email = document.getElementById('dev-company-email').value.trim();
+  const pass = document.getElementById('dev-company-pass').value;
+
+  if (!name || !email || !pass) return alert('❌ أكمل جميع البيانات');
+
+  showLoading();
+  try {
+    const result = await api('POST', '/api/dev/register-company', { name, email, password: pass });
+    alert(`✅ تم تسجيل الشركة!\nCompany ID: ${result.companyId}\nAdmin User ID: ${result.userId}`);
+    document.getElementById('dev-company-name').value = '';
+    document.getElementById('dev-company-email').value = '';
+    document.getElementById('dev-company-pass').value = '';
+    loadDevStats();
+    loadDevCompanies();
+  } catch (e) {
+    alert(`❌ خطأ: ${e.message}`);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function devRegisterUser() {
+  const companyId = document.getElementById('dev-user-company').value;
+  const email = document.getElementById('dev-user-email').value.trim();
+  const pass = document.getElementById('dev-user-pass').value;
+  const role = document.getElementById('dev-user-role').value;
+
+  if (!companyId || !email || !pass || !role) return alert('❌ أكمل جميع البيانات');
+
+  showLoading();
+  try {
+    const result = await api('POST', '/api/dev/register-user', { companyId, email, password: pass, role });
+    alert(`✅ تم تسجيل المستخدم!\nUser ID: ${result.userId}`);
+    document.getElementById('dev-user-email').value = '';
+    document.getElementById('dev-user-pass').value = '';
+    loadDevStats();
+  } catch (e) {
+    alert(`❌ خطأ: ${e.message}`);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function devTestEmpAutoAccount() {
+  const jobId = document.getElementById('dev-emp-jobid').value.trim();
+  const nationalId = document.getElementById('dev-emp-national').value.trim();
+  const name = document.getElementById('dev-emp-name').value.trim();
+  const companyId = document.getElementById('dev-emp-company').value;
+
+  if (!jobId || !nationalId || !name || !companyId) return alert('❌ أكمل جميع البيانات');
+  if (nationalId.length !== 14) return alert('❌ الرقم القومي يجب أن يكون 14 أرقام');
+
+  showLoading();
+  try {
+    const result = await api('POST', '/api/dev/test-emp-autoaccount', {
+      jobId, nationalId, name, companyId
+    });
+    alert(`✅ تم إنشاء الحساب التلقائي للموظف!\n\nUsername (الدخول): ${result.username}\nPassword (مشفر): [مشتق من الرقم القومي]\n\nتفاصيل الموظف:\nID: ${result.employeeId}\nUser ID: ${result.userId}`);
+    document.getElementById('dev-emp-jobid').value = '';
+    document.getElementById('dev-emp-national').value = '';
+    document.getElementById('dev-emp-name').value = '';
+    loadDevStats();
+  } catch (e) {
+    alert(`❌ خطأ: ${e.message}`);
+  } finally {
+    hideLoading();
+  }
+}
+
 
 // ==================== DASHBOARD ====================
 async function loadDashboard() {
@@ -2737,5 +2956,8 @@ window.addEventListener('load', () => {
   }
 });
 </script>
+<script src="js/biometric.js"></script>
+<script src="js/attendance.js"></script>
+<script src="js/leaveAPI.js"></script>
 </body>
 </html>
