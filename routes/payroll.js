@@ -32,6 +32,37 @@ router.post(["/calculate", "/"], authMiddleware, async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Calculation error: " + err.message }); }
 });
 
+router.post("/preview", authMiddleware, async (req, res) => {
+    try {
+        const { gross, insSalary, exemption } = req.body;
+        if (!gross) return res.status(400).json({ error: "gross salary required" });
+        
+        const MAX_INS = 16700, MIN_INS = 5384.62;
+        const cappedIns = R(Math.min(MAX_INS, Math.max(MIN_INS, insSalary || MIN_INS)));
+        
+        const result = runPayrollLogic(
+            { fullBasic: R(gross), fullTrans: 0, days: 30, additions: [], deductions: [], month: new Date().toISOString().substring(0, 7), hiringDate: null, resignationDate: null },
+            { pDays: 0, pTaxable: 0, pTaxes: 0 },
+            { insSalary: cappedIns }
+        );
+        
+        const insComp = R(cappedIns * 0.1875);
+        const annualTaxable = R(Math.max(0, (R(gross) - R(result.insuranceEmployee) - (exemption || 20000) / 12) * 12));
+        
+        res.json({
+            gross: R(gross),
+            insSalary: cappedIns,
+            insEmployee: R(result.insuranceEmployee),
+            insCompany: insComp,
+            annualTaxable: annualTaxable,
+            monthlyTax: R(result.monthlyTax),
+            martyrs: R(R(gross) * 0.0005),
+            net: R(result.net),
+            totalCompanyCost: R(R(gross) + insComp)
+        });
+    } catch (err) { res.status(500).json({ error: "Preview calculation failed: " + err.message }); }
+});
+
 router.post("/net-to-gross", authMiddleware, async (req, res) => {
     try {
         const { targetNet } = req.body;

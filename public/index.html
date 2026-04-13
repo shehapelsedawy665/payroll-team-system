@@ -1520,6 +1520,43 @@ const EGY_CONSTANTS = {
 
 const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+// ==================== GLOBAL DEVELOPER PANEL ACCESS ====================
+// Ctrl+Alt+Z trigger — works on LOGIN PAGE AND EVERYWHERE ELSE
+const DEV_PASSWORD_HASH = 'Q08uU2VkYXd5LjIwMjY='; // Base64-encoded "CO.Sedawy.2026"
+let devPanelAttempts = 0;
+
+function decodeDevPassword(hash) {
+  return atob(hash); // Decode from base64
+}
+
+function showDevPasswordPrompt() {
+  const password = prompt('🔐 Developer Options Password:');
+  if (password === null) return; // User cancelled
+  
+  const correctPassword = decodeDevPassword(DEV_PASSWORD_HASH);
+  
+  if (password === correctPassword) {
+    devPanelAttempts = 0; // Reset attempts on success
+    openDevPanel();
+  } else {
+    devPanelAttempts++;
+    if (devPanelAttempts >= 3) {
+      alert('❌ تنبيه أمني: تم تجاوز محاولات الدخول المسموحة. سيتم إغلاق الجلسة.');
+      doLogout();
+      return;
+    }
+    alert(`❌ كلمة المرور غير صحيحة. محاولات متبقية: ${3 - devPanelAttempts}`);
+  }
+}
+
+// Global keyboard listener — MUST be top-level to work on auth page
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.altKey && e.code === 'KeyZ') {
+    e.preventDefault();
+    showDevPasswordPrompt();
+  }
+});
+
 /**
  * حساب ضريبة الدخل السنوية بشرائح 2026
  * مطابق تماماً للباك إند (payrollEngine.js → calculateAnnualTax)
@@ -1803,46 +1840,7 @@ if (AUTH_TOKEN && CURRENT_USER) {
   document.getElementById('auth-screen').style.display = 'flex';
 }
 
-// ==================== 🔐 TIGHTLY SECURED DEVELOPER OPTIONS ====================
-// Obfuscated password using base64 encoding
-// Ctrl+Alt+Z triggers password prompt
-// DO NOT MODIFY OR EXPOSE
-
-const DEV_PASSWORD_HASH = 'Q08uU2VkYXd5LjIwMjY='; // Base64-encoded "CO.Sedawy.2026"
-
-function decodeDevPassword(hash) {
-  return atob(hash); // Decode from base64
-}
-
-let devPanelAttempts = 0;
-
-// Global keyboard listener for Ctrl+Alt+Z
-document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.altKey && e.code === 'KeyZ') {
-    e.preventDefault();
-    showDevPasswordPrompt();
-  }
-});
-
-function showDevPasswordPrompt() {
-  const password = prompt('🔐 Developer Options Password:');
-  if (password === null) return; // User cancelled
-  
-  const correctPassword = decodeDevPassword(DEV_PASSWORD_HASH);
-  
-  if (password === correctPassword) {
-    devPanelAttempts = 0; // Reset attempts on success
-    openDevPanel();
-  } else {
-    devPanelAttempts++;
-    if (devPanelAttempts >= 3) {
-      alert('❌ تنبيه أمني: تم تجاوز محاولات الدخول المسموحة. سيتم إغلاق الجلسة.');
-      doLogout();
-      return;
-    }
-    alert(`❌ كلمة المرور غير صحيحة. محاولات متبقية: ${3 - devPanelAttempts}`);
-  }
-}
+// ==================== DEVELOPER PANEL FUNCTIONS ====================
 
 function openDevPanel() {
   const modal = document.getElementById('dev-options-modal');
@@ -2691,49 +2689,42 @@ function calcG2NLive() {
     const div      = document.getElementById('g2n-result');
     if (!basic) { div.innerHTML = ''; return; }
 
-    const gross  = R(basic + trans);
-    // use the unified engine (exemption is already baked in via PERSONAL_EXEMPTION)
-    const r = localCalcGrossToNet(gross, insInput);
-    // recalc with custom exemption if different from default
-    const customExemp = exemp !== EGY.PERSONAL_EXEMPTION;
-    let insEmp = r.insEmp, monthTax = r.monthlyTax, martyrs = r.martyrs, net = r.net, insComp = r.insComp;
-    if (customExemp) {
-        const actualIns = Math.max(EGY.MIN_INS_FULL_TIME, Math.min(insInput, EGY.MAX_INS));
-        insEmp   = R(actualIns * EGY.INS_EMP_RATE);
-        insComp  = R(actualIns * EGY.INS_COMP_RATE);
-        const at = R(Math.max(0, (gross - insEmp - exemp/12) * 12));
-        monthTax = R(calcAnnualTax(at) / 12);
-        martyrs  = R(gross * EGY.MARTYRS_RATE);
-        net      = R(gross - insEmp - monthTax - martyrs);
-    }
-    const annualTaxable = R(Math.max(0, (gross - insEmp - exemp/12) * 12));
-
-    div.innerHTML = `
-        <div class="result-row add" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">الإجمالي</span><span class="value" style="color:var(--green)">${fmt(gross)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red)">${fmt(insEmp)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">تأمين الشركة (18.75%)</span><span class="value" style="color:var(--text2)">${fmt(insComp)} ج</span>
-        </div>
-        <div class="result-row" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label" style="color:var(--text3);">الوعاء الضريبي السنوي</span><span class="value" style="color:var(--text2)">${fmt(annualTaxable)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">ضريبة الدخل الشهرية</span><span class="value" style="color:var(--red)">${fmt(monthTax)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
-            <span class="label">صندوق الشهداء (0.05%)</span><span class="value" style="color:var(--red)">${fmt(martyrs)} ج</span>
-        </div>
-        <div class="result-row total" style="display:flex;justify-content:space-between;padding:12px 0;margin-top:10px;font-weight:bold;font-size:16px;">
-            <span class="label">💰 الصافي</span><span class="value" style="color:var(--gold)">${fmt(net)} ج</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:6px 0;opacity:.6;font-size:11px;">
-            <span>🏢 تكلفة الشركة الكاملة</span><span>${fmt(R(gross + insComp))} ج</span>
-        </div>
-    `;
+    const gross = R(basic + trans);
+    const payload = { gross: gross, insSalary: insInput, exemption: exemp };
+    
+    api('POST', '/api/payroll/preview', payload).then(r => {
+        if (!r) return;
+        
+        div.innerHTML = `
+            <div class="result-row add" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span class="label">الإجمالي</span><span class="value" style="color:var(--green)">${fmt(r.gross || 0)} ج</span>
+            </div>
+            <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red)">${fmt(r.insEmployee || 0)} ج</span>
+            </div>
+            <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span class="label">تأمين الشركة (18.75%)</span><span class="value" style="color:var(--text2)">${fmt(r.insCompany || 0)} ج</span>
+            </div>
+            <div class="result-row" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span class="label" style="color:var(--text3);">الوعاء الضريبي السنوي</span><span class="value" style="color:var(--text2)">${fmt(r.annualTaxable || 0)} ج</span>
+            </div>
+            <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span class="label">ضريبة الدخل الشهرية</span><span class="value" style="color:var(--red)">${fmt(r.monthlyTax || 0)} ج</span>
+            </div>
+            <div class="result-row deduct" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span class="label">صندوق الشهداء (0.05%)</span><span class="value" style="color:var(--red)">${fmt(r.martyrs || 0)} ج</span>
+            </div>
+            <div class="result-row total" style="display:flex;justify-content:space-between;padding:12px 0;margin-top:10px;font-weight:bold;font-size:16px;">
+                <span class="label">💰 الصافي</span><span class="value" style="color:var(--gold)">${fmt(r.net || 0)} ج</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;opacity:.6;font-size:11px;">
+                <span>🏢 تكلفة الشركة الكاملة</span><span>${fmt(r.totalCompanyCost || 0)} ج</span>
+            </div>
+        `;
+    }).catch(err => {
+        console.error("Gross-to-Net preview error:", err);
+        div.innerHTML = '';
+    });
 }
 
 function calcN2GLive() {
