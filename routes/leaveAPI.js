@@ -18,9 +18,9 @@ const {
     getLeaveBalance,
     initializeLeaveBalance
 } = require('../backend/modules/leave/leaveEngine');
-const auth = require('../backend/middleware/auth');
+const { authMiddleware } = require('../backend/middleware/auth');
 
-router.use(auth);
+router.use(authMiddleware);
 
 // ==================== LEAVE TYPES ====================
 
