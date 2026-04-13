@@ -1,6 +1,6 @@
 /**
  * @file backend/logic/payrollEngine.js
- * @description Advanced Egyptian Payroll Engine - (Restored from Original 2026 Logic with Part-Time Support)
+ * @description Advanced Egyptian Payroll Engine - (Fixed Tax Floor & Net-to-Gross Precision)
  */
 
 // 1. الثوابت الأصلية بتاعتك + تحديث البارت تايم
@@ -87,8 +87,10 @@ const calculateGrossToNet = (params) => {
     
     let monthlyTax = 0;
     if (!isTaxExempted) {
-        const annualTaxableIncome = (monthlyGrossForTax - monthlyExemptions) * EGY_CONSTANTS.MONTHS_IN_YEAR;
+        let annualTaxableIncome = (monthlyGrossForTax - monthlyExemptions) * EGY_CONSTANTS.MONTHS_IN_YEAR;
         if (annualTaxableIncome > 0) {
+            // 🔥 التعديل السحري: تقريب الوعاء السنوي لأقرب 10 جنيه للأسفل لمنع كسور القروش
+            annualTaxableIncome = Math.floor(annualTaxableIncome / 10) * 10;
             const annualTax = calculateAnnualTax(annualTaxableIncome);
             monthlyTax = annualTax / EGY_CONSTANTS.MONTHS_IN_YEAR;
         }
@@ -138,7 +140,7 @@ const runPayrollLogic = (input, prev, emp) => {
         loanDeduction: totalDeductions,
         isTaxExempted: emp.isTaxExempted || 0,
         companySettings: emp.companySettings || {},
-        jobType: emp.jobType || "Full Time" // 🔥 تمرير نوع الوظيفة من الموظف
+        jobType: emp.jobType || "Full Time" 
     });
 
     return {
@@ -166,15 +168,35 @@ const calculateNetToGross = (targetNet, insSalary, companySettings, isTaxExempte
     let maxGross = targetNet * 2.5; 
     let currentGross = (minGross + maxGross) / 2;
     let bestMatch = null;
+    
     for (let i = 0; i < 100; i++) {
         const payload = calculateGrossToNet({ 
             basicSalary: currentGross, 
             insSalary: insSalary, 
             companySettings: companySettings, 
             isTaxExempted: isTaxExempted,
-            jobType: jobType // 🔥 تمرير نوع الوظيفة للوب
+            jobType: jobType 
         });
-        if (Math.abs(payload.netSalary - targetNet) < 0.01) { bestMatch = payload; break; }
+        
+        if (Math.abs(payload.netSalary - targetNet) < 0.01) { 
+            // 🔥 التعديل السحري: تجربة الرقم الصحيح للتخلص من الكسور المزعجة
+            let roundedGross = Math.round(currentGross);
+            let checkPayload = calculateGrossToNet({
+                basicSalary: roundedGross,
+                insSalary: insSalary,
+                companySettings: companySettings,
+                isTaxExempted: isTaxExempted,
+                jobType: jobType
+            });
+
+            if (Math.abs(checkPayload.netSalary - targetNet) < 0.05) {
+                bestMatch = checkPayload;
+                break;
+            }
+
+            bestMatch = payload; 
+            break; 
+        }
         if (payload.netSalary > targetNet) maxGross = currentGross;
         else minGross = currentGross;
         currentGross = (minGross + maxGross) / 2;
