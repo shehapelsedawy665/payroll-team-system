@@ -9,6 +9,10 @@ if (!runPayrollLogic || !calculateGrossToNet || !analyzePayrollAnomaly || !gener
     throw new Error("❌ CRITICAL: Payroll engine functions not loaded properly");
 }
 
+// ============= STRICT MATHEMATICAL PRECISION =============
+// Rounding function for Egyptian tax calculations (2 decimals)
+const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 router.post(["/calculate", "/"], authMiddleware, async (req, res) => {
     try {
         const empId = req.body.empId || req.body.employeeId;
@@ -17,7 +21,11 @@ router.post(["/calculate", "/"], authMiddleware, async (req, res) => {
         const MAX_INS = 16700, MIN_INS = 5384.62;
         const effectiveInsSalary = Math.min(MAX_INS, Math.max(MIN_INS, emp.insSalary || 0));
         const empForCalc = { ...emp.toObject(), insSalary: effectiveInsSalary };
-        if (resignationDate) await Employee.findByIdAndUpdate(empId, { resignationDate });
+        // Update employee with resignation date if provided (using already-fetched emp object)
+        if (resignationDate) {
+            emp.resignationDate = resignationDate;
+            await emp.save();
+        }
         const result = runPayrollLogic({ fullBasic, fullTrans, days, additions, deductions, month, hiringDate, resignationDate }, prevData || { pDays: 0, pTaxable: 0, pTaxes: 0 }, empForCalc);
         const record = await Payroll.findOneAndUpdate({ employeeId: empId, month }, { employeeId: empId, companyId: req.user.companyId, month, payload: result, createdAt: new Date() }, { upsert: true, new: true });
         res.json({ success: true, data: { payload: result, record } });
@@ -27,17 +35,20 @@ router.post(["/calculate", "/"], authMiddleware, async (req, res) => {
 router.post("/net-to-gross", authMiddleware, async (req, res) => {
     try {
         const { targetNet } = req.body;
-        let estimateGross = Number(targetNet);
+        let estimateGross = R(Number(targetNet));
         let finalResult = {};
         const MAX_INS = 16700, MIN_INS = 5384.62;
+        // ============= STRICT MATHEMATICAL PRECISION LOOP =============
         for (let i = 0; i < 100; i++) {
             let cappedIns = Math.min(MAX_INS, Math.max(MIN_INS, estimateGross));
             finalResult = runPayrollLogic({ fullBasic: estimateGross, fullTrans: 0, days: 30, additions: [], deductions: [], month: new Date().toISOString().substring(0, 7), hiringDate: null, resignationDate: null }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: cappedIns });
-            let diff = Number(targetNet) - finalResult.net;
-            if (Math.abs(diff) < 0.01) break;
-            estimateGross += diff;
+            // Apply strict 2-decimal rounding at every iteration to match calculations.js
+            let diff = R(R(Number(targetNet)) - R(finalResult.net));
+            if (Math.abs(diff) === 0) break; // Strict equality check after rounding
+            estimateGross = R(estimateGross + diff);
         }
-        res.json({ gross: Math.round(estimateGross * 100) / 100, insSalary: Math.min(MAX_INS, Math.max(MIN_INS, estimateGross)), insEmployee: finalResult.insuranceEmployee, taxes: finalResult.monthlyTax, net: finalResult.net });
+        // Ensure all response values are strictly rounded to 2 decimals
+        res.json({ gross: R(estimateGross), insSalary: R(Math.min(MAX_INS, Math.max(MIN_INS, estimateGross))), insEmployee: R(finalResult.insuranceEmployee), taxes: R(finalResult.monthlyTax), net: R(finalResult.net) });
     } catch (err) { res.status(500).json({ error: "Net to Gross failed" }); }
 });
 

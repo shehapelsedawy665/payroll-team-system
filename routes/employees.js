@@ -53,7 +53,13 @@ router.post("/", authMiddleware, validateEmployee, async (req, res) => {
         
         await new LeaveBalance({ employeeId: emp._id, companyId: emp.companyId, year: new Date().getFullYear() }).save();
         res.status(201).json(emp);
-    } catch (err) { res.status(400).json({ error: err.message }); }
+    } catch (err) {
+        // Handle MongoDB E11000 duplicate key error (duplicate nationalId)
+        if (err.code === 11000) {
+            return res.status(400).json({ error: "هذا الرقم القومي مسجل مسبقاً لموظف آخر" });
+        }
+        res.status(400).json({ error: err.message });
+    }
 });
 
 // 3. تفاصيل الموظف (البروفايل)

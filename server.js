@@ -7,6 +7,10 @@ require('dotenv').config();
 const { connectDB, Company, User, Employee } = require('./backend/config/db');
 const { runPayrollLogic } = require('./backend/logic/payrollEngine');
 
+// ============= STRICT MATHEMATICAL PRECISION =============
+// Rounding function for Egyptian tax calculations (2 decimals)
+const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 const app = express();
 
 // Middleware
