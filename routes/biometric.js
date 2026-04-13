@@ -22,9 +22,9 @@ router.use(authMiddleware);
  */
 router.post('/device/register', async (req, res) => {
     try {
-        // Only HR/Admin can register devices
-        if (req.user.role !== 'hr' && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Only HR/Admins can register devices' });
+        // Only HR/Admin/Manager can register devices
+        if (!['hr', 'admin', 'manager'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
         }
 
         const {
@@ -117,8 +117,8 @@ router.get('/devices', async (req, res) => {
  */
 router.put('/device/:id', async (req, res) => {
     try {
-        if (req.user.role !== 'hr' && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Only HR/Admins can update devices' });
+        if (!['hr', 'admin', 'manager'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
         }
 
         const { location, latitude, longitude, allowedRadius, isActive } = req.body;
@@ -236,8 +236,8 @@ router.get('/device/:id/enrollments', async (req, res) => {
  */
 router.delete('/device/:deviceId/enroll/:employeeId', async (req, res) => {
     try {
-        if (req.user.role !== 'hr' && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Only HR/Admins can unenroll' });
+        if (!['hr', 'admin', 'manager'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
         }
 
         const device = await BiometricDevice.findByIdAndUpdate(
@@ -397,8 +397,8 @@ router.get('/sync-status', async (req, res) => {
  */
 router.post('/test-connection', async (req, res) => {
     try {
-        if (req.user.role !== 'hr' && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Only HR/Admins can test connections' });
+        if (!['hr', 'admin', 'manager'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
         }
 
         const { deviceId } = req.body;
@@ -454,8 +454,8 @@ router.post('/test-connection', async (req, res) => {
  */
 router.post('/device/:id/sync-employees', async (req, res) => {
     try {
-        if (req.user.role !== 'hr' && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Only HR/Admins can trigger sync' });
+        if (!['hr', 'admin', 'manager'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
         }
 
         const device = await BiometricDevice.findById(req.params.id);

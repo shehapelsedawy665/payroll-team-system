@@ -40,7 +40,8 @@ router.post("/net-to-gross", authMiddleware, async (req, res) => {
         const MAX_INS = 16700, MIN_INS = 5384.62;
         // ============= STRICT MATHEMATICAL PRECISION LOOP =============
         for (let i = 0; i < 100; i++) {
-            let cappedIns = Math.min(MAX_INS, Math.max(MIN_INS, estimateGross));
+            // CRITICAL FIX: Wrap cappedIns in R() to prevent floating-point errors
+            let cappedIns = R(Math.min(MAX_INS, Math.max(MIN_INS, estimateGross)));
             finalResult = runPayrollLogic({ fullBasic: estimateGross, fullTrans: 0, days: 30, additions: [], deductions: [], month: new Date().toISOString().substring(0, 7), hiringDate: null, resignationDate: null }, { pDays: 0, pTaxable: 0, pTaxes: 0 }, { insSalary: cappedIns });
             // Apply strict 2-decimal rounding at every iteration to match calculations.js
             let diff = R(R(Number(targetNet)) - R(finalResult.net));
