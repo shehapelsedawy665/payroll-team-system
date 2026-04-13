@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { connectDB, Company, User, Employee } = require('../backend/config/db');
+const { Company, User, Employee } = require('../backend/config/db');
 
 // 🔐 Security middleware - Verify request origin/IP if needed (optional extra layer)
 const isDev = (req, res, next) => {
@@ -13,7 +13,6 @@ const isDev = (req, res, next) => {
 // ==================== DEV STATISTICS ====================
 router.get('/stats', isDev, async (req, res) => {
     try {
-        await connectDB();
         const companies = await Company.countDocuments();
         const users = await User.countDocuments();
         const employees = await Employee.countDocuments();
@@ -35,7 +34,6 @@ router.get('/stats', isDev, async (req, res) => {
 // ==================== LIST ALL COMPANIES ====================
 router.get('/companies', isDev, async (req, res) => {
     try {
-        await connectDB();
         const companies = await Company.find().select('_id name createdAt');
         res.json(companies);
     } catch (err) {
@@ -53,7 +51,6 @@ router.post('/register-company', isDev, async (req, res) => {
     }
     
     try {
-        await connectDB();
         
         // Check if email already exists
         const existing = await User.findOne({ email });
@@ -115,7 +112,6 @@ router.post('/register-user', isDev, async (req, res) => {
     }
     
     try {
-        await connectDB();
         
         // Verify company exists
         const company = await Company.findById(companyId);
@@ -162,7 +158,6 @@ router.post('/test-emp-autoaccount', isDev, async (req, res) => {
     }
     
     try {
-        await connectDB();
         
         // Verify company exists
         const company = await Company.findById(companyId);

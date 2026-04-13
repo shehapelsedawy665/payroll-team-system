@@ -1,14 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { connectDB, Employee, LeaveBalance, Payroll, Attendance, Leave, User, Company } = require('../backend/config/db');
+const { Employee, LeaveBalance, Payroll, Attendance, Leave, User, Company } = require('../backend/config/db');
 const { authMiddleware, adminOnly } = require('../backend/middleware/auth');
 const { validateEmployee } = require('../backend/middleware/validators');
 
 // 1. جلب كل الموظفين
 router.get("/", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const employees = await Employee.find({ companyId: req.user.companyId }).sort({ _id: -1 });
         res.json(employees);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -17,7 +16,6 @@ router.get("/", authMiddleware, async (req, res) => {
 // 2. إضافة موظف جديد (مع إنشاء حساب تلقائي)
 router.post("/", authMiddleware, validateEmployee, async (req, res) => {
     try {
-        await connectDB();
         
         // Create employee
         const emp = await new Employee({
@@ -61,7 +59,6 @@ router.post("/", authMiddleware, validateEmployee, async (req, res) => {
 // 3. تفاصيل الموظف (البروفايل)
 router.get("/details", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const id = req.query.id;
         const emp = await Employee.findById(id);
         const history = await Payroll.find({ employeeId: id }).sort({ month: 1 });
@@ -73,7 +70,6 @@ router.get("/details", authMiddleware, async (req, res) => {
 // 4. تحديث بيانات موظف
 router.put("/", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const emp = await Employee.findByIdAndUpdate(req.query.id, req.body, { new: true });
         res.json(emp);
     } catch (err) { res.status(400).json({ error: err.message }); }
@@ -82,7 +78,6 @@ router.put("/", authMiddleware, async (req, res) => {
 // 5. حذف موظف
 router.delete("/", authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const id = req.query.id;
         await Employee.findByIdAndDelete(id);
         res.json({ success: true });

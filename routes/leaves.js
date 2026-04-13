@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { connectDB, Leave, LeaveBalance, Employee, EWARequest } = require('../backend/config/db');
+const { Leave, LeaveBalance, Employee, EWARequest } = require('../backend/config/db');
 const { authMiddleware, adminOnly } = require('../backend/middleware/auth');
 
 router.post("/", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const { employeeId, type, startDate, endDate, days, reason } = req.body;
         const year = new Date(startDate).getFullYear();
         if (['annual', 'sick', 'emergency'].includes(type)) {
@@ -22,7 +21,7 @@ router.post("/", authMiddleware, async (req, res) => {
 
 router.get(["/:employeeId", "/employee"], authMiddleware, async (req, res) => {
     try {
-        await connectDB();
+
         const employeeId = req.params.employeeId || req.query.id;
         const year = req.query.year || new Date().getFullYear();
         const leaves = await Leave.find({ employeeId, year }).sort({ startDate: -1 });
@@ -33,7 +32,6 @@ router.get(["/:employeeId", "/employee"], authMiddleware, async (req, res) => {
 
 router.get(["/company/pending", "/pending"], authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const leaves = await Leave.find({ companyId: req.user.companyId, status: 'pending' }).populate('employeeId', 'name department').sort({ createdAt: -1 });
         res.json(leaves);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -41,7 +39,7 @@ router.get(["/company/pending", "/pending"], authMiddleware, async (req, res) =>
 
 router.put(["/:id/approve", "/approve"], authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
+
         const id = req.params.id || req.query.id;
         const { status } = req.body; 
         const leave = await Leave.findByIdAndUpdate(id, { status, approvedBy: req.user.id }, { new: true });
@@ -55,7 +53,6 @@ router.put(["/:id/approve", "/approve"], authMiddleware, adminOnly, async (req, 
 
 router.get("/balance/:employeeId", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const year = req.query.year || new Date().getFullYear();
         let balance = await LeaveBalance.findOne({ employeeId: req.params.employeeId, year });
         if (!balance) {

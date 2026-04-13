@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { connectDB, Attendance, Employee } = require('../backend/config/db');
+const { Attendance, Employee } = require('../backend/config/db');
 const { authMiddleware } = require('../backend/middleware/auth');
 
 router.post("/", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const { employeeId, date, status, checkIn, checkOut, lateMinutes, overtimeHours, notes } = req.body;
         const month = date.substring(0, 7);
         const record = await Attendance.findOneAndUpdate(
@@ -19,7 +18,6 @@ router.post("/", authMiddleware, async (req, res) => {
 
 router.post("/bulk", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const { records } = req.body; 
         const ops = records.map(r => ({
             updateOne: {
@@ -39,7 +37,6 @@ router.post('/webhook/biometric', async (req, res) => {
         return res.status(401).json({ error: "Invalid API key" });
     }
     try {
-        await connectDB();
         const { nationalId, deviceId, timestamp, type } = req.body; 
         const employee = await Employee.findOne({ nationalId });
         if (!employee) return res.status(404).json({ error: "الموظف غير مسجل" });
@@ -57,7 +54,7 @@ router.post('/webhook/biometric', async (req, res) => {
 
 router.get(["/:employeeId/:month", "/"], authMiddleware, async (req, res) => {
     try {
-        await connectDB();
+
         const employeeId = req.params.employeeId || req.query.employeeId;
         const month = req.params.month || req.query.month;
         const records = await Attendance.find({ employeeId, month }).sort({ date: 1 });
@@ -67,7 +64,6 @@ router.get(["/:employeeId/:month", "/"], authMiddleware, async (req, res) => {
 
 router.get("/company/:month", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const records = await Attendance.find({ companyId: req.user.companyId, month: req.params.month }).populate('employeeId', 'name department');
         res.json(records);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -75,7 +71,6 @@ router.get("/company/:month", authMiddleware, async (req, res) => {
 
 router.get("/stats/:employeeId/:month", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const records = await Attendance.find({ employeeId: req.params.employeeId, month: req.params.month });
         const stats = {
             present: records.filter(r => r.status === 'present').length,

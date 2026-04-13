@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { connectDB, Employee, Payroll, Attendance, Penalty, Company } = require('../backend/config/db');
+const { Employee, Payroll, Attendance, Penalty, Company } = require('../backend/config/db');
 const { authMiddleware } = require('../backend/middleware/auth');
 
 let calculations = require("../backend/logic/payrollEngine");
@@ -11,7 +11,6 @@ if (!runPayrollLogic || !calculateGrossToNet || !analyzePayrollAnomaly || !gener
 
 router.post(["/calculate", "/"], authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const empId = req.body.empId || req.body.employeeId;
         const { month, days, fullBasic, fullTrans, additions, deductions, prevData, hiringDate, resignationDate } = req.body;
         const emp = await Employee.findById(empId);
@@ -44,7 +43,6 @@ router.post("/net-to-gross", authMiddleware, async (req, res) => {
 
 router.post('/run', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const { month } = req.body; 
         const company = await Company.findById(req.user.companyId);
         const employees = await Employee.find({ companyId: req.user.companyId, resignationDate: null });
@@ -70,7 +68,6 @@ router.post('/run', authMiddleware, async (req, res) => {
 
 router.get('/export-unified-tax/:month', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const payrolls = await Payroll.find({ companyId: req.user.companyId, month: req.params.month }).populate('employeeId');
         const exportData = payrolls.map(pr => generateUnifiedTaxRow(pr.employeeId, pr));
         res.json({ month: req.params.month, data: exportData });
@@ -79,7 +76,6 @@ router.get('/export-unified-tax/:month', authMiddleware, async (req, res) => {
 
 router.get("/summary/:month", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const records = await Payroll.find({ companyId: req.user.companyId, month: req.params.month }).populate('employeeId', 'name department');
         const totals = records.reduce((acc, r) => ({ gross: acc.gross + (r.payload.gross || 0), insurance: acc.insurance + (r.payload.insuranceEmployee || 0), tax: acc.tax + (r.payload.monthlyTax || 0), net: acc.net + (r.payload.net || 0), count: acc.count + 1 }), { gross: 0, insurance: 0, tax: 0, net: 0, count: 0 });
         res.json({ records, totals });

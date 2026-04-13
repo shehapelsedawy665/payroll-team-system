@@ -5,7 +5,6 @@
 
 const express = require('express');
 const router = express.Router();
-const { connectDB } = require('../backend/config/db');
 const { authMiddleware, adminOnly, managerOnly } = require('../backend/middleware/auth');
 
 // Import models
@@ -32,7 +31,6 @@ try {
 // Create a new appraisal cycle
 router.post('/cycles', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const cycle = new AppraisalCycle({
             companyId: req.user.companyId,
             ...req.body
@@ -50,7 +48,6 @@ router.post('/cycles', authMiddleware, adminOnly, async (req, res) => {
 // Get all appraisal cycles for company
 router.get('/cycles', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const cycles = await AppraisalCycle.find({
             companyId: req.user.companyId
         }).sort({ startDate: -1 });
@@ -67,7 +64,6 @@ router.get('/cycles', authMiddleware, async (req, res) => {
 // Get specific cycle
 router.get('/cycles/:id', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const cycle = await AppraisalCycle.findById(req.params.id);
         if (!cycle || cycle.companyId.toString() !== req.user.companyId) {
             return res.status(404).json({ error: 'الدورة غير موجودة' });
@@ -81,7 +77,6 @@ router.get('/cycles/:id', authMiddleware, async (req, res) => {
 // Update cycle
 router.put('/cycles/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const cycle = await AppraisalCycle.findByIdAndUpdate(
             req.params.id,
             { ...req.body, updatedAt: new Date() },
@@ -102,7 +97,6 @@ router.put('/cycles/:id', authMiddleware, adminOnly, async (req, res) => {
 // Close/Complete a cycle
 router.post('/cycles/:id/close', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const cycle = await AppraisalCycle.findById(req.params.id);
         if (!cycle) {
             return res.status(404).json({ error: 'الدورة غير موجودة' });
@@ -130,7 +124,6 @@ router.post('/cycles/:id/close', authMiddleware, adminOnly, async (req, res) => 
 // Create template
 router.post('/templates', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const template = new AppraisalTemplate({
             companyId: req.user.companyId,
             ...req.body
@@ -148,7 +141,6 @@ router.post('/templates', authMiddleware, adminOnly, async (req, res) => {
 // Get all templates
 router.get('/templates', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const templates = await AppraisalTemplate.find({
             companyId: req.user.companyId,
             isActive: true
@@ -166,7 +158,6 @@ router.get('/templates', authMiddleware, async (req, res) => {
 // Update template
 router.put('/templates/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const template = await AppraisalTemplate.findByIdAndUpdate(
             req.params.id,
             { ...req.body, updatedAt: new Date() },
@@ -193,7 +184,6 @@ router.put('/templates/:id', authMiddleware, adminOnly, async (req, res) => {
 // Create appraisals for a cycle (bulk create for all employees)
 router.post('/forms/create-batch', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const { cycleId, employeeFilter = {} } = req.body;
         
         const cycle = await AppraisalCycle.findById(cycleId);
@@ -253,7 +243,6 @@ router.post('/forms/create-batch', authMiddleware, adminOnly, async (req, res) =
 // Get appraisal form for employee
 router.get('/forms/:id', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.id)
             .populate('employeeId', 'name email jobTitle')
             .populate('managerId', 'name email jobTitle')
@@ -281,7 +270,6 @@ router.get('/forms/:id', authMiddleware, async (req, res) => {
 // Submit employee self-assessment
 router.post('/forms/:id/self-assessment', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.id);
         
         if (!appraisal) {
@@ -314,7 +302,6 @@ router.post('/forms/:id/self-assessment', authMiddleware, async (req, res) => {
 // Submit manager rating
 router.post('/forms/:id/manager-rating', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.id);
         
         if (!appraisal) {
@@ -356,7 +343,6 @@ router.post('/forms/:id/manager-rating', authMiddleware, async (req, res) => {
 // Get appraisals by cycle
 router.get('/cycles/:cycleId/appraisals', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const { status, departmentId } = req.query;
         
         const filter = {
@@ -388,7 +374,6 @@ router.get('/cycles/:cycleId/appraisals', authMiddleware, async (req, res) => {
 // Get appraisals for current user (employee or manager)
 router.get('/my-appraisals', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const { role, userId, companyId } = req.user;
         const { cycleId } = req.query;
         
@@ -430,7 +415,6 @@ router.get('/my-appraisals', authMiddleware, async (req, res) => {
 // Get appraisal summary/statistics
 router.get('/cycles/:cycleId/summary', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisals = await Appraisal.find({
             cycleId: req.params.cycleId,
             companyId: req.user.companyId
@@ -466,7 +450,6 @@ router.get('/cycles/:cycleId/summary', authMiddleware, adminOnly, async (req, re
 // Export cycle appraisals as CSV
 router.get('/cycles/:cycleId/export/csv', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const { Appraisal: AppraisalModel, Employee: EmployeeModel } = require('../backend/config/db');
         const { generateAppraisalsCSV } = require('../backend/logic/appraisalExporter');
 
@@ -492,7 +475,6 @@ router.get('/cycles/:cycleId/export/csv', authMiddleware, adminOnly, async (req,
 // Export cycle appraisals as JSON
 router.get('/cycles/:cycleId/export/json', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const { Appraisal: AppraisalModel, Employee: EmployeeModel } = require('../backend/config/db');
         const { generateAppraisalsJSON } = require('../backend/logic/appraisalExporter');
 
@@ -519,7 +501,6 @@ router.get('/cycles/:cycleId/export/json', authMiddleware, adminOnly, async (req
 // Generate calibration report
 router.get('/cycles/:cycleId/export/calibration', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const cycle = await AppraisalCycle.findById(req.params.cycleId)
             .populate('templateId');
 
@@ -578,7 +559,6 @@ router.get('/cycles/:cycleId/export/calibration', authMiddleware, adminOnly, asy
 // Get performance insights for an employee
 router.get('/forms/:id/insights', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.id)
             .populate('employeeId', 'name jobTitle')
             .populate('cycleId');

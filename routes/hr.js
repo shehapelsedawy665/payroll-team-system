@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { connectDB, Candidate, Employee, LeaveBalance, Loan, Settlement, Company, EWARequest } = require('../backend/config/db');
+const { Candidate, Employee, LeaveBalance, Loan, Settlement, Company, EWARequest } = require('../backend/config/db');
 const { authMiddleware, adminOnly } = require('../backend/middleware/auth');
 
 let calculations = require("../backend/logic/payrollEngine");
@@ -11,7 +11,6 @@ if (!calculateSettlement) {
 
 router.post('/candidates', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const candidate = new Candidate({ ...req.body, companyId: req.user.companyId });
         await candidate.save();
         res.status(201).json({ message: "تم إضافة المرشح بنجاح", candidate });
@@ -20,7 +19,6 @@ router.post('/candidates', authMiddleware, async (req, res) => {
 
 router.post('/hire-candidate/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const candidate = await Candidate.findById(req.params.id);
         if (!candidate) return res.status(404).json({ error: "المرشح غير موجود" });
         const newEmployee = new Employee({ name: candidate.name, nationalId: req.body.nationalId, hiringDate: new Date(), basicSalary: req.body.basicSalary, insSalary: req.body.insSalary || 0, jobType: req.body.jobType || "Full Time", position: candidate.appliedPosition, phone: candidate.phone, companyId: req.user.companyId });
@@ -33,7 +31,6 @@ router.post('/hire-candidate/:id', authMiddleware, adminOnly, async (req, res) =
 
 router.post('/settlement/:employeeId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const employee = await Employee.findById(req.params.employeeId);
         const company = await Company.findById(req.user.companyId);
         const currentYear = new Date().getFullYear();
@@ -52,7 +49,6 @@ router.post('/settlement/:employeeId', authMiddleware, adminOnly, async (req, re
 
 router.post('/ewa-request', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const { requestedAmount, walletNumber } = req.body;
         if (!req.user.employeeId) return res.status(403).json({ error: "هذه الخاصية للموظفين فقط" });
         const employee = await Employee.findById(req.user.employeeId);

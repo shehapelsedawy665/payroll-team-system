@@ -11,7 +11,6 @@ const Employee = require('../backend/models/Employee');
 const Attendance = require('../backend/models/Attendance');
 const Shift = require('../backend/models/Shift');
 const { authMiddleware } = require('../backend/middleware/auth');
-const { connectDB } = require('../backend/config/db');
 
 router.use(authMiddleware);
 

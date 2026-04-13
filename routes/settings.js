@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { connectDB, Company, Employee, Payroll, Leave } = require('../backend/config/db');
+const { Company, Employee, Payroll, Leave } = require('../backend/config/db');
 const { authMiddleware, adminOnly } = require('../backend/middleware/auth');
 
 router.get("/", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const company = await Company.findById(req.user.companyId);
         res.json(company?.settings || {});
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -13,7 +12,6 @@ router.get("/", authMiddleware, async (req, res) => {
 
 router.put("/", authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const company = await Company.findByIdAndUpdate(req.user.companyId, { settings: req.body }, { new: true });
         res.json({ success: true, settings: company.settings });
     } catch (err) { res.status(400).json({ error: err.message }); }
@@ -21,7 +19,6 @@ router.put("/", authMiddleware, adminOnly, async (req, res) => {
 
 router.get("/analytics/dashboard", authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const companyId = req.user.companyId;
         const currentMonth = new Date().toISOString().substring(0, 7);
         const [totalEmployees, activeEmployees, monthPayroll, pendingLeaves] = await Promise.all([

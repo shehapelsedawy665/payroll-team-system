@@ -19,9 +19,7 @@ const {
     initializeLeaveBalance
 } = require('../backend/modules/leave/leaveEngine');
 const auth = require('../backend/middleware/auth');
-const connectDB = require('../backend/config/db');
 
-connectDB();
 router.use(auth);
 
 // ==================== LEAVE TYPES ====================

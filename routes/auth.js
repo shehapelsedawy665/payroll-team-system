@@ -2,12 +2,11 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { connectDB, User, Company, Subscription } = require('../backend/config/db');
+const { User, Company, Subscription } = require('../backend/config/db');
 
 // مسار التسجيل (/api/auth/signup)
 router.post('/signup', async (req, res) => {
     try {
-        await connectDB();
         const { email, password, role, companyName, companyPassword } = req.body;
         if (!email || !password) return res.status(400).json({ error: "البيانات ناقصة" });
 
@@ -41,7 +40,6 @@ router.post('/login', async (req, res) => {
             return res.status(500).json({ error: "❌ JWT secrets not configured on server" });
         }
         
-        await connectDB();
         const { email, password } = req.body;
         const user = await User.findOne({ email }).populate('companyId');
         if (!user) return res.status(401).json({ error: "بيانات غير صحيحة" });

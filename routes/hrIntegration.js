@@ -6,7 +6,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { connectDB } = require('../backend/config/db');
+
 const { authMiddleware, adminOnly, managerOnly } = require('../backend/middleware/auth');
 
 // Import models
@@ -22,7 +22,6 @@ const hrIntegration = require('../backend/logic/hrIntegration');
  */
 router.get('/salary-increment/:appraisalId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.appraisalId)
             .populate('employeeId');
 
@@ -52,7 +51,6 @@ router.get('/salary-increment/:appraisalId', authMiddleware, adminOnly, async (r
  */
 router.get('/promotion-eligibility/:appraisalId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.appraisalId)
             .populate('employeeId');
 
@@ -83,7 +81,6 @@ router.get('/promotion-eligibility/:appraisalId', authMiddleware, adminOnly, asy
  */
 router.get('/leave-allocation/:appraisalId', authMiddleware, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.appraisalId)
             .populate('employeeId');
 
@@ -113,7 +110,6 @@ router.get('/leave-allocation/:appraisalId', authMiddleware, async (req, res) =>
  */
 router.get('/compensation-adjustment/:appraisalId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisal = await Appraisal.findById(req.params.appraisalId)
             .populate('employeeId');
 
@@ -143,7 +139,6 @@ router.get('/compensation-adjustment/:appraisalId', authMiddleware, adminOnly, a
  */
 router.get('/succession-plan/:cycleId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisals = await Appraisal.find({
             cycleId: req.params.cycleId,
             companyId: req.user.companyId
@@ -172,7 +167,6 @@ router.get('/succession-plan/:cycleId', authMiddleware, adminOnly, async (req, r
  */
 router.get('/training-needs/:cycleId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisals = await Appraisal.find({
             cycleId: req.params.cycleId,
             companyId: req.user.companyId
@@ -204,7 +198,6 @@ router.get('/training-needs/:cycleId', authMiddleware, adminOnly, async (req, re
  */
 router.get('/action-items/:cycleId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisals = await Appraisal.find({
             cycleId: req.params.cycleId,
             companyId: req.user.companyId,
@@ -238,7 +231,6 @@ router.get('/action-items/:cycleId', authMiddleware, adminOnly, async (req, res)
  */
 router.post('/apply-salary-increments/:cycleId', authMiddleware, adminOnly, async (req, res) => {
     try {
-        await connectDB();
         const appraisals = await Appraisal.find({
             cycleId: req.params.cycleId,
             companyId: req.user.companyId,
