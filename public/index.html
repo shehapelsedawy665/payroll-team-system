@@ -1419,7 +1419,7 @@ tbody tr:last-child td { border-bottom: none; }
     <div style="background:#1a1a2e;border:2px solid #f39c12;border-radius:12px;padding:24px;max-width:900px;width:90%;max-height:90vh;overflow-y:auto;color:#fff;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
         <h2 style="margin:0;color:#f39c12;">⚙️ Developer Options & Super Admin Panel</h2>
-        <button onclick="closeDevPanel()" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:bold;">X إغلاق</button>
+        <button onclick="closeDevSettings()" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:bold;">X إغلاق</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
@@ -1854,6 +1854,37 @@ function openDevPanel() {
 function closeDevPanel() {
   const modal = document.getElementById('dev-options-modal');
   if (modal) modal.style.display = 'none';
+}
+
+function showDevSettings() {
+  const authScreen = document.getElementById('auth-screen');
+  const app = document.getElementById('app');
+  const modal = document.getElementById('dev-options-modal');
+  
+  if (authScreen && authScreen.style.display !== 'none') {
+    authScreen.style.display = 'none';
+  }
+  
+  if (app) {
+    app.style.display = 'block';
+  }
+  
+  if (modal) {
+    modal.style.display = 'flex';
+    loadDevStats();
+    loadDevCompanies();
+  }
+}
+
+function closeDevSettings() {
+  if (!CURRENT_USER) {
+    document.getElementById('app').style.display = 'none';
+    const modal = document.getElementById('dev-options-modal');
+    if (modal) modal.style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+  } else {
+    navigate('dashboard');
+  }
 }
 
 async function loadDevStats() {
