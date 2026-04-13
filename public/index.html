@@ -1750,9 +1750,6 @@ async function doLogin() {
 async function doSignup() {
   return showAuthError('❌ تم تعطيل التسجيل العام. للتسجيل، تواصل مع مسؤول النظام.');
 }
-  } catch(e) { showAuthError(e.message); }
-  finally { hideLoading(); }
-}
 
 function showAuthError(msg) {
   const el = document.getElementById('auth-error');
