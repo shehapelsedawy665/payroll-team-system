@@ -1596,15 +1596,30 @@ function localCalcGrossToNet(grossSalary, insSalaryRaw, opts = {}) {
 
 /** عكسي: صافي → إجمالي */
 function localCalcNetToGross(targetNet, insSalaryRaw, opts = {}) {
-  let minG = targetNet, maxG = targetNet * 2.5, best = null;
-  for (let i = 0; i < 120; i++) {
-    const g = (minG + maxG) / 2;
-    const r = localCalcGrossToNet(g, insSalaryRaw, opts);
-    if (Math.abs(r.net - targetNet) < 0.01) { best = r; best.grossNeeded = R(g); break; }
-    if (r.net > targetNet) maxG = g; else minG = g;
-    best = r; best.grossNeeded = R(g);
+  // CRITICAL FIX: Use same iterative algorithm as backend, not binary search
+  let estimateGross = R(Number(targetNet));
+  let finalResult = null;
+  const MAX_INS = 16700, MIN_INS = 5384.62;
+  
+  // Iterate to match backend algorithm exactly
+  for (let i = 0; i < 100; i++) {
+    const cappedIns = R(Math.min(MAX_INS, Math.max(MIN_INS, estimateGross)));
+    finalResult = localCalcGrossToNet(estimateGross, cappedIns, opts);
+    // Apply strict 2-decimal rounding at every iteration
+    let diff = R(R(Number(targetNet)) - R(finalResult.net));
+    if (Math.abs(diff) === 0) break; // Strict equality check after rounding
+    estimateGross = R(estimateGross + diff);
   }
-  return best;
+  
+  // Return with strictly rounded values to match backend
+  return {
+    ...finalResult,
+    grossNeeded: R(estimateGross),
+    gross: R(estimateGross),
+    insEmployee: R(finalResult?.insuranceEmployee || 0),
+    monthlyTax: R(finalResult?.monthlyTax || 0),
+    net: R(finalResult?.net || 0)
+  };
 }
 
 /**
