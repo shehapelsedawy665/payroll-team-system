@@ -94,4 +94,4 @@ const OnboardingTask = require('../models/OnboardingTask');
 const OnboardingChecklist = require('../models/OnboardingChecklist');
 const BiometricDevice = require('../models/BiometricDevice');
 
-module.exports = { connectDB, User, Company, Employee, PayrollRecord, Attendance, Penalty, Leave, LeaveBalance, LeaveRequest, LeaveType, Subscription, Shift, AppraisalCycle, AppraisalTemplate, Appraisal, JobPosting, Candidate, Offer, OnboardingTask, OnboardingChecklist, BiometricDevice };
+module.exports = { connectDB, User, Company, Employee, PayrollRecord, Payroll: PayrollRecord, Attendance, Penalty, Leave, LeaveBalance, LeaveRequest, LeaveType, Subscription, Shift, AppraisalCycle, AppraisalTemplate, Appraisal, JobPosting, Candidate, Offer, OnboardingTask, OnboardingChecklist, BiometricDevice };
