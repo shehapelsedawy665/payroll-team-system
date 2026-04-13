@@ -34,10 +34,10 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const JWT_SECRET = process.env.JWT_SECRET;
-        const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+        const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
         
-        if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
-            return res.status(500).json({ error: "❌ JWT secrets not configured on server" });
+        if (!JWT_SECRET) {
+            return res.status(500).json({ error: "❌ JWT_SECRET not configured on server" });
         }
         
         const { email, password } = req.body;
