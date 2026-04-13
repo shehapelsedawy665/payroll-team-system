@@ -64,4 +64,4 @@ onboardingChecklistSchema.index({ companyId: 1, employeeId: 1 });
 onboardingChecklistSchema.index({ status: 1 });
 onboardingChecklistSchema.index({ joiningDate: 1 });
 
-module.exports = mongoose.model('OnboardingChecklist', onboardingChecklistSchema);
+module.exports = mongoose.models.OnboardingChecklist || mongoose.model('OnboardingChecklist', onboardingChecklistSchema);

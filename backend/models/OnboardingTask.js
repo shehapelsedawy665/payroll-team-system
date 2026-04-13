@@ -41,4 +41,4 @@ const onboardingTaskSchema = new mongoose.Schema({
 onboardingTaskSchema.index({ companyId: 1, isTemplate: 1 });
 onboardingTaskSchema.index({ category: 1 });
 
-module.exports = mongoose.model('OnboardingTask', onboardingTaskSchema);
+module.exports = mongoose.models.OnboardingTask || mongoose.model('OnboardingTask', onboardingTaskSchema);

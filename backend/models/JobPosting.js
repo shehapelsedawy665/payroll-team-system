@@ -76,4 +76,4 @@ jobPostingSchema.index({ companyId: 1, status: 1 });
 jobPostingSchema.index({ department: 1 });
 jobPostingSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('JobPosting', jobPostingSchema);
+module.exports = mongoose.models.JobPosting || mongoose.model('JobPosting', jobPostingSchema);

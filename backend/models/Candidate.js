@@ -99,4 +99,4 @@ candidateSchema.index({ email: 1 });
 candidateSchema.index({ stage: 1 });
 candidateSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Candidate', candidateSchema);
+module.exports = mongoose.models.Candidate || mongoose.model('Candidate', candidateSchema);

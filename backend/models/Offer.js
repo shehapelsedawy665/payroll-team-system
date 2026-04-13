@@ -82,4 +82,4 @@ offerSchema.index({ companyId: 1, status: 1 });
 offerSchema.index({ candidateId: 1 });
 offerSchema.index({ expiryDate: 1 });
 
-module.exports = mongoose.model('Offer', offerSchema);
+module.exports = mongoose.models.Offer || mongoose.model('Offer', offerSchema);

@@ -122,4 +122,4 @@ leaveRequestSchema.pre('save', function(next) {
     next();
 });
 
-module.exports = mongoose.model('LeaveRequest', leaveRequestSchema);
+module.exports = mongoose.models.LeaveRequest || mongoose.model('LeaveRequest', leaveRequestSchema);
