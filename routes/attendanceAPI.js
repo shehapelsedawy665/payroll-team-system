@@ -9,11 +9,11 @@ const Attendance = require('../backend/models/Attendance');
 const Shift = require('../backend/models/Shift');
 const Employee = require('../backend/models/Employee');
 const { calculateAttendance, getMonthlyAttendanceSummary, isWithinGeofence } = require('../backend/modules/attendance/attendanceEngine');
-const auth = require('../backend/middleware/auth');
+const { authMiddleware } = require('../backend/middleware/auth');
 const { connectDB } = require('../backend/config/db');
 
 // ==================== MIDDLEWARE ====================
-router.use(auth); // All routes require authentication
+router.use(authMiddleware); // All routes require authentication
 
 /**
  * POST /api/attendance/checkin

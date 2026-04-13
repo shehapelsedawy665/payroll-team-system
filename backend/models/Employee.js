@@ -22,8 +22,6 @@ const EmployeeSchema = new mongoose.Schema({
     isTaxExempted: { type: Boolean, default: false }
 }, { timestamps: true });
 
-EmployeeSchema.index({ nationalId: 1 });
-EmployeeSchema.index({ jobId: 1 });
 EmployeeSchema.index({ companyId: 1 });
 
 module.exports = mongoose.models.Employee || mongoose.model('Employee', EmployeeSchema);
