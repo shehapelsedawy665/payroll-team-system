@@ -10,11 +10,10 @@ const BiometricDevice = require('../backend/models/BiometricDevice');
 const Employee = require('../backend/models/Employee');
 const Attendance = require('../backend/models/Attendance');
 const Shift = require('../backend/models/Shift');
-const auth = require('../backend/middleware/auth');
-const connectDB = require('../backend/config/db');
+const { authMiddleware } = require('../backend/middleware/auth');
+const { connectDB } = require('../backend/config/db');
 
-connectDB();
-router.use(auth);
+router.use(authMiddleware);
 
 // ==================== DEVICE MANAGEMENT ====================
 

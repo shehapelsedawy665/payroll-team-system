@@ -80,6 +80,8 @@ const Attendance = require('../models/Attendance');
 const Penalty = require('../models/Penalty');
 const Leave = require('../models/Leave');
 const LeaveBalance = require('../models/LeaveBalance');
+const LeaveRequest = require('../models/LeaveRequest');
+const LeaveType = require('../models/LeaveType');
 const Subscription = require('../models/Subscription');
 const Shift = require('../models/Shift');
 const AppraisalCycle = require('../models/AppraisalCycle');
@@ -90,5 +92,6 @@ const Candidate = require('../models/Candidate');
 const Offer = require('../models/Offer');
 const OnboardingTask = require('../models/OnboardingTask');
 const OnboardingChecklist = require('../models/OnboardingChecklist');
+const BiometricDevice = require('../models/BiometricDevice');
 
-module.exports = { connectDB, User, Company, Employee, PayrollRecord, Attendance, Penalty, Leave, LeaveBalance, Subscription, Shift, AppraisalCycle, AppraisalTemplate, Appraisal, JobPosting, Candidate, Offer, OnboardingTask, OnboardingChecklist };
+module.exports = { connectDB, User, Company, Employee, PayrollRecord, Attendance, Penalty, Leave, LeaveBalance, LeaveRequest, LeaveType, Subscription, Shift, AppraisalCycle, AppraisalTemplate, Appraisal, JobPosting, Candidate, Offer, OnboardingTask, OnboardingChecklist, BiometricDevice };

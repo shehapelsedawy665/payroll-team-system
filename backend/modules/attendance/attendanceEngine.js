@@ -4,8 +4,8 @@
  * Handles check-ins, check-outs, late arrivals, overtime, and penalties
  */
 
-const Shift = require('./Shift');
-const Attendance = require('./Attendance');
+const Shift = require('../../models/Shift');
+const Attendance = require('../../models/Attendance');
 
 /**
  * Calculate time difference between two times (HH:MM format)
