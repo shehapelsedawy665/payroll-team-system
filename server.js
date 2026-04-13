@@ -61,6 +61,37 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// ============= PAYROLL PREVIEW ENDPOINT (Backend Source of Truth) =============
+// POST /api/payroll/preview - Calculate payroll with backend logic (no local math)
+app.post('/api/payroll/preview', async (req, res) => {
+    try {
+        const { fullBasic, fullTrans, days, additions, deductions, hiringDate, resignationDate, insSalary, jobType } = req.body;
+        
+        // Validate required inputs
+        if (!fullBasic) {
+            return res.status(400).json({ error: "fullBasic is required" });
+        }
+
+        // Build employee-like object for payroll logic
+        const empForCalc = {
+            insSalary: insSalary || 5384.62,
+            jobType: jobType || 'Full Time'
+        };
+
+        // Call backend payroll engine (only source of truth)
+        const result = runPayrollLogic(
+            { fullBasic, fullTrans: fullTrans || 0, days: days || 30, additions: additions || [], deductions: deductions || [], month: new Date().toISOString().substring(0, 7), hiringDate, resignationDate },
+            { pDays: 0, pTaxable: 0, pTaxes: 0 },
+            empForCalc
+        );
+
+        res.json(result);
+    } catch (err) {
+        console.error("Preview calculation error:", err.message);
+        res.status(500).json({ error: "Preview calculation failed: " + err.message });
+    }
+});
+
 // Route Imports
 const authRoutes = require('./routes/auth');
 const employeeRoutes = require('./routes/employees');

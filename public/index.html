@@ -2437,25 +2437,46 @@ function payrollLivePreview() {
   const trans = Number(document.getElementById('payroll-trans').value)||0;
   const days  = Number(document.getElementById('payroll-days').value)||30;
   if (!basic) { document.getElementById('payroll-preview-box').style.display='none'; return; }
-  const prorBasic = R(basic * (days / 30));
-  const prorTrans = R(trans * (days / 30));
-  const gross     = R(prorBasic + prorTrans);
-  const insBase   = PAYROLL_EMP?.insSalary || EGY.MIN_INS_FULL_TIME;
-  const jobType   = PAYROLL_EMP?.jobType || 'Full Time';
-  const r         = localCalcGrossToNet(gross, insBase, { jobType });
-  const box       = document.getElementById('payroll-preview-box');
-  const content   = document.getElementById('payroll-preview-content');
-  box.style.display = '';
-  content.innerHTML = `
-    <div class="result-row add"><span class="label">الأساسي (${days} يوم)</span><span class="value">${fmt(prorBasic)} ج</span></div>
-    ${prorTrans>0?`<div class="result-row add"><span class="label">بدل انتقال</span><span class="value">${fmt(prorTrans)} ج</span></div>`:''}
-    <div class="result-row add" style="font-weight:700;"><span class="label">الإجمالي</span><span class="value">${fmt(r.gross)} ج</span></div>
-    <div style="border-bottom:1px dashed var(--border);margin:4px 0;"></div>
-    <div class="result-row deduct"><span class="label">تأمينات (11%)</span><span class="value">${fmt(r.insEmp)} ج</span></div>
-    <div class="result-row deduct"><span class="label">ضريبة الدخل</span><span class="value">${fmt(r.monthlyTax)} ج</span></div>
-    <div class="result-row deduct"><span class="label">صندوق الشهداء</span><span class="value">${fmt(r.martyrs)} ج</span></div>
-    <div class="result-row total"><span class="label">الصافي (تقريبي)</span><span class="value">${fmt(r.net)} ج</span></div>
-  `;
+  
+  // BACKEND AS SOURCE OF TRUTH: Call /api/payroll/preview instead of local calculations
+  const payload = {
+    fullBasic: basic,
+    fullTrans: trans,
+    days: days,
+    additions: [],
+    deductions: [],
+    insSalary: PAYROLL_EMP?.insSalary || EGY.MIN_INS_FULL_TIME,
+    jobType: PAYROLL_EMP?.jobType || 'Full Time'
+  };
+  
+  api('POST', '/api/payroll/preview', payload).then(r => {
+    const box = document.getElementById('payroll-preview-box');
+    const content = document.getElementById('payroll-preview-content');
+    box.style.display = '';
+    
+    // Use exact values from backend - NO LOCAL MATH
+    const prorBasic = r.proratedBasic || R(basic * (days / 30));
+    const prorTrans = r.proratedTrans || R(trans * (days / 30));
+    const gross = r.gross || 0;
+    const insEmp = r.insuranceEmployee || 0;
+    const monthlyTax = r.monthlyTax || 0;
+    const martyrs = r.martyrs || 0;
+    const net = r.net || 0;
+    
+    content.innerHTML = `
+      <div class="result-row add"><span class="label">الأساسي (${days} يوم)</span><span class="value">${fmt(prorBasic)} ج</span></div>
+      ${prorTrans>0?`<div class="result-row add"><span class="label">بدل انتقال</span><span class="value">${fmt(prorTrans)} ج</span></div>`:''}
+      <div class="result-row add" style="font-weight:700;"><span class="label">الإجمالي</span><span class="value">${fmt(gross)} ج</span></div>
+      <div style="border-bottom:1px dashed var(--border);margin:4px 0;"></div>
+      <div class="result-row deduct"><span class="label">تأمينات (11%)</span><span class="value">${fmt(insEmp)} ج</span></div>
+      <div class="result-row deduct"><span class="label">ضريبة الدخل</span><span class="value">${fmt(monthlyTax)} ج</span></div>
+      <div class="result-row deduct"><span class="label">صندوق الشهداء</span><span class="value">${fmt(martyrs)} ج</span></div>
+      <div class="result-row total"><span class="label">الصافي (تقريبي)</span><span class="value">${fmt(net)} ج</span></div>
+    `;
+  }).catch(err => {
+    console.error("Preview error:", err);
+    document.getElementById('payroll-preview-box').style.display='none';
+  });
 }
 
 async function onPayrollEmpChange() {
@@ -2721,32 +2742,42 @@ function calcN2GLive() {
     const div       = document.getElementById('n2g-result');
     if (!targetNet) { div.innerHTML = ''; return; }
 
-    const r = localCalcNetToGross(targetNet, insInput);
-    if (!r) return;
-    const bestGross = r.grossNeeded || R(r.gross);
+    // BACKEND AS SOURCE OF TRUTH: Call /api/payroll/net-to-gross instead of local calculations
+    const payload = {
+        targetNet: targetNet,
+        insSalary: insInput
+    };
 
-    div.innerHTML = `
-        <div class="result-row add" style="background:var(--primary-dim);padding:12px;border-radius:8px;display:flex;justify-content:space-between;margin-bottom:12px;">
-            <span class="label" style="color:var(--primary);">الإجمالي المطلوب</span>
-            <span class="value" style="font-size:18px;font-weight:bold;color:var(--primary);">${fmt(bestGross)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex;justify-content:space-between;margin-top:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:5px;">
-            <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red);">${fmt(r.insEmp)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex;justify-content:space-between;margin-top:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:5px;">
-            <span class="label">ضريبة الدخل</span><span class="value" style="color:var(--red);">${fmt(r.monthlyTax)} ج</span>
-        </div>
-        <div class="result-row deduct" style="display:flex;justify-content:space-between;margin-top:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:5px;">
-            <span class="label">صندوق الشهداء (0.05%)</span><span class="value" style="color:var(--red);">${fmt(r.martyrs)} ج</span>
-        </div>
-        <div class="result-row add" style="display:flex;justify-content:space-between;margin-top:10px;">
-            <span class="label">✅ الصافي الفعلي</span>
-            <span class="value" style="color:var(--green);font-weight:bold;">${fmt(r.net)} ج</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-top:8px;opacity:.6;font-size:11px;">
-            <span>🏢 تكلفة الشركة</span><span>${fmt(R(bestGross + r.insComp))} ج</span>
-        </div>
-    `;
+    api('POST', '/api/payroll/net-to-gross', payload).then(r => {
+        if (!r) return;
+        const bestGross = r.gross || 0;
+
+        div.innerHTML = `
+            <div class="result-row add" style="background:var(--primary-dim);padding:12px;border-radius:8px;display:flex;justify-content:space-between;margin-bottom:12px;">
+                <span class="label" style="color:var(--primary);">الإجمالي المطلوب</span>
+                <span class="value" style="font-size:18px;font-weight:bold;color:var(--primary);">${fmt(bestGross)} ج</span>
+            </div>
+            <div class="result-row deduct" style="display:flex;justify-content:space-between;margin-top:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:5px;">
+                <span class="label">تأمين الموظف (11%)</span><span class="value" style="color:var(--red);">${fmt(r.insEmployee || 0)} ج</span>
+            </div>
+            <div class="result-row deduct" style="display:flex;justify-content:space-between;margin-top:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:5px;">
+                <span class="label">ضريبة الدخل</span><span class="value" style="color:var(--red);">${fmt(r.taxes || 0)} ج</span>
+            </div>
+            <div class="result-row deduct" style="display:flex;justify-content:space-between;margin-top:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:5px;">
+                <span class="label">صندوق الشهداء (0.05%)</span><span class="value" style="color:var(--red);">${fmt(r.martyrs || 0)} ج</span>
+            </div>
+            <div class="result-row add" style="display:flex;justify-content:space-between;margin-top:10px;">
+                <span class="label">✅ الصافي الفعلي</span>
+                <span class="value" style="color:var(--green);font-weight:bold;">${fmt(r.net || 0)} ج</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;opacity:.6;font-size:11px;">
+                <span>🏢 تكلفة الشركة</span><span>${fmt(R((r.gross || 0) + (r.insComp || 0)))} ج</span>
+            </div>
+        `;
+    }).catch(err => {
+        console.error("Net to Gross error:", err);
+        div.innerHTML = '';
+    });
 }
 
 

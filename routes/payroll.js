@@ -48,8 +48,12 @@ router.post("/net-to-gross", authMiddleware, async (req, res) => {
             if (Math.abs(diff) === 0) break; // Strict equality check after rounding
             estimateGross = R(estimateGross + diff);
         }
+        // Calculate company insurance and martyrs fund
+        const insSalary = R(Math.min(MAX_INS, Math.max(MIN_INS, estimateGross)));
+        const insComp = R(insSalary * 0.1875);
+        const martyrs = R(estimateGross * 0.0005);
         // Ensure all response values are strictly rounded to 2 decimals
-        res.json({ gross: R(estimateGross), insSalary: R(Math.min(MAX_INS, Math.max(MIN_INS, estimateGross))), insEmployee: R(finalResult.insuranceEmployee), taxes: R(finalResult.monthlyTax), net: R(finalResult.net) });
+        res.json({ gross: R(estimateGross), insSalary: insSalary, insEmployee: R(finalResult.insuranceEmployee), insComp: insComp, taxes: R(finalResult.monthlyTax), martyrs: martyrs, net: R(finalResult.net) });
     } catch (err) { res.status(500).json({ error: "Net to Gross failed" }); }
 });
 
