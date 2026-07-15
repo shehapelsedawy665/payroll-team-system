@@ -1,172 +1,40 @@
-const express = require("express");
-const cors = require("cors");
-const mongoose = require("mongoose");
-const path = require("path");
-require('dotenv').config();
-
-const { connectDB, Company, User, Employee } = require('./backend/config/db');
-const { runPayrollLogic } = require('./backend/logic/payrollEngine');
-
-// ============= STRICT MATHEMATICAL PRECISION =============
-// Rounding function for Egyptian tax calculations (2 decimals)
-const R = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+require('dotenv').config(); // عشان نقرأ المتغيرات السرية زي رابط الداتابيز
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors'); // عشان نسمح للـ Frontend يكلم الـ Backend بدون مشاكل
+const path = require('path');
 
 const app = express();
 
-// Middleware
-app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// --- 1. الـ Middleware الأساسية ---
+app.use(express.json()); // عشان السيرفر يفهم الداتا اللي مبعوتة في شكل JSON
+app.use(cors());
 
-app.use(express.json());
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// --- 2. الاتصال بقاعدة البيانات (MongoDB) ---
+const dbURI = process.env.MONGO_URI || 'mongodb://localhost:27017/hr_payroll_system';
+mongoose.connect(dbURI)
+    .then(() => console.log('✅ تم الاتصال بقاعدة البيانات بنجاح'))
+    .catch((err) => console.error('❌ خطأ في الاتصال بقاعدة البيانات:', err));
 
-// Payroll Schema (inline for immediate availability)
-const payrollSchema = new mongoose.Schema({
-    employeeId: mongoose.Schema.Types.ObjectId, 
-    month: String, 
-    payload: Object 
-});
-const Payroll = mongoose.models.Payroll || mongoose.model("Payroll", payrollSchema);
+// --- 3. تعريف مسارات الـ API (الـ Routes اللي عملناها) ---
+app.use('/api/auth', require('./backend/routes/auth'));
+app.use('/api/employees', require('./backend/routes/employees'));
+app.use('/api/attendance', require('./backend/routes/attendance'));
+app.use('/api/payroll', require('./backend/routes/payroll'));
 
-// LAZY DB CONNECTION: Connect on first API request, not at startup
-let dbConnected = false;
-
-app.use(async (req, res, next) => {
-    if (!dbConnected && req.path.startsWith('/api/')) {
-        try {
-            await connectDB();
-            dbConnected = true;
-        } catch (error) {
-            console.error("Database connection failed on request:", error.message);
-            return res.status(503).json({
-                error: "Database connection failed",
-                message: process.env.NODE_ENV === 'development' ? error.message : "Service temporarily unavailable"
-            });
-        }
-    }
-    next();
-});
-
-// Health check endpoint (before DB requirement)
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'OK',
-        timestamp: new Date().toISOString(),
-        dbConnected: mongoose.connection.readyState === 1,
-        environment: process.env.NODE_ENV || 'development'
+// --- 4. مسار اختبار سريع للتأكد إن السيرفر شغال ---
+app.get('/', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: '🚀 HR & Payroll System API is running flawlessly!'
     });
 });
 
-// ============= PAYROLL PREVIEW ENDPOINT (Backend Source of Truth) =============
-// POST /api/payroll/preview - Calculate payroll with backend logic (no local math)
-app.post('/api/payroll/preview', async (req, res) => {
-    try {
-        const { fullBasic, fullTrans, days, additions, deductions, hiringDate, resignationDate, insSalary, jobType } = req.body;
-        
-        // Validate required inputs
-        if (!fullBasic) {
-            return res.status(400).json({ error: "fullBasic is required" });
-        }
+// مسار عشان الـ Frontend يقدر يحمل ملفات الـ PDF اللي بتطلع
+app.use('/payslips', express.static(path.join(__dirname, 'public/payslips')));
 
-        // Build employee-like object for payroll logic
-        const empForCalc = {
-            insSalary: insSalary || 5384.62,
-            jobType: jobType || 'Full Time'
-        };
-
-        // Call backend payroll engine (only source of truth)
-        const result = runPayrollLogic(
-            { fullBasic, fullTrans: fullTrans || 0, days: days || 30, additions: additions || [], deductions: deductions || [], month: new Date().toISOString().substring(0, 7), hiringDate, resignationDate },
-            { pDays: 0, pTaxable: 0, pTaxes: 0 },
-            empForCalc
-        );
-
-        res.json(result);
-    } catch (err) {
-        console.error("Preview calculation error:", err.message);
-        res.status(500).json({ error: "Preview calculation failed: " + err.message });
-    }
+// --- 5. تشغيل السيرفر ---
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`🚀 السيرفر شغال تمام على بورت ${PORT}`);
 });
-
-// Route Imports
-const authRoutes = require('./routes/auth');
-const employeeRoutes = require('./routes/employees');
-const payrollRoutes = require('./routes/payroll');
-const attendanceRoutes = require('./routes/attendance');
-const attendanceAPIRoutes = require('./routes/attendanceAPI');
-const biometricRoutes = require('./routes/biometric');
-const leaveAPIRoutes = require('./routes/leaveAPI');
-const settingsRoutes = require('./routes/settings');
-const leaveRoutes = require('./routes/leaves');
-const hrRoutes = require('./routes/hr');
-const devRoutes = require('./routes/dev');
-const appraisalRoutes = require('./routes/appraisal');
-const hrIntegrationRoutes = require('./routes/hrIntegration');
-const recruitmentRoutes = require('./routes/recruitment');
-const onboardingRoutes = require('./routes/onboarding');
-
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/payroll', payrollRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/attendance', attendanceAPIRoutes);
-app.use('/api/biometric', biometricRoutes);
-app.use('/api/leave', leaveAPIRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/leaves', leaveRoutes);
-app.use('/api/hr', hrRoutes);
-app.use('/api/dev', devRoutes);
-app.use('/api/appraisal', appraisalRoutes);
-app.use('/api/hr-integration', hrIntegrationRoutes);
-app.use('/api/recruitment', recruitmentRoutes);
-app.use('/api/onboarding', onboardingRoutes);
-
-// Static Files
-const publicPath = path.join(__dirname, "public");
-app.use(express.static(publicPath));
-
-// SPA catch-all: serve index.html for non-API routes
-app.get("*", (req, res) => {
-    res.sendFile(path.join(publicPath, "index.html"), (err) => {
-        if (err) {
-            res.status(404).json({ error: "Page not found" });
-        }
-    });
-});
-
-// Error Handler
-app.use((err, req, res, next) => {
-    console.error("❌ Server Error:", {
-        message: err.message,
-        path: req.path,
-        method: req.method,
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
-
-    const statusCode = err.statusCode || 500;
-    res.status(statusCode).json({
-        error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
-        statusCode: statusCode
-    });
-});
-
-// 404 Handler
-app.use((req, res) => {
-    res.status(404).json({ error: "Endpoint not found", path: req.path });
-});
-
-// Local development server (Vercel ignores this)
-if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-        console.log(`🚀 Development Server running on http://localhost:${PORT}`);
-    });
-}
-
-// Export for Vercel Serverless
-module.exports = app;
