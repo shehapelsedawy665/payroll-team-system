@@ -1,59 +1,35 @@
-/**
- * @file backend/models/LeaveBalance.js
- * @description Employee leave balances by type and year
- */
-
 const mongoose = require('mongoose');
 
 const LeaveBalanceSchema = new mongoose.Schema({
-    employeeId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Employee', 
-        required: true,
-        index: true 
-    },
-    companyId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Company', 
-        required: true,
-        index: true 
-    },
-    leaveTypeId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'LeaveType'
-    },
-    year: { 
-        type: Number, 
-        required: true 
-    },
+    // 1. ربط الرصيد بالموظف والشركة
+    employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     
-    // For legacy compatibility and quick access
-    annualDays: { type: Number, default: 30 },
-    usedDays: { type: Number, default: 0 },
-    sickDays: { type: Number, default: 8 },
-    usedSickDays: { type: Number, default: 0 },
-    
-    // New fields for enhanced tracking
-    allocatedDays: { type: Number, default: 0 },
-    approvedDays: { type: Number, default: 0 },
-    pendingDays: { type: Number, default: 0 },
-    carriedOverDays: { type: Number, default: 0 },
-    remainingDays: { type: Number, default: 0 },
-    
-    history: [{
-        date: Date,
-        action: { type: String, enum: ['allocated', 'used', 'approved', 'rejected', 'cancelled', 'carried_over'] },
-        days: Number,
-        reason: String,
-        requestId: mongoose.Schema.Types.ObjectId,
-        changedBy: mongoose.Schema.Types.ObjectId
-    }],
-    
-    lastUpdated: { type: Date, default: Date.now }
+    // 2. رصيد سنة كام؟
+    year: { type: Number, required: true }, 
+
+    // 3. تفاصيل الأرصدة (بناءً على قانون العمل المصري)
+    balances: {
+        annual: {
+            total: { type: Number, default: 21 }, // الإجمالي المستحق في السنة (الاعتيادي)
+            used: { type: Number, default: 0 }    // اللي اتسحب منه لحد دلوقتي
+        },
+        casual: {
+            total: { type: Number, default: 6 },  // العارضة (بتتخصم من رصيد الاعتيادي فعلياً بس ليها حد أقصى 6 أيام)
+            used: { type: Number, default: 0 }
+        },
+        sick: {
+            total: { type: Number, default: 90 }, // المرضي
+            used: { type: Number, default: 0 }
+        }
+    },
+
+    // 4. الرصيد المرحل 
+    carriedForward: { type: Number, default: 0 } // لو الموظفرحله أيام من السنة اللي فاتت
+
 }, { timestamps: true });
 
-// Unique index: company + employee + year + leaveType
-LeaveBalanceSchema.index({ companyId: 1, employeeId: 1, year: 1 });
-LeaveBalanceSchema.index({ employeeId: 1, year: 1 });
+// Index عشان نمنع إن الموظف ينزله رصيدين لنفس السنة بالغلط
+LeaveBalanceSchema.index({ employeeId: 1, year: 1 }, { unique: true });
 
 module.exports = mongoose.models.LeaveBalance || mongoose.model('LeaveBalance', LeaveBalanceSchema);
