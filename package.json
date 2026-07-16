@@ -1,32 +1,19 @@
 {
-  "name": "payroll-pro",
-  "version": "2.0.0",
-  "description": "Egyptian HR & Payroll ERP System",
+  "name": "hr-payroll-saas",
+  "version": "1.0.0",
+  "description": "Multi-tenant SaaS HR-ERP system tailored to Egyptian tax and labor laws",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "NODE_ENV=development node server.js",
-    "test": "jest --forceExit --detectOpenHandles --runInBand",
-    "test:watch": "jest --watch"
+    "dev": "nodemon server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^8.0.3",
-    "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express-validator": "^7.0.0",
-    "pdfkit": "^0.13.0",
-    "exceljs": "^4.3.0",
-    "nodemailer": "^6.9.7"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "supertest": "^6.3.3"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.4.1",
+    "pdfkit": "^0.13.0"
   }
 }
