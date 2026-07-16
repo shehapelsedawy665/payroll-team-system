@@ -12,6 +12,19 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // 🟢 الباب السري للتجربة (Test Mode) 🟢
+        // ده هيدخلك فوراً من غير ما يكلم الداتابيز عشان تجرب الشاشات
+        if (email === 'admin@test.com' && password === '123') {
+            const token = jwt.sign({ role: 'SuperAdmin', companyId: null }, process.env.JWT_SECRET || 'fallback_secret_key', { expiresIn: '1d' });
+            return res.status(200).json({
+                success: true,
+                message: "تم تسجيل الدخول (وضع التجربة)",
+                token,
+                data: { id: 'test123', email, role: 'SuperAdmin', company: 'Test Company' }
+            });
+        }
+
+        // --- الكود الأصلي (لو الإيميل مش بتاع التجربة، هيروح يدور في الداتابيز) ---
         // 1. نتأكد إن الإيميل موجود في الداتابيز
         const user = await User.findOne({ email }).populate('companyId', 'name isActive');
         if (!user) {
