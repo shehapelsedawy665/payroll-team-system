@@ -9,6 +9,8 @@ const app = express();
 // --- 1. الـ Middleware الأساسية ---
 app.use(express.json()); // عشان السيرفر يفهم الداتا اللي مبعوتة في شكل JSON
 app.use(cors());
+// السطر ده عشان السيرفر يقدر يقرأ ويعرض كل شاشات الـ HTML اللي جوه فولدر public
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- 2. الاتصال بقاعدة البيانات (MongoDB) ---
 const dbURI = process.env.MONGO_URI || 'mongodb://localhost:27017/hr_payroll_system';
