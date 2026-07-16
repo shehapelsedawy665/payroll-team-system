@@ -1,122 +1,132 @@
-// public/js/employees.js
-
-// 1. تحميل قائمة الموظفين من السيرفر
-async function loadEmployees() {
-    showLoading();
-    try {
-        // بننادي الـ API اللي عملناه في الفولدر التاني
-        EMPLOYEES = await api('GET', '/api/employees');
-        renderEmployees(EMPLOYEES);
-        populateDeptFilter();
-    } catch (e) {
-        toast(e.message, 'error');
-    } finally {
-        hideLoading();
-    }
-}
-
-// 2. عرض الموظفين في الجدول
-function renderEmployees(list) {
-    const tbody = document.getElementById('employees-tbody');
-    if (!list.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">👥</div><p>لا يوجد موظفين حالياً</p></div></td></tr>`;
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. حماية الشاشة: التأكد إن المستخدم مسجل دخول
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/index.html';
         return;
     }
 
-    tbody.innerHTML = list.map(e => `
-    <tr>
-      <td>
-        <div style="font-weight:600;color:var(--text);">${e.name}</div>
-        <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">${e.nationalId}</div>
-      </td>
-      <td>${e.department ? `<span class="dept-chip">${e.department}</span>` : '<span style="color:var(--text3);">-</span>'}</td>
-      <td><span style="color:var(--text2);">${e.position || '-'}</span></td>
-      <td><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text3);">${e.hiringDate ? e.hiringDate.split('T')[0] : '-'}</span></td>
-      <td>${e.status === 'active' ? `<span class="badge green">نشط</span>` : `<span class="badge red">غير نشط</span>`}</td>
-      <td style="display:flex;gap:6px;">
-        <button class="action-btn view" onclick="viewEmployee('${e._id}')" title="عرض">👁</button>
-        <button class="action-btn edit" onclick="editEmployee('${e._id}')" title="تعديل">✏️</button>
-        <button class="action-btn delete" onclick="deleteEmployee('${e._id}','${e.name.replace(/'/g, "\\\\'")}')" title="حذف">🗑</button>
-      </td>
-    </tr>
-  `).join('');
-}
+    // فك شفرة التوكن عشان نجيب الـ companyId بتاع الـ HR اللي فاتح
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const companyId = payload.companyId;
 
-// 3. فلترة الموظفين بالبحث
-function filterEmployees(q) {
-    const query = q.toLowerCase();
-    const filtered = EMPLOYEES.filter(e => 
-        e.name.toLowerCase().includes(query) || 
-        e.nationalId.includes(query) || 
-        (e.department && e.department.toLowerCase().includes(query))
-    );
-    renderEmployees(filtered);
-}
+    // 2. تفعيل زرار تسجيل الخروج
+    const logout = (e) => {
+        e.preventDefault();
+        localStorage.clear();
+        window.location.href = '/index.html';
+    };
+    const logoutBtn = document.getElementById('logoutBtn');
+    const logoutBtnMobile = document.getElementById('logoutBtnMobile');
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+    if (logoutBtnMobile) logoutBtnMobile.addEventListener('click', logout);
 
-// 4. فتح مودال إضافة موظف جديد
-function openAddEmployee() {
-    document.getElementById('emp-id').value = '';
-    document.getElementById('emp-modal-title').textContent = 'إضافة موظف جديد';
-    
-    // تصفير الفورم
-    ['emp-name', 'emp-national-id', 'emp-hiring-date', 'emp-department', 'emp-position', 'emp-ins-salary'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = (id === 'emp-ins-salary' ? '5384' : '');
-    });
-    
-    openModal('modal-employee');
-}
+    // 3. دالة لجلب الموظفين وعرضهم في الجدول
+    const fetchEmployees = async () => {
+        try {
+            // لو مفيش companyId (مثلاً لو SuperAdmin)، هنحط كود افتراضي للتجربة
+            const fetchId = companyId || 'DUMMY_COMPANY_ID'; 
+            const response = await fetch(`/api/employees/company/${fetchId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await response.json();
+            
+            const tbody = document.getElementById('employeesTableBody');
+            tbody.innerHTML = '';
 
-// 5. حفظ البيانات (إضافة أو تعديل)
-async function saveEmployee() {
-    const id = document.getElementById('emp-id').value;
-    const body = {
-        name: document.getElementById('emp-name').value.trim(),
-        nationalId: document.getElementById('emp-national-id').value.trim(),
-        hiringDate: document.getElementById('emp-hiring-date').value,
-        department: document.getElementById('emp-department').value.trim(),
-        position: document.getElementById('emp-position').value.trim(),
-        insSalary: Number(document.getElementById('emp-ins-salary').value) || 5384,
-        status: 'active'
+            if (result.success && result.data.length > 0) {
+                result.data.forEach(emp => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="fw-bold">${emp.name}</td>
+                            <td>${emp.jobId}</td>
+                            <td><span class="badge bg-secondary">${emp.department}</span></td>
+                            <td>${emp.financials.basicSalary.toLocaleString()} ج.م</td>
+                            <td>${emp.legalDetails.insSalary.toLocaleString()} ج.م</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">لا يوجد موظفين مسجلين حالياً.</td></tr>';
+            }
+        } catch (error) {
+            console.error('خطأ في جلب الموظفين:', error);
+            document.getElementById('employeesTableBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">حدث خطأ في الاتصال بالسيرفر.</td></tr>';
+        }
     };
 
-    if (!body.name || !body.nationalId || !body.hiringDate) {
-        return toast('برجاء إكمال البيانات الأساسية (الاسم، الرقم القومي، تاريخ التعيين)', 'error');
-    }
+    // تشغيل الدالة أول ما الشاشة تفتح
+    fetchEmployees();
 
-    showLoading();
-    try {
-        const method = id ? 'PUT' : 'POST';
-        const path = id ? `/api/employees?id=${id}` : '/api/employees';
+    // 4. إضافة موظف جديد
+    const addEmployeeForm = document.getElementById('addEmployeeForm');
+    addEmployeeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        await api(method, path, body);
-        toast(id ? 'تم تحديث بيانات الموظف' : 'تم إضافة الموظف بنجاح');
-        closeModal('modal-employee');
-        loadEmployees(); // تحديث الجدول
-    } catch (e) {
-        toast(e.message, 'error');
-    } finally {
-        hideLoading();
-    }
-}
+        const saveBtnText = document.getElementById('saveBtnText');
+        const saveBtnLoader = document.getElementById('saveBtnLoader');
+        const saveEmpBtn = document.getElementById('saveEmpBtn');
 
-// 6. حذف موظف
-async function deleteEmployee(id, name) {
-    if (!confirm(`هل أنت متأكد من حذف الموظف "${name}"؟`)) return;
+        // تجهيز شكل الداتا زي ما الداتابيز (Employee Model) طالبها
+        const employeeData = {
+            companyId: companyId || 'DUMMY_COMPANY_ID',
+            name: document.getElementById('empName').value,
+            jobId: document.getElementById('empJobId').value,
+            nationalId: document.getElementById('empNationalId').value,
+            department: document.getElementById('empDepartment').value,
+            financials: {
+                basicSalary: Number(document.getElementById('empBasic').value),
+                variableSalary: Number(document.getElementById('empVariable').value),
+                allowances: { transportation: 0, other: 0 }
+            },
+            legalDetails: {
+                insSalary: Number(document.getElementById('empInsSalary').value),
+                insuranceNumber: '',
+                isTaxExempted: false
+            }
+        };
 
-    showLoading();
-    try {
-        await api('DELETE', `/api/employees?id=${id}`);
-        toast('تم حذف الموظف بنجاح');
-        loadEmployees();
-    } catch (e) {
-        toast(e.message, 'error');
-    } finally {
-        hideLoading();
-    }
-}
+        // تفعيل حالة التحميل
+        saveBtnText.textContent = 'جاري الحفظ...';
+        saveBtnLoader.classList.remove('d-none');
+        saveEmpBtn.disabled = true;
 
-// 7. عرض تفاصيل موظف (مستقبلاً)
-function viewEmployee(id) {
-    toast('سيتم عرض التفاصيل والـ YTD في التحديث القادم', 'info');
-}
+        try {
+            const response = await fetch('/api/employees', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(employeeData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert('تم تسجيل الموظف بنجاح!');
+                addEmployeeForm.reset();
+                
+                // قفل الـ Modal بتاع البوتستراب
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addEmployeeModal'));
+                modal.hide();
+                
+                // تحديث الجدول
+                fetchEmployees();
+            } else {
+                alert(result.message || 'حدث خطأ أثناء التسجيل.');
+            }
+        } catch (error) {
+            console.error('Error adding employee:', error);
+            alert('حدث خطأ في الاتصال بالسيرفر.');
+        } finally {
+            saveBtnText.textContent = 'حفظ الموظف';
+            saveBtnLoader.classList.add('d-none');
+            saveEmpBtn.disabled = false;
+        }
+    });
+});
