@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم - نظام الموارد البشرية</title>
+    <!-- استدعاء مكتبة البوتستراب والأيقونات -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { 
+            background-color: #f8f9fa; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        .sidebar { 
+            min-height: 100vh; 
+            background-color: #212529; 
+            color: white; 
+            padding-top: 20px; 
+        }
+        .sidebar a { 
+            color: #adb5bd; 
+            text-decoration: none; 
+            padding: 12px 20px; 
+            display: block; 
+            transition: 0.3s;
+        }
+        .sidebar a:hover, .sidebar a.active { 
+            color: white; 
+            background-color: #0d6efd; 
+            border-radius: 5px;
+            margin: 0 10px;
+        }
+        .card-stat { 
+            border-radius: 10px; 
+            border: none; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- القائمة الجانبية (للشاشات الكبيرة) -->
+            <div class="col-md-2 sidebar d-none d-md-block">
+                <h4 class="text-center text-white mb-4 fw-bold">HR SaaS</h4>
+                <a href="/dashboard.html" class="active"><i class="bi bi-house-door me-2"></i> الرئيسية</a>
+                <a href="/employees.html"><i class="bi bi-people me-2"></i> إدارة الموظفين</a>
+                <a href="/attendance.html"><i class="bi bi-calendar-check me-2"></i> الحضور والانصراف</a>
+                <a href="/payroll.html"><i class="bi bi-cash-stack me-2"></i> المرتبات</a>
+                <a href="#" id="logoutBtn" class="text-danger mt-5"><i class="bi bi-box-arrow-right me-2"></i> تسجيل الخروج</a>
+            </div>
+
+            <!-- المحتوى الرئيسي -->
+            <div class="col-md-10 p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold">نظرة عامة</h2>
+                    <!-- زرار القائمة الجانبية للموبايل -->
+                    <button class="btn btn-outline-dark d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+                        <i class="bi bi-list fs-4"></i>
+                    </button>
+                </div>
+
+                <!-- كروت الإحصائيات -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-3">
+                        <div class="card card-stat p-3 border-primary border-start border-4">
+                            <h6 class="text-muted">إجمالي الموظفين</h6>
+                            <h3 class="fw-bold" id="totalEmployees">--</h3>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <div class="card card-stat p-3 border-success border-start border-4">
+                            <h6 class="text-muted">حضور اليوم</h6>
+                            <h3 class="fw-bold" id="todayAttendance">--</h3>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <div class="card card-stat p-3 border-warning border-start border-4">
+                            <h6 class="text-muted">طلبات إجازة معلقة</h6>
+                            <h3 class="fw-bold" id="pendingLeaves">--</h3>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <div class="card card-stat p-3 border-info border-start border-4">
+                            <h6 class="text-muted">حالة مرتبات الشهر</h6>
+                            <h4 class="fw-bold text-info mt-1" id="monthlyPayrollStatus">مسودة</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- جدول العمليات الأخيرة -->
+                <div class="card card-stat p-3">
+                    <h5 class="fw-bold mb-3">أحدث الموظفين المسجلين</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>الاسم</th>
+                                    <th>الكود الوظيفي</th>
+                                    <th>القسم</th>
+                                    <th>تاريخ التعيين</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentEmployeesTable">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-3">جاري تحميل البيانات...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- القائمة الجانبية للموبايل (Offcanvas) -->
+    <div class="offcanvas offcanvas-end bg-dark text-white" tabindex="-1" id="mobileSidebar">
+        <div class="offcanvas-header border-bottom border-secondary">
+            <h5 class="offcanvas-title fw-bold">HR SaaS</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body sidebar pt-0">
+            <a href="/dashboard.html" class="active mt-3"><i class="bi bi-house-door me-2"></i> الرئيسية</a>
+            <a href="/employees.html"><i class="bi bi-people me-2"></i> إدارة الموظفين</a>
+            <a href="/attendance.html"><i class="bi bi-calendar-check me-2"></i> الحضور والانصراف</a>
+            <a href="/payroll.html"><i class="bi bi-cash-stack me-2"></i> المرتبات</a>
+            <a href="#" id="logoutBtnMobile" class="text-danger mt-5"><i class="bi bi-box-arrow-right me-2"></i> تسجيل الخروج</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>
