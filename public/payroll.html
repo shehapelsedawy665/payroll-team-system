@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة الرواتب - نظام الموارد البشرية</title>
+    <!-- استدعاء مكتبة البوتستراب والأيقونات -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { 
+            background-color: #f8f9fa; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        .sidebar { 
+            min-height: 100vh; 
+            background-color: #212529; 
+            color: white; 
+            padding-top: 20px; 
+        }
+        .sidebar a { 
+            color: #adb5bd; 
+            text-decoration: none; 
+            padding: 12px 20px; 
+            display: block; 
+            transition: 0.3s;
+        }
+        .sidebar a:hover, .sidebar a.active { 
+            color: white; 
+            background-color: #0d6efd; 
+            border-radius: 5px;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- القائمة الجانبية (للشاشات الكبيرة) -->
+            <div class="col-md-2 sidebar d-none d-md-block">
+                <h4 class="text-center text-white mb-4 fw-bold">HR SaaS</h4>
+                <a href="/dashboard.html"><i class="bi bi-house-door me-2"></i> الرئيسية</a>
+                <a href="/employees.html"><i class="bi bi-people me-2"></i> إدارة الموظفين</a>
+                <a href="/attendance.html"><i class="bi bi-calendar-check me-2"></i> الحضور والانصراف</a>
+                <a href="/payroll.html" class="active"><i class="bi bi-cash-stack me-2"></i> المرتبات</a>
+                <a href="#" id="logoutBtn" class="text-danger mt-5"><i class="bi bi-box-arrow-right me-2"></i> تسجيل الخروج</a>
+            </div>
+
+            <!-- المحتوى الرئيسي -->
+            <div class="col-md-10 p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold">إدارة الرواتب (Payroll)</h2>
+                    <div>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#runPayrollModal">
+                            <i class="bi bi-calculator"></i> حساب راتب موظف
+                        </button>
+                        <!-- زرار القائمة الجانبية للموبايل -->
+                        <button class="btn btn-outline-dark d-md-none ms-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+                            <i class="bi bi-list fs-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- جدول الرواتب المحسوبة -->
+                <div class="card border-0 shadow-sm p-3">
+                    <h5 class="fw-bold mb-3">سجل الرواتب (مسودات الشهر الحالي)</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>الموظف</th>
+                                    <th>الشهر / السنة</th>
+                                    <th>إجمالي الاستحقاقات</th>
+                                    <th>إجمالي الاستقطاعات</th>
+                                    <th>الصافي (Net)</th>
+                                    <th>مفردات المرتب (Payslip)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payrollTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-3">جاري تحميل البيانات...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- القائمة الجانبية للموبايل (Offcanvas) -->
+    <div class="offcanvas offcanvas-end bg-dark text-white" tabindex="-1" id="mobileSidebar">
+        <div class="offcanvas-header border-bottom border-secondary">
+            <h5 class="offcanvas-title fw-bold">HR SaaS</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body sidebar pt-0">
+            <a href="/dashboard.html" class="mt-3"><i class="bi bi-house-door me-2"></i> الرئيسية</a>
+            <a href="/employees.html"><i class="bi bi-people me-2"></i> إدارة الموظفين</a>
+            <a href="/attendance.html"><i class="bi bi-calendar-check me-2"></i> الحضور والانصراف</a>
+            <a href="/payroll.html" class="active"><i class="bi bi-cash-stack me-2"></i> المرتبات</a>
+            <a href="#" id="logoutBtnMobile" class="text-danger mt-5"><i class="bi bi-box-arrow-right me-2"></i> تسجيل الخروج</a>
+        </div>
+    </div>
+
+    <!-- نافذة حساب الراتب (Modal) -->
+    <div class="modal fade" id="runPayrollModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">حساب راتب شهر جديد</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="runPayrollForm">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">الموظف</label>
+                            <select class="form-select" id="payEmployeeId" required>
+                                <option value="">جاري تحميل الموظفين...</option>
+                            </select>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">الشهر</label>
+                                <select class="form-select" id="payMonth" required>
+                                    <option value="1">يناير</option>
+                                    <option value="2">فبراير</option>
+                                    <option value="3">مارس</option>
+                                    <option value="4">أبريل</option>
+                                    <option value="5" selected>مايو</option>
+                                    <option value="6">يونيو</option>
+                                    <option value="7">يوليو</option>
+                                    <option value="8">أغسطس</option>
+                                    <option value="9">سبتمبر</option>
+                                    <option value="10">أكتوبر</option>
+                                    <option value="11">نوفمبر</option>
+                                    <option value="12">ديسمبر</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">السنة</label>
+                                <input type="number" class="form-control" id="payYear" value="2026" required>
+                            </div>
+                        </div>
+                        <div class="alert alert-info text-center" style="font-size: 0.9rem;">
+                            سيقوم النظام بحساب الضرائب والتأمينات تلقائياً بناءً على القوانين المصرية.
+                        </div>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                            <button type="submit" class="btn btn-primary" id="runPayBtn">
+                                <span id="runBtnText">تشغيل الحساب (Run Payroll)</span>
+                                <span id="runBtnLoader" class="spinner-border spinner-border-sm d-none"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ربط السكريبتات -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/payroll.js"></script>
+</body>
+</html>
