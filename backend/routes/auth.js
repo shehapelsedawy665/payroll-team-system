@@ -3,29 +3,37 @@ const router = express.Router();
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
-// عشان نربط اليوزر بشركة لما نأسس السيستم
 const mongoose = require('mongoose');
+
 const companySchema = new mongoose.Schema({ name: String, isActive: Boolean });
 const Company = mongoose.models.Company || mongoose.model('Company', companySchema);
 
 /**
- * مسار تأسيس السيستم (بنفتحه مرة واحدة بس من المتصفح عشان يكريت أول حساب)
- * المسار: GET /api/auth/setup
+ * مسار تأسيس السيستم (مع كاشف الأعطال)
  */
 router.get('/setup', async (req, res) => {
     try {
+        // 1. فحص هل Vercel شايف لينك الداتابيز أصلاً ولا لأ؟
+        if (!process.env.MONGO_URI) {
+            return res.send(`
+                <h2 style="color: red;">❌ السيرفر مش لاقي المتغير MONGO_URI</h2>
+                <p>تأكد إنك ضفت اللينك في Environment Variables جوه Vercel وعملت Redeploy.</p>
+            `);
+        }
+
+        // 2. إجبار الاتصال بقاعدة البيانات واصطياد أي خطأ
+        if (mongoose.connection.readyState !== 1) {
+            await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 5000 });
+        }
+
         const existingUser = await User.findOne({ email: 'admin@hr.com' });
-        if (existingUser) return res.send('تم تأسيس النظام مسبقاً. يمكنك تسجيل الدخول.');
+        if (existingUser) return res.send('<h2>تم تأسيس النظام مسبقاً. يمكنك تسجيل الدخول.</h2>');
 
-        // 1. إنشاء شركة جديدة
+        // 3. التأسيس
         const newCompany = await Company.create({ name: 'الشركة الرئيسية', isActive: true });
-
-        // 2. إنشاء باسورد مشفر
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash('123456', salt);
 
-        // 3. إنشاء حساب الأدمن وربطه بالشركة
         await User.create({
             email: 'admin@hr.com',
             password: hashedPassword,
@@ -33,20 +41,27 @@ router.get('/setup', async (req, res) => {
             companyId: newCompany._id
         });
 
-        res.send('تم تأسيس السيستم بنجاح! الإيميل: admin@hr.com | الباسورد: 123456');
+        res.send('<h2 style="color: green;">✅ تم تأسيس السيستم بنجاح! الإيميل: admin@hr.com | الباسورد: 123456</h2>');
     } catch (error) {
-        res.status(500).send('خطأ في التأسيس: ' + error.message);
+        // 4. هنا هيظهرلك العطل الحقيقي من MongoDB على الشاشة
+        res.send(`
+            <h2 style="color: darkred;">❌ ظهر خطأ حقيقي من قاعدة البيانات:</h2>
+            <p style="background: #f8d7da; padding: 10px; border: 1px solid red;">${error.message}</p>
+        `);
     }
 });
 
 /**
- * تسجيل الدخول الحقيقي
- * المسار: POST /api/auth/login
+ * تسجيل الدخول
  */
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         
+        if (mongoose.connection.readyState !== 1) {
+            await mongoose.connect(process.env.MONGO_URI);
+        }
+
         const user = await User.findOne({ email });
         if (!user) return res.status(401).json({ success: false, message: "الإيميل أو كلمة المرور غير صحيحة" });
 
