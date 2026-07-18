@@ -76,8 +76,18 @@ router.post('/login', async (req, res) => {
         };
 
         const token = jwt.sign(payload, process.env.JWT_SECRET || 'fallback_secret_key', { expiresIn: '1d' });
+         // ضفنا الـ companyId عشان الـ Frontend يقدر يستخدمه وهو بيسجل الموظفين
+        res.status(200).json({ 
+            success: true, 
+            token, 
+            data: { 
+                id: user._id, 
+                email: user.email, 
+                role: user.role,
+                companyId: user.companyId 
+            } 
+        });
 
-        res.status(200).json({ success: true, token, data: { id: user._id, email: user.email, role: user.role } });
     } catch (error) {
         res.status(500).json({ success: false, message: "حصل خطأ في السيرفر", error: error.message });
     }
