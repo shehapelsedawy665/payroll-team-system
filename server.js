@@ -1,30 +1,37 @@
-require('dotenv').config(); // عشان نقرأ المتغيرات السرية زي رابط الداتابيز
+require('dotenv').config(); 
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // عشان نسمح للـ Frontend يكلم الـ Backend بدون مشاكل
+const cors = require('cors'); 
 const path = require('path');
 
 const app = express();
 
 // --- 1. الـ Middleware الأساسية ---
-app.use(express.json()); // عشان السيرفر يفهم الداتا اللي مبعوتة في شكل JSON
+app.use(express.json()); 
 app.use(cors());
-// السطر ده عشان السيرفر يقدر يقرأ ويعرض كل شاشات الـ HTML اللي جوه فولدر public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- 2. الاتصال بقاعدة البيانات (MongoDB) ---
-const dbURI = process.env.MONGO_URI || 'mongodb://localhost:27017/hr_payroll_system';
-mongoose.connect(dbURI)
+// --- 2. الاتصال بقاعدة البيانات (مُجهز لبيئة Vercel) ---
+const dbURI = process.env.MONGO_URI;
+
+// لو اللينك مش موجود في Vercel السيرفر هيعرفنا فوراً
+if (!dbURI) {
+    console.error('❌ رابط قاعدة البيانات (MONGO_URI) مش موجود في Vercel!');
+} else {
+    mongoose.connect(dbURI, {
+        serverSelectionTimeoutMS: 5000, // خليناها 5 ثواني عشان لو فيه غلطة يرد أسرع
+    })
     .then(() => console.log('✅ تم الاتصال بقاعدة البيانات بنجاح'))
     .catch((err) => console.error('❌ خطأ في الاتصال بقاعدة البيانات:', err));
+}
 
-// --- 3. تعريف مسارات الـ API (الـ Routes اللي عملناها) ---
+// --- 3. تعريف مسارات الـ API ---
 app.use('/api/auth', require('./backend/routes/auth'));
 app.use('/api/employees', require('./backend/routes/employees'));
 app.use('/api/attendance', require('./backend/routes/attendance'));
 app.use('/api/payroll', require('./backend/routes/payroll'));
 
-// --- 4. مسار اختبار سريع للتأكد إن السيرفر شغال ---
+// --- 4. مسار اختبار سريع ---
 app.get('/', (req, res) => {
     res.status(200).json({
         success: true,
@@ -32,11 +39,17 @@ app.get('/', (req, res) => {
     });
 });
 
-// مسار عشان الـ Frontend يقدر يحمل ملفات الـ PDF اللي بتطلع
 app.use('/payslips', express.static(path.join(__dirname, 'public/payslips')));
 
-// --- 5. تشغيل السيرفر ---
+// --- 5. تشغيل السيرفر (متوافق مع Vercel) ---
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`🚀 السيرفر شغال تمام على بورت ${PORT}`);
-});
+
+// لو شغالين محلياً نشغله بالطريقة العادية
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`🚀 السيرفر شغال تمام على بورت ${PORT}`);
+    });
+}
+
+// 🟢 السطر ده هو "المفتاح السحري" لـ Vercel عشان ميضربش Timeout 🟢
+module.exports = app;
