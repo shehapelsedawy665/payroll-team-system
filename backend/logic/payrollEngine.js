@@ -46,6 +46,7 @@ const calculateAnnualTax = (annualTaxableIncome) => {
     return tax;
 };
 
+// المحرك الرئيسي المحدث لدعم التراكمي (YTD) والأيام الفعلية
 const calculateGrossToNet = (params) => {
     const { 
         basicSalary, 
@@ -60,7 +61,7 @@ const calculateGrossToNet = (params) => {
         isTaxExempted = 0, 
         companySettings = {},
         jobType = "Full Time",
-        targetDays = 30, // أيام الشهر الضريبية (مثبتة دايماً بـ 30)
+        targetDays = 30, // يعتمد الآن على الأيام الفعلية الممررة
         prevData = { pDays: 0, pTaxable: 0, pTaxes: 0 } 
     } = params;
 
@@ -69,6 +70,7 @@ const calculateGrossToNet = (params) => {
     const minInsSalary = (jobType === "Part Time" || jobType === "مؤقت") ? EGY_CONSTANTS.MIN_INSURANCE_SALARY_PART_TIME : EGY_CONSTANTS.MIN_INSURANCE_SALARY_2024;
     let actualInsSalary = Math.max(minInsSalary, Math.min(insSalary || 0, EGY_CONSTANTS.MAX_INSURANCE_SALARY_2024));
     
+    // التأمينات ثابتة لا تتأثر بالأيام حسب القانون المصري
     const socialInsuranceEmpShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_EMP_RATE;
     const socialInsuranceCompShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_COMP_RATE;
 
@@ -80,18 +82,18 @@ const calculateGrossToNet = (params) => {
 
     const monthlyGrossForTax = grossSalary + overtimeAddition - absenceDeduction - penaltyDeduction;
     
-    // الإعفاء الشخصي على أساس 30 يوم
+    // الإعفاء الشخصي يُنسب لعدد الأيام الفعلية في الشهر
     const proratedPersonalExemption = (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 360) * targetDays;
     
-    // حساب الخصومات المعفاة (كالتأمين الطبي)
+    // حساب الخصومات المعفاة (كالتأمين الطبي أو صناديق الزمالة)
     const requestedExemptDeductions = deductionsList
         .filter(d => d.type === 'exempted')
         .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
-    // صافي الإيراد المؤقت لحساب نسبة الـ 15%
+    // 1. صافي الإيراد المؤقت (قبل خصم التأمين الطبي) لحساب نسبة الـ 15%
     const netBeforeMedical = Math.max(0, monthlyGrossForTax - socialInsuranceEmpShare - proratedPersonalExemption);
 
-    // تطبيق السقف القانوني للإعفاء الطبي (أيهما أقل: المدفوع، 15% من الصافي، أو 10000 سنوياً مقسطة)
+    // 2. تطبيق السقف القانوني (أيهما أقل: المدفوع الفعلي، 15% من الصافي، أو 10000 سنوياً مقسطة حسب الأيام الفعلية)
     const maxExemptionByPercentage = netBeforeMedical * 0.15;
     const maxExemptionByValue = (10000 / 360) * targetDays; 
     
@@ -101,11 +103,13 @@ const calculateGrossToNet = (params) => {
         maxExemptionByValue
     ));
 
+    // الوعاء الخاضع للشهر الحالي فقط
     const currentTaxable = Math.max(0, netBeforeMedical - allowedTaxExemptDeductions);
     
     let monthlyTax = 0;
     
     if (!isTaxExempted) {
+        // 🔥 الحسبة التراكمية (YTD Logic) باستخدام الأيام الفعلية للموظف
         const totalDaysYTD = targetDays + (Number(prevData.pDays) || 0);
         const totalTaxableYTD = currentTaxable + (Number(prevData.pTaxable) || 0);
 
@@ -152,7 +156,6 @@ const runPayrollLogic = (input, prev, emp) => {
     }
 
     const targetDays = Number(input.days) || 30;
-    // تقسيط الأساسي والبدلات بناءً على أيام العمل الفعلية
     const basicProp = (Number(input.fullBasic) || 0) * (targetDays / 30);
     const transProp = (Number(input.fullTrans) || 0) * (targetDays / 30);
 
@@ -168,12 +171,12 @@ const runPayrollLogic = (input, prev, emp) => {
         isTaxExempted: emp.isTaxExempted || 0,
         companySettings: emp.companySettings || {},
         jobType: emp.jobType || "Full Time",
-        targetDays: 30, // 🔥 [التعديل هنا] تثبيت فترة الضريبة كشهر كامل (30 يوم) لمنع التضخم الضريبي
+        targetDays: targetDays, // تم إصلاح المشكلة وتمرير الأيام الفعلية هنا
         prevData: safePrev
     });
 
     return {
-        days: targetDays, // يتم إرجاع الأيام الفعلية لعرضها في القسيمة (مثال: 29)
+        days: targetDays,
         gross: payload.grossSalary,
         proratedBasic: Number(basicProp.toFixed(2)),
         proratedTrans: Number(transProp.toFixed(2)),
