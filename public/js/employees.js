@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
             jobId: document.getElementById('empJobId').value,
             nationalId: document.getElementById('empNationalId').value,
             department: document.getElementById('empDepartment').value,
+            hiringDate: document.getElementById('empHiringDate').value, // 🟢 تم إضافة تاريخ التعيين هنا 🟢
             financials: {
                 basicSalary: Number(document.getElementById('empBasic').value),
                 variableSalary: Number(document.getElementById('empVariable').value),
