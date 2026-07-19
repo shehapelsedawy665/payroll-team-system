@@ -1,6 +1,6 @@
 /**
  * @file backend/logic/payrollEngine.js
- * @description The FINAL Advanced Egyptian Payroll Engine - (Cumulative YTD & Strict Floor)
+ * @description The FINAL Advanced Egyptian Payroll Engine - (Cumulative YTD, Strict Floor, & Medical Cap)
  */
 
 const EGY_CONSTANTS = {
@@ -46,7 +46,6 @@ const calculateAnnualTax = (annualTaxableIncome) => {
     return tax;
 };
 
-// المحرك الرئيسي المحدث لدعم التراكمي (YTD) والأيام الفعلية
 const calculateGrossToNet = (params) => {
     const { 
         basicSalary, 
@@ -61,8 +60,8 @@ const calculateGrossToNet = (params) => {
         isTaxExempted = 0, 
         companySettings = {},
         jobType = "Full Time",
-        targetDays = 30, // أيام الشهر الفعلية للضرايب
-        prevData = { pDays: 0, pTaxable: 0, pTaxes: 0 } // بيانات الشهور السابقة
+        targetDays = 30, // أيام الشهر الضريبية (مثبتة دايماً بـ 30)
+        prevData = { pDays: 0, pTaxable: 0, pTaxes: 0 } 
     } = params;
 
     const grossSalary = basicSalary + variableSalary + allowances;
@@ -70,7 +69,6 @@ const calculateGrossToNet = (params) => {
     const minInsSalary = (jobType === "Part Time" || jobType === "مؤقت") ? EGY_CONSTANTS.MIN_INSURANCE_SALARY_PART_TIME : EGY_CONSTANTS.MIN_INSURANCE_SALARY_2024;
     let actualInsSalary = Math.max(minInsSalary, Math.min(insSalary || 0, EGY_CONSTANTS.MAX_INSURANCE_SALARY_2024));
     
-    // التأمينات ثابتة لا تتأثر بالأيام حسب القانون المصري
     const socialInsuranceEmpShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_EMP_RATE;
     const socialInsuranceCompShare = actualInsSalary * EGY_CONSTANTS.SOCIAL_INSURANCE_COMP_RATE;
 
@@ -82,20 +80,20 @@ const calculateGrossToNet = (params) => {
 
     const monthlyGrossForTax = grossSalary + overtimeAddition - absenceDeduction - penaltyDeduction;
     
-    // الإعفاء الشخصي يُنسب لعدد الأيام الفعلية في الشهر
+    // الإعفاء الشخصي على أساس 30 يوم
     const proratedPersonalExemption = (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 360) * targetDays;
     
-    // 🔥 (تحديث السقف): حساب الخصومات المعفاة (كالتأمين الطبي أو صناديق الزمالة)
+    // حساب الخصومات المعفاة (كالتأمين الطبي)
     const requestedExemptDeductions = deductionsList
         .filter(d => d.type === 'exempted')
         .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
-    // 1. صافي الإيراد المؤقت (قبل خصم التأمين الطبي) لحساب نسبة الـ 15%
+    // صافي الإيراد المؤقت لحساب نسبة الـ 15%
     const netBeforeMedical = Math.max(0, monthlyGrossForTax - socialInsuranceEmpShare - proratedPersonalExemption);
 
-    // 2. تطبيق السقف القانوني (أيهما أقل: المدفوع الفعلي، 15% من الصافي، أو 10000 سنوياً مقسطة)
+    // تطبيق السقف القانوني للإعفاء الطبي (أيهما أقل: المدفوع، 15% من الصافي، أو 10000 سنوياً مقسطة)
     const maxExemptionByPercentage = netBeforeMedical * 0.15;
-    const maxExemptionByValue = (10000 / 360) * targetDays; // ~833.33 للشهر
+    const maxExemptionByValue = (10000 / 360) * targetDays; 
     
     const allowedTaxExemptDeductions = Math.max(0, Math.min(
         requestedExemptDeductions,
@@ -103,30 +101,19 @@ const calculateGrossToNet = (params) => {
         maxExemptionByValue
     ));
 
-    // الوعاء الخاضع للشهر الحالي فقط (يتم حفظه للداتابيز)
     const currentTaxable = Math.max(0, netBeforeMedical - allowedTaxExemptDeductions);
     
     let monthlyTax = 0;
     
     if (!isTaxExempted) {
-        // 🔥 الحسبة التراكمية (YTD Logic)
         const totalDaysYTD = targetDays + (Number(prevData.pDays) || 0);
         const totalTaxableYTD = currentTaxable + (Number(prevData.pTaxable) || 0);
 
         if (totalDaysYTD > 0 && totalTaxableYTD > 0) {
-            // 1. تحويل الوعاء التراكمي إلى سنوي
             let rawAnnual = (totalTaxableYTD / totalDaysYTD) * 360;
-            
-            // 2. تقريب القانون المصري للأسفل لأقرب 10 جنيه
             let annualProjected = Math.floor(rawAnnual / 10) * 10;
-            
-            // 3. حساب الضريبة السنوية
             let annualTax = calculateAnnualTax(annualProjected);
-            
-            // 4. رد الضريبة للمدة التراكمية الفعلية
             let totalTaxDueUntilNow = (annualTax / 360) * totalDaysYTD;
-            
-            // 5. خصم ما تم تسديده في الشهور السابقة
             let prevTaxes = Number(prevData.pTaxes) || 0;
             monthlyTax = Math.max(0, totalTaxDueUntilNow - prevTaxes);
         }
@@ -144,7 +131,7 @@ const calculateGrossToNet = (params) => {
         socialInsuranceCompShare: Number(socialInsuranceCompShare.toFixed(2)),
         absenceDeduction: Number(absenceDeduction.toFixed(2)),
         penaltyDeduction: Number(penaltyDeduction.toFixed(2)),
-        currentTaxable: Number(currentTaxable.toFixed(2)), // يخزن للشهر القادم
+        currentTaxable: Number(currentTaxable.toFixed(2)), 
         monthlyTax: Number(monthlyTax.toFixed(2)),
         martyrsFund,
         loanDeduction: Number(loanDeduction.toFixed(2)),
@@ -165,6 +152,7 @@ const runPayrollLogic = (input, prev, emp) => {
     }
 
     const targetDays = Number(input.days) || 30;
+    // تقسيط الأساسي والبدلات بناءً على أيام العمل الفعلية
     const basicProp = (Number(input.fullBasic) || 0) * (targetDays / 30);
     const transProp = (Number(input.fullTrans) || 0) * (targetDays / 30);
 
@@ -180,12 +168,12 @@ const runPayrollLogic = (input, prev, emp) => {
         isTaxExempted: emp.isTaxExempted || 0,
         companySettings: emp.companySettings || {},
         jobType: emp.jobType || "Full Time",
-        targetDays: targetDays,
+        targetDays: 30, // 🔥 [التعديل هنا] تثبيت فترة الضريبة كشهر كامل (30 يوم) لمنع التضخم الضريبي
         prevData: safePrev
     });
 
     return {
-        days: targetDays,
+        days: targetDays, // يتم إرجاع الأيام الفعلية لعرضها في القسيمة (مثال: 29)
         gross: payload.grossSalary,
         proratedBasic: Number(basicProp.toFixed(2)),
         proratedTrans: Number(transProp.toFixed(2)),
@@ -216,7 +204,7 @@ const calculateNetToGross = (targetNet, insSalary, companySettings, isTaxExempte
             companySettings: companySettings, 
             isTaxExempted: isTaxExempted,
             jobType: jobType,
-            targetDays: 30, // الحاسبة تفترض شهر كامل
+            targetDays: 30,
             prevData: { pDays: 0, pTaxable: 0, pTaxes: 0 }
         });
         
@@ -248,7 +236,6 @@ const calculateNetToGross = (targetNet, insSalary, companySettings, isTaxExempte
     return bestMatch;
 };
 
-// -- (باقي دوال التقرير والتسوية كما هي بدون تغيير) --
 const generateUnifiedTaxRow = (employee, payrollRecord) => {
     const p = payrollRecord.payload;
     return {
