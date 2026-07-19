@@ -1645,25 +1645,6 @@ function localCalcGrossToNet(grossSalary, insSalaryRaw, opts = {}) {
     net
   };
 }
-  const monthlyExempt = insEmp + (EGY.PERSONAL_EXEMPTION / EGY.MONTHS);
-  const annualTaxable = R(Math.max(0, (grossForTax - monthlyExempt) * EGY.MONTHS));
-  const monthlyTax    = isTaxExempted ? 0 : R(calcAnnualTax(annualTaxable) / EGY.MONTHS);
-
-  const martyrs = R(grossSalary * EGY.MARTYRS_RATE);   // صندوق الشهداء 0.05%
-  const net     = R(grossSalary - insEmp - monthlyTax - martyrs - absentDeduction - otherDeductions);
-
-  return {
-    gross:          R(grossSalary),
-    insEmp,
-    insComp,
-    martyrs,
-    monthlyTax,
-    annualTaxable,
-    absentDeduction: R(absentDeduction),
-    otherDeductions:  R(otherDeductions),
-    net
-  };
-}
 
 /** عكسي: صافي → إجمالي */
 function localCalcNetToGross(targetNet, insSalaryRaw, opts = {}) {
