@@ -57,6 +57,7 @@ const calculateGrossToNet = (params) => {
         penaltyDays = 0, 
         overtimeHours = 0, 
         loanDeduction = 0, 
+        deductionsList = [], // 🔥 (NEW) استلام قائمة الخصومات
         isTaxExempted = 0, 
         companySettings = {},
         jobType = "Full Time",
@@ -84,8 +85,13 @@ const calculateGrossToNet = (params) => {
     // 🔥 الإعفاء الشخصي يُنسب لعدد الأيام الفعلية في الشهر
     const proratedPersonalExemption = (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 360) * targetDays;
     
-    // الوعاء الخاضع للشهر الحالي فقط (يتم حفظه للداتابيز)
-    const currentTaxable = Math.max(0, monthlyGrossForTax - socialInsuranceEmpShare - proratedPersonalExemption);
+    // 🔥 (NEW) حساب الخصومات المعفاة من الضريبة التي تخفض الوعاء (مثل التأمين الطبي)
+    const taxExemptDeductions = deductionsList
+        .filter(d => d.type === 'exempted')
+        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+    // الوعاء الخاضع للشهر الحالي فقط (يتم حفظه للداتابيز) - تم طرح الخصومات المعفاة
+    const currentTaxable = Math.max(0, monthlyGrossForTax - socialInsuranceEmpShare - proratedPersonalExemption - taxExemptDeductions);
     
     let monthlyTax = 0;
     
@@ -157,6 +163,7 @@ const runPayrollLogic = (input, prev, emp) => {
         allowances: transProp,
         insSalary: Number(emp.insSalary) || 0,
         loanDeduction: totalDeductions,
+        deductionsList: input.deductions || [], // 🔥 (NEW) إرسال قائمة الخصومات للمحرك
         isTaxExempted: emp.isTaxExempted || 0,
         companySettings: emp.companySettings || {},
         jobType: emp.jobType || "Full Time",
