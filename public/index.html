@@ -1537,7 +1537,7 @@ function showDevPasswordPrompt() {
   
   if (password === correctPassword) {
     devPanelAttempts = 0; // Reset attempts on success
-    openDevPanel();
+    showDevSettings();
   } else {
     devPanelAttempts++;
     if (devPanelAttempts >= 3) {
@@ -1667,8 +1667,8 @@ function localCalcNetToGross(targetNet, insSalaryRaw, opts = {}) {
 function enrichPayrollResult(p, inputBasic, inputTrans, inputDays, additions, deductions) {
   const days      = p.days || Number(inputDays) || 30;
   // proratedBasic/Trans: use backend values if present, otherwise compute from inputs
-  const prorBasic = p.proratedBasic   != null ? p.proratedBasic   : R((Number(inputBasic)||0) * (days/30));
-  const prorTrans = p.proratedTrans   != null ? p.proratedTrans   : R((Number(inputTrans)||0) * (days/30));
+  const prorBasic = p.proratedBasic    != null ? p.proratedBasic    : R((Number(inputBasic)||0) * (days/30));
+  const prorTrans = p.proratedTrans    != null ? p.proratedTrans    : R((Number(inputTrans)||0) * (days/30));
   const adds      = additions  || p.additions  || [];
   const deds      = deductions || p.deductions || [];
   const totalAdd  = p.totalAdditions       != null ? p.totalAdditions       : R(adds.reduce((s,a)=>s+(Number(a.amount)||0),0));
@@ -1877,10 +1877,11 @@ function showDevSettings() {
 }
 
 function closeDevSettings() {
+  const modal = document.getElementById('dev-options-modal');
+  if (modal) modal.style.display = 'none';
+  
   if (!CURRENT_USER) {
     document.getElementById('app').style.display = 'none';
-    const modal = document.getElementById('dev-options-modal');
-    if (modal) modal.style.display = 'none';
     document.getElementById('auth-screen').style.display = 'flex';
   } else {
     navigate('dashboard');
