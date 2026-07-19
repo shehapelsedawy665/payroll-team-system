@@ -1280,6 +1280,73 @@ tbody tr:last-child td { border-bottom: none; }
   </main>
 </div>
 
+<!-- 🔐 HIDDEN DEVELOPER OPTIONS DASHBOARD (Secured) -->
+<div id="dev-options-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:10000;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#1a1a2e;border:2px solid #f39c12;border-radius:12px;padding:24px;max-width:900px;width:90%;max-height:90vh;overflow-y:auto;color:#fff;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+      <h2 style="margin:0;color:#f39c12;">⚙️ Developer Options & Super Admin Panel</h2>
+      <button onclick="closeDevSettings()" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:bold;">X إغلاق</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <!-- Company Registration -->
+      <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;">
+        <h3 style="color:#f39c12;margin-top:0;">🏢 تسجيل شركة جديدة</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <input type="text" id="dev-company-name" placeholder="اسم الشركة" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+          <input type="email" id="dev-company-email" placeholder="البريد الإلكتروني (Admin)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+          <input type="password" id="dev-company-pass" placeholder="كلمة المرور" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+          <button onclick="devRegisterCompany()" style="background:#27ae60;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;">✅ تسجيل الشركة</button>
+        </div>
+      </div>
+
+      <!-- User Management -->
+      <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;">
+        <h3 style="color:#f39c12;margin-top:0;">👤 تسجيل مستخدم نظام</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <select id="dev-user-company" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;">
+            <option value="">-- اختر شركة --</option>
+          </select>
+          <input type="email" id="dev-user-email" placeholder="البريد الإلكتروني" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+          <input type="password" id="dev-user-pass" placeholder="كلمة المرور" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
+          <select id="dev-user-role" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;">
+            <option value="admin">Admin (مدير)</option>
+            <option value="hr">HR (موارد بشرية)</option>
+            <option value="finance">Finance (مالية)</option>
+          </select>
+          <button onclick="devRegisterUser()" style="background:#3498db;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;">✅ تسجيل المستخدم</button>
+        </div>
+      </div>
+
+      <!-- Employee Quick Registration (for auto-account test) -->
+      <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;grid-column:1/3;">
+        <h3 style="color:#f39c12;margin-top:0;">👨‍💼 اختبار إنشاء حساب موظف تلقائي (Employee Auto-Account)</h3>
+        <p style="color:#ecf0f1;font-size:12px;margin:8px 0;">عند إضافة موظف جديد، يتم إنشاء حساب تلقائي: Username = Job ID | Password = National ID (مشفر)</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+          <input type="text" id="dev-emp-jobid" placeholder="Job ID (الرقم الوظيفي)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
+          <input type="text" id="dev-emp-national" placeholder="National ID (14 رقم)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
+          <input type="text" id="dev-emp-name" placeholder="الاسم" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
+          <select id="dev-emp-company" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;">
+            <option value="">-- شركة --</option>
+          </select>
+        </div>
+        <button onclick="devTestEmpAutoAccount()" style="background:#9b59b6;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;width:100%;margin-top:10px;">🧪 اختبر الحساب التلقائي</button>
+      </div>
+
+      <!-- Dev Stats -->
+      <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;grid-column:1/3;">
+        <h3 style="color:#f39c12;margin-top:0;">📊 إحصائيات النظام</h3>
+        <div id="dev-stats" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;font-size:12px;">
+          <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الشركات</strong><br/><span id="stat-companies">0</span></div>
+          <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">المستخدمين</strong><br/><span id="stat-users">0</span></div>
+          <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الموظفين</strong><br/><span id="stat-employees">0</span></div>
+          <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الحسابات المرتبطة</strong><br/><span id="stat-linked-accounts">0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODALS ===== -->
 
 <!-- ADD/EDIT EMPLOYEE -->
@@ -1413,74 +1480,6 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
     <input type="hidden" id="att-day-date"/>
   </div>
-
-  <!-- 🔐 HIDDEN DEVELOPER OPTIONS DASHBOARD (Secured) -->
-  <div id="dev-options-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:10000;display:flex;align-items:center;justify-content:center;">
-    <div style="background:#1a1a2e;border:2px solid #f39c12;border-radius:12px;padding:24px;max-width:900px;width:90%;max-height:90vh;overflow-y:auto;color:#fff;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
-        <h2 style="margin:0;color:#f39c12;">⚙️ Developer Options & Super Admin Panel</h2>
-        <button onclick="closeDevSettings()" style="background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:bold;">X إغلاق</button>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <!-- Company Registration -->
-        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;">
-          <h3 style="color:#f39c12;margin-top:0;">🏢 تسجيل شركة جديدة</h3>
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            <input type="text" id="dev-company-name" placeholder="اسم الشركة" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
-            <input type="email" id="dev-company-email" placeholder="البريد الإلكتروني (Admin)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
-            <input type="password" id="dev-company-pass" placeholder="كلمة المرور" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
-            <button onclick="devRegisterCompany()" style="background:#27ae60;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;">✅ تسجيل الشركة</button>
-          </div>
-        </div>
-
-        <!-- User Management -->
-        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;">
-          <h3 style="color:#f39c12;margin-top:0;">👤 تسجيل مستخدم نظام</h3>
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            <select id="dev-user-company" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;">
-              <option value="">-- اختر شركة --</option>
-            </select>
-            <input type="email" id="dev-user-email" placeholder="البريد الإلكتروني" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
-            <input type="password" id="dev-user-pass" placeholder="كلمة المرور" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;"/>
-            <select id="dev-user-role" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:10px;border-radius:4px;font-family:Arial;">
-              <option value="admin">Admin (مدير)</option>
-              <option value="hr">HR (موارد بشرية)</option>
-              <option value="finance">Finance (مالية)</option>
-            </select>
-            <button onclick="devRegisterUser()" style="background:#3498db;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;">✅ تسجيل المستخدم</button>
-          </div>
-        </div>
-
-        <!-- Employee Quick Registration (for auto-account test) -->
-        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;grid-column:1/3;">
-          <h3 style="color:#f39c12;margin-top:0;">👨‍💼 اختبار إنشاء حساب موظف تلقائي (Employee Auto-Account)</h3>
-          <p style="color:#ecf0f1;font-size:12px;margin:8px 0;">عند إضافة موظف جديد، يتم إنشاء حساب تلقائي: Username = Job ID | Password = National ID (مشفر)</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
-            <input type="text" id="dev-emp-jobid" placeholder="Job ID (الرقم الوظيفي)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
-            <input type="text" id="dev-emp-national" placeholder="National ID (14 رقم)" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
-            <input type="text" id="dev-emp-name" placeholder="الاسم" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;"/>
-            <select id="dev-emp-company" style="background:#0f3460;border:1px solid #f39c12;color:white;padding:8px;border-radius:4px;">
-              <option value="">-- شركة --</option>
-            </select>
-          </div>
-          <button onclick="devTestEmpAutoAccount()" style="background:#9b59b6;color:white;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;width:100%;margin-top:10px;">🧪 اختبر الحساب التلقائي</button>
-        </div>
-
-        <!-- Dev Stats -->
-        <div style="background:#16213e;border:1px solid #f39c12;border-radius:8px;padding:16px;grid-column:1/3;">
-          <h3 style="color:#f39c12;margin-top:0;">📊 إحصائيات النظام</h3>
-          <div id="dev-stats" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;font-size:12px;">
-            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الشركات</strong><br/><span id="stat-companies">0</span></div>
-            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">المستخدمين</strong><br/><span id="stat-users">0</span></div>
-            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الموظفين</strong><br/><span id="stat-employees">0</span></div>
-            <div style="background:#0f3460;padding:12px;border-radius:4px;"><strong style="color:#f39c12;">الحسابات المرتبطة</strong><br/><span id="stat-linked-accounts">0</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
 </div>
 
 <script>
@@ -1860,31 +1859,31 @@ function showDevSettings() {
   const authScreen = document.getElementById('auth-screen');
   const app = document.getElementById('app');
   const modal = document.getElementById('dev-options-modal');
-  
-  if (authScreen && authScreen.style.display !== 'none') {
-    authScreen.style.display = 'none';
-  }
-  
-  if (app) {
-    app.style.display = 'block';
-  }
-  
+
+  // إخفاء شاشة الدخول والسيستم تماماً عشان ميضربش errors
+  if (authScreen) authScreen.style.display = 'none';
+  if (app) app.style.display = 'none'; 
+
+  // إظهار لوحة المطورين فقط
   if (modal) {
     modal.style.display = 'flex';
-    loadDevStats();
-    loadDevCompanies();
+    if (typeof loadDevStats === 'function') loadDevStats();
+    if (typeof loadDevCompanies === 'function') loadDevCompanies();
   }
 }
 
 function closeDevSettings() {
   const modal = document.getElementById('dev-options-modal');
   if (modal) modal.style.display = 'none';
-  
-  if (!CURRENT_USER) {
-    document.getElementById('app').style.display = 'none';
+
+  // لو مفيش مستخدم مسجل دخول، نرجعه لشاشة الدخول السوداء فقط
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) {
     document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
   } else {
-    navigate('dashboard');
+    // لو مسجل دخول فعلاً، نظهر السيستم
+    document.getElementById('app').style.display = 'block';
+    if (typeof navigate === 'function') navigate('dashboard');
   }
 }
 
