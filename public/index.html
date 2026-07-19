@@ -1609,7 +1609,43 @@ function localCalcGrossToNet(grossSalary, insSalaryRaw, opts = {}) {
   const insEmp  = R(actualIns * EGY.INS_EMP_RATE);
   const insComp = R(actualIns * EGY.INS_COMP_RATE);
 
-  const grossForTax   = grossSalary - absentDeduction;
+  function localCalcGrossToNet(grossSalary, insSalaryRaw, opts = {}) {
+  const { jobType = 'Full Time', isTaxExempted = false,
+          absentDeduction = 0, otherDeductions = 0, deductionsList = [] } = opts;
+
+  const minIns  = (jobType === 'Part Time' || jobType === 'مؤقت')
+                ? EGY.MIN_INS_PART_TIME : EGY.MIN_INS_FULL_TIME;
+  const actualIns = Math.max(minIns, Math.min(insSalaryRaw || EGY.MIN_INS_FULL_TIME, EGY.MAX_INS));
+
+  const insEmp  = R(actualIns * EGY.INS_EMP_RATE);
+  const insComp = R(actualIns * EGY.INS_COMP_RATE);
+
+  // 1. حساب مجموع الخصومات المعفاة التي تخفض الوعاء الضريبي (مثل التأمين الطبي)
+  const taxExemptDeductions = deductionsList
+    .filter(d => d.type === 'exempted')
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+  // 2. طرح الغياب والخصومات المعفاة من الوعاء قبل حساب الضريبة
+  const grossForTax   = grossSalary - absentDeduction - taxExemptDeductions;
+  const monthlyExempt = insEmp + (EGY.PERSONAL_EXEMPTION / EGY.MONTHS);
+  const annualTaxable = R(Math.max(0, (grossForTax - monthlyExempt) * EGY.MONTHS));
+  const monthlyTax    = isTaxExempted ? 0 : R(calcAnnualTax(annualTaxable) / EGY.MONTHS);
+
+  const martyrs = R(grossSalary * EGY.MARTYRS_RATE);
+  const net     = R(grossSalary - insEmp - monthlyTax - martyrs - absentDeduction - otherDeductions);
+
+  return {
+    gross:          R(grossSalary),
+    insEmp,
+    insComp,
+    martyrs,
+    monthlyTax,
+    annualTaxable,
+    absentDeduction: R(absentDeduction),
+    otherDeductions:  R(otherDeductions),
+    net
+  };
+}
   const monthlyExempt = insEmp + (EGY.PERSONAL_EXEMPTION / EGY.MONTHS);
   const annualTaxable = R(Math.max(0, (grossForTax - monthlyExempt) * EGY.MONTHS));
   const monthlyTax    = isTaxExempted ? 0 : R(calcAnnualTax(annualTaxable) / EGY.MONTHS);
