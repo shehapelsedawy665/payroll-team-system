@@ -57,7 +57,7 @@ const calculateGrossToNet = (params) => {
         penaltyDays = 0, 
         overtimeHours = 0, 
         loanDeduction = 0, 
-        deductionsList = [], // 🔥 (NEW) استلام قائمة الخصومات
+        deductionsList = [], 
         isTaxExempted = 0, 
         companySettings = {},
         jobType = "Full Time",
@@ -82,16 +82,29 @@ const calculateGrossToNet = (params) => {
 
     const monthlyGrossForTax = grossSalary + overtimeAddition - absenceDeduction - penaltyDeduction;
     
-    // 🔥 الإعفاء الشخصي يُنسب لعدد الأيام الفعلية في الشهر
+    // الإعفاء الشخصي يُنسب لعدد الأيام الفعلية في الشهر
     const proratedPersonalExemption = (EGY_CONSTANTS.PERSONAL_EXEMPTION_2024 / 360) * targetDays;
     
-    // 🔥 (NEW) حساب الخصومات المعفاة من الضريبة التي تخفض الوعاء (مثل التأمين الطبي)
-    const taxExemptDeductions = deductionsList
+    // 🔥 (تحديث السقف): حساب الخصومات المعفاة (كالتأمين الطبي أو صناديق الزمالة)
+    const requestedExemptDeductions = deductionsList
         .filter(d => d.type === 'exempted')
         .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
-    // الوعاء الخاضع للشهر الحالي فقط (يتم حفظه للداتابيز) - تم طرح الخصومات المعفاة
-    const currentTaxable = Math.max(0, monthlyGrossForTax - socialInsuranceEmpShare - proratedPersonalExemption - taxExemptDeductions);
+    // 1. صافي الإيراد المؤقت (قبل خصم التأمين الطبي) لحساب نسبة الـ 15%
+    const netBeforeMedical = Math.max(0, monthlyGrossForTax - socialInsuranceEmpShare - proratedPersonalExemption);
+
+    // 2. تطبيق السقف القانوني (أيهما أقل: المدفوع الفعلي، 15% من الصافي، أو 10000 سنوياً مقسطة)
+    const maxExemptionByPercentage = netBeforeMedical * 0.15;
+    const maxExemptionByValue = (10000 / 360) * targetDays; // ~833.33 للشهر
+    
+    const allowedTaxExemptDeductions = Math.max(0, Math.min(
+        requestedExemptDeductions,
+        maxExemptionByPercentage,
+        maxExemptionByValue
+    ));
+
+    // الوعاء الخاضع للشهر الحالي فقط (يتم حفظه للداتابيز)
+    const currentTaxable = Math.max(0, netBeforeMedical - allowedTaxExemptDeductions);
     
     let monthlyTax = 0;
     
@@ -131,7 +144,7 @@ const calculateGrossToNet = (params) => {
         socialInsuranceCompShare: Number(socialInsuranceCompShare.toFixed(2)),
         absenceDeduction: Number(absenceDeduction.toFixed(2)),
         penaltyDeduction: Number(penaltyDeduction.toFixed(2)),
-        currentTaxable: Number(currentTaxable.toFixed(2)), // هذا المتغير يخزن للشهر القادم
+        currentTaxable: Number(currentTaxable.toFixed(2)), // يخزن للشهر القادم
         monthlyTax: Number(monthlyTax.toFixed(2)),
         martyrsFund,
         loanDeduction: Number(loanDeduction.toFixed(2)),
@@ -163,7 +176,7 @@ const runPayrollLogic = (input, prev, emp) => {
         allowances: transProp,
         insSalary: Number(emp.insSalary) || 0,
         loanDeduction: totalDeductions,
-        deductionsList: input.deductions || [], // 🔥 (NEW) إرسال قائمة الخصومات للمحرك
+        deductionsList: input.deductions || [], 
         isTaxExempted: emp.isTaxExempted || 0,
         companySettings: emp.companySettings || {},
         jobType: emp.jobType || "Full Time",
